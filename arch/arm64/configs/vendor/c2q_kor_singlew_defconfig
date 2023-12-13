@@ -1,6 +1,11 @@
 #
 # Automatically generated file; DO NOT EDIT.
+<<<<<<< HEAD:arch/arm64/configs/vendor/c2q_kor_singlew_defconfig
 # Linux/arm64 4.19.113 Kernel Configurati
+=======
+# Linux/arm64 4.19.302 Kernel Configuration
+#
+>>>>>>> 11014b6fd41a (Linux 4.19.302):arch/arm64/configs/vendor/lineage_y2qdcmw_defconfig
 
 #
 CONFIG_GCC_VERSION=0
