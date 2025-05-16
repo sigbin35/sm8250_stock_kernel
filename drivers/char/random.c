@@ -24,6 +24,7 @@
  */
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 /*
  * (now, with legal B.S. out of the way.....)
  *
@@ -292,6 +293,8 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/utsname.h>
@@ -320,21 +323,25 @@
 #include <linux/completion.h>
 #include <linux/uuid.h>
 <<<<<<< HEAD
+<<<<<<< HEAD
 #include <crypto/chacha.h>
 
 #include <asm/processor.h>
 =======
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 #include <linux/uaccess.h>
 #include <linux/siphash.h>
 #include <linux/uio.h>
-#include <crypto/chacha20.h>
+#include <crypto/chacha.h>
 #include <crypto/blake2s.h>
 #include <asm/processor.h>
 #include <asm/irq.h>
 #include <asm/irq_regs.h>
 #include <asm/io.h>
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 #define CREATE_TRACE_POINTS
 #include <trace/events/random.h>
@@ -745,6 +752,8 @@ static int credit_entropy_bits_safe(struct entropy_store *r, int nbits)
 
 =======
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 /*********************************************************************
  *
  * Initialization and readiness waiting.
@@ -1117,7 +1126,7 @@ static void _get_random_bytes(void *buf, size_t len)
  * wait_for_random_bytes() should be called and return 0 at least once
  * at any point prior.
  */
-void get_random_bytes(void *buf, size_t len)
+void get_random_bytes(void *buf, int len)
 {
 	warn_unseeded_randomness();
 	_get_random_bytes(buf, len);
@@ -1482,6 +1491,7 @@ static int __init parse_trust_bootloader(char *arg)
 }
 early_param("random.trust_cpu", parse_trust_cpu);
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 static void crng_initialize(struct crng_state *crng)
 {
@@ -1547,6 +1557,9 @@ static void numa_crng_init(void) {}
 =======
 early_param("random.trust_bootloader", parse_trust_bootloader);
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+early_param("random.trust_bootloader", parse_trust_bootloader);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 /*
  * The first collection of entropy occurs at system boot while interrupts
@@ -1562,6 +1575,7 @@ int __init random_init(const char *command_line)
 	unsigned int i, arch_bits;
 	unsigned long entropy;
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 	if (!spin_trylock_irqsave(&primary_crng.lock, flags))
 		return 0;
@@ -1776,6 +1790,13 @@ static ssize_t extract_crng_user(void __user *buf, size_t nbytes)
 		buf += i;
 		ret += i;
 =======
+=======
+#if defined(LATENT_ENTROPY_PLUGIN)
+	static const u8 compiletime_seed[BLAKE2S_BLOCK_SIZE] __initconst __latent_entropy;
+	_mix_pool_bytes(compiletime_seed, sizeof(compiletime_seed));
+#endif
+
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	for (i = 0, arch_bits = BLAKE2S_BLOCK_SIZE * 8;
 	     i < BLAKE2S_BLOCK_SIZE; i += sizeof(entropy)) {
 		if (!arch_get_random_seed_long_early(&entropy) &&
@@ -1784,7 +1805,10 @@ static ssize_t extract_crng_user(void __user *buf, size_t nbytes)
 			arch_bits -= sizeof(entropy) * 8;
 		}
 		_mix_pool_bytes(&entropy, sizeof(entropy));
+<<<<<<< HEAD
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	}
 	_mix_pool_bytes(&now, sizeof(now));
 	_mix_pool_bytes(utsname(), sizeof(*(utsname())));
@@ -1824,7 +1848,7 @@ EXPORT_SYMBOL(add_device_randomness);
  * Those devices may produce endless random bits and will be throttled
  * when our pool is full.
  */
-void add_hwgenerator_randomness(const void *buf, size_t len, size_t entropy)
+void add_hwgenerator_randomness(const char *buf, size_t len, size_t entropy)
 {
 	mix_pool_bytes(buf, len);
 	credit_init_bits(entropy);
@@ -1833,7 +1857,8 @@ void add_hwgenerator_randomness(const void *buf, size_t len, size_t entropy)
 	 * Throttle writing to once every CRNG_RESEED_INTERVAL, unless
 	 * we're not yet initialized.
 	 */
-	if (!kthread_should_stop() && crng_ready())
+	if ((current->flags & PF_KTHREAD) &&
+	    !kthread_should_stop() && crng_ready())
 		schedule_timeout_interruptible(CRNG_RESEED_INTERVAL);
 }
 EXPORT_SYMBOL_GPL(add_hwgenerator_randomness);
@@ -2037,6 +2062,7 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned int nu
 
 	/*
 <<<<<<< HEAD
+<<<<<<< HEAD
 	 * delta is now minimum absolute delta.
 	 * Round down by 1 bit on general principles,
 	 * and limit entropy estimate to 12 bits.
@@ -2044,6 +2070,10 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned int nu
 	 * delta is now minimum absolute delta. Round down by 1 bit
 	 * on general principles, and limit entropy estimate to 11 bits.
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	 * delta is now minimum absolute delta. Round down by 1 bit
+	 * on general principles, and limit entropy estimate to 11 bits.
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	 */
 	bits = min(fls(delta >> 1), 11);
 
@@ -2085,6 +2115,7 @@ void add_disk_randomness(struct gendisk *disk)
 }
 EXPORT_SYMBOL_GPL(add_disk_randomness);
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 /*********************************************************************
  *
@@ -2568,6 +2599,9 @@ void rand_initialize_disk(struct gendisk *disk)
 =======
 void __cold rand_initialize_disk(struct gendisk *disk)
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+void __cold rand_initialize_disk(struct gendisk *disk)
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 {
 	struct timer_rand_state *state;
 
@@ -2584,6 +2618,7 @@ void __cold rand_initialize_disk(struct gendisk *disk)
 #endif
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 static ssize_t
 urandom_read_nowarn(struct file *file, char __user *buf, size_t nbytes,
 		    loff_t *ppos)
@@ -2596,6 +2631,8 @@ urandom_read_nowarn(struct file *file, char __user *buf, size_t nbytes,
 	return ret;
 }
 =======
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 /*
  * Each time the timer fires, we expect that we got an unpredictable
  * jump in the cycle counter. Even if the timer is running on another
@@ -2645,7 +2682,10 @@ static void __cold try_to_generate_entropy(void)
 	mix_pool_bytes(&stack.entropy, sizeof(stack.entropy));
 }
 
+<<<<<<< HEAD
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 /**********************************************************************
  *
@@ -2678,6 +2718,7 @@ static void __cold try_to_generate_entropy(void)
 SYSCALL_DEFINE3(getrandom, char __user *, ubuf, size_t, len, unsigned int, flags)
 {
 <<<<<<< HEAD
+<<<<<<< HEAD
 	unsigned long flags;
 	static int maxwarn = 10;
 
@@ -2705,13 +2746,18 @@ random_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 	return urandom_read_nowarn(file, buf, nbytes, ppos);
 }
 =======
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	struct iov_iter iter;
 	struct iovec iov;
 	int ret;
 
 	if (flags & ~(GRND_NONBLOCK | GRND_RANDOM | GRND_INSECURE))
 		return -EINVAL;
+<<<<<<< HEAD
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	/*
 	 * Requesting insecure and blocking randomness at the same time makes
@@ -2720,6 +2766,7 @@ random_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 	if ((flags & (GRND_INSECURE | GRND_RANDOM)) == (GRND_INSECURE | GRND_RANDOM))
 		return -EINVAL;
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 	poll_wait(file, &crng_init_wait, wait);
 	poll_wait(file, &random_write_wait, wait);
@@ -2757,13 +2804,18 @@ write_pool(struct entropy_store *r, const char __user *buffer, size_t count)
 		mix_pool_bytes(r, buf, bytes);
 		cond_resched();
 =======
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	if (!crng_ready() && !(flags & GRND_INSECURE)) {
 		if (flags & GRND_NONBLOCK)
 			return -EAGAIN;
 		ret = wait_for_random_bytes();
 		if (unlikely(ret))
 			return ret;
+<<<<<<< HEAD
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	}
 
 	ret = import_single_range(READ, ubuf, len, &iov, &iter);
@@ -2895,9 +2947,12 @@ static long random_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 <<<<<<< HEAD
+<<<<<<< HEAD
 		input_pool.entropy_count = 0;
 =======
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		return 0;
 	case RNDRESEEDCRNG:
 		if (!capable(CAP_SYS_ADMIN))
@@ -2938,6 +2993,7 @@ const struct file_operations urandom_fops = {
 };
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 SYSCALL_DEFINE3(getrandom, char __user *, buf, size_t, count,
 		unsigned int, flags)
 {
@@ -2967,6 +3023,8 @@ SYSCALL_DEFINE3(getrandom, char __user *, buf, size_t, count,
 }
 =======
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 /********************************************************************
  *
@@ -3003,16 +3061,22 @@ SYSCALL_DEFINE3(getrandom, char __user *, buf, size_t, count,
 #include <linux/sysctl.h>
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 static int min_write_thresh;
 static int max_write_thresh = INPUT_POOL_WORDS * 32;
 static int random_min_urandom_seed = 60;
 static char sysctl_bootid[16];
 =======
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 static int sysctl_random_min_urandom_seed = CRNG_RESEED_INTERVAL / HZ;
 static int sysctl_random_write_wakeup_bits = POOL_READY_BITS;
 static int sysctl_poolsize = POOL_BITS;
 static u8 sysctl_bootid[UUID_SIZE];
+<<<<<<< HEAD
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 /*
  * This function is used to return both the bootid UUID, and random
@@ -3071,11 +3135,15 @@ struct ctl_table random_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0444,
 <<<<<<< HEAD
+<<<<<<< HEAD
 		.proc_handler	= proc_do_entropy,
 		.data		= &input_pool.entropy_count,
 =======
 		.proc_handler	= proc_dointvec,
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+		.proc_handler	= proc_dointvec,
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	},
 	{
 		.procname	= "write_wakeup_threshold",
@@ -3104,6 +3172,7 @@ struct ctl_table random_table[] = {
 	},
 	{ }
 };
+<<<<<<< HEAD
 <<<<<<< HEAD
 #endif 	/* CONFIG_SYSCTL */
 
@@ -3283,3 +3352,6 @@ EXPORT_SYMBOL_GPL(add_bootloader_randomness);
 =======
 #endif	/* CONFIG_SYSCTL */
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+#endif	/* CONFIG_SYSCTL */
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843

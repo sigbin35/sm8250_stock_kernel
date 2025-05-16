@@ -177,7 +177,7 @@ static struct uac2_input_terminal_descriptor io_in_it_desc = {
 
 	.bDescriptorSubtype = UAC_INPUT_TERMINAL,
 	.bTerminalID = IO_IN_IT_ID,
-	.wTerminalType = cpu_to_le16(UAC_INPUT_TERMINAL_UNDEFINED),
+	.wTerminalType = cpu_to_le16(UAC_INPUT_TERMINAL_MICROPHONE),
 	.bAssocTerminal = 0,
 	.bCSourceID = USB_IN_CLK_ID,
 	.iChannelNames = 0,
@@ -205,7 +205,7 @@ static struct uac2_output_terminal_descriptor io_out_ot_desc = {
 
 	.bDescriptorSubtype = UAC_OUTPUT_TERMINAL,
 	.bTerminalID = IO_OUT_OT_ID,
-	.wTerminalType = cpu_to_le16(UAC_OUTPUT_TERMINAL_UNDEFINED),
+	.wTerminalType = cpu_to_le16(UAC_OUTPUT_TERMINAL_SPEAKER),
 	.bAssocTerminal = 0,
 	.bSourceID = USB_OUT_IT_ID,
 	.bCSourceID = USB_OUT_CLK_ID,
@@ -278,7 +278,11 @@ static struct usb_endpoint_descriptor fs_epout_desc = {
 
 	.bEndpointAddress = USB_DIR_OUT,
 	.bmAttributes = USB_ENDPOINT_XFER_ISOC | USB_ENDPOINT_SYNC_SYNC,
+<<<<<<< HEAD
 	.wMaxPacketSize = cpu_to_le16(1023),
+=======
+	/* .wMaxPacketSize = DYNAMIC */
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	.bInterval = 1,
 };
 
@@ -287,7 +291,11 @@ static struct usb_endpoint_descriptor hs_epout_desc = {
 	.bDescriptorType = USB_DT_ENDPOINT,
 
 	.bmAttributes = USB_ENDPOINT_XFER_ISOC | USB_ENDPOINT_SYNC_SYNC,
+<<<<<<< HEAD
 	.wMaxPacketSize = cpu_to_le16(1024),
+=======
+	/* .wMaxPacketSize = DYNAMIC */
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	.bInterval = 4,
 };
 
@@ -362,7 +370,11 @@ static struct usb_endpoint_descriptor fs_epin_desc = {
 
 	.bEndpointAddress = USB_DIR_IN,
 	.bmAttributes = USB_ENDPOINT_XFER_ISOC | USB_ENDPOINT_SYNC_SYNC,
+<<<<<<< HEAD
 	.wMaxPacketSize = cpu_to_le16(1023),
+=======
+	/* .wMaxPacketSize = DYNAMIC */
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	.bInterval = 1,
 };
 
@@ -371,7 +383,11 @@ static struct usb_endpoint_descriptor hs_epin_desc = {
 	.bDescriptorType = USB_DT_ENDPOINT,
 
 	.bmAttributes = USB_ENDPOINT_XFER_ISOC | USB_ENDPOINT_SYNC_SYNC,
+<<<<<<< HEAD
 	.wMaxPacketSize = cpu_to_le16(1024),
+=======
+	/* .wMaxPacketSize = DYNAMIC */
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	.bInterval = 4,
 };
 
@@ -638,7 +654,7 @@ afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 	hs_epin_desc.bEndpointAddress = fs_epin_desc.bEndpointAddress;
 
 	ret = usb_assign_descriptors(fn, fs_audio_desc, hs_audio_desc,
-					ss_audio_desc, NULL);
+					ss_audio_desc, ss_audio_desc);
 	if (ret)
 		return ret;
 

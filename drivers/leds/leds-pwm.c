@@ -40,6 +40,7 @@ struct led_pwm_data {
 	struct led_classdev	cdev;
 	struct pwm_device	*pwm;
 <<<<<<< HEAD
+<<<<<<< HEAD
 	struct pwm_setting	pwm_setting;
 	struct led_setting	led_setting;
 	unsigned int		active_low;
@@ -50,6 +51,13 @@ struct led_pwm_data {
 	struct pwm_state	pwmstate;
 	unsigned int		active_low;
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	struct pwm_setting	pwm_setting;
+	struct led_setting	led_setting;
+	struct pwm_state	pwmstate;
+	unsigned int		active_low;
+	bool			blinking;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 };
 
 struct led_pwm_priv {
@@ -58,6 +66,9 @@ struct led_pwm_priv {
 };
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 static int __led_blink_config_pwm(struct led_pwm_data *led_data)
 {
 	struct pwm_state pstate;
@@ -162,6 +173,7 @@ static int led_pwm_blink_set(struct led_classdev *led_cdev,
 	return rc;
 }
 
+<<<<<<< HEAD
 static void __led_pwm_set(struct led_pwm_data *led_data)
 {
 	int new_duty = led_data->duty;
@@ -176,11 +188,14 @@ static void __led_pwm_set(struct led_pwm_data *led_data)
 
 =======
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 static int led_pwm_set(struct led_classdev *led_cdev,
 		       enum led_brightness brightness)
 {
 	struct led_pwm_data *led_data =
 		container_of(led_cdev, struct led_pwm_data, cdev);
+<<<<<<< HEAD
 <<<<<<< HEAD
 	unsigned int max = led_data->cdev.max_brightness;
 	unsigned long long duty =  led_data->period;
@@ -188,14 +203,22 @@ static int led_pwm_set(struct led_classdev *led_cdev,
 	unsigned int max = led_dat->cdev.max_brightness;
 	unsigned long long duty = led_dat->pwmstate.period;
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	unsigned int max = led_data->cdev.max_brightness;
+	unsigned long long duty = led_data->pwmstate.period;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	duty *= brightness;
 	do_div(duty, max);
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	if (led_data->active_low)
-		duty = led_data->period - duty;
+		duty = led_data->pwmstate.period - duty;
 
+<<<<<<< HEAD
 	led_data->duty = duty;
 	led_data->blinking = false;
 
@@ -210,6 +233,11 @@ static int led_pwm_set(struct led_classdev *led_cdev,
 	led_dat->pwmstate.enabled = true;
 	return pwm_apply_state(led_dat->pwm, &led_dat->pwmstate);
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	led_data->pwmstate.duty_cycle = duty;
+	led_data->pwmstate.enabled = true;
+	return pwm_apply_state(led_data->pwm, &led_data->pwmstate);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 }
 
 static inline size_t sizeof_pwm_leds_priv(int num_leds)

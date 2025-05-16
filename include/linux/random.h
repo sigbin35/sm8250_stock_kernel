@@ -13,22 +13,30 @@
 struct notifier_block;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 extern void add_device_randomness(const void *, unsigned int);
 extern void add_bootloader_randomness(const void *, unsigned int);
 =======
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 void add_device_randomness(const void *buf, size_t len);
 void __init add_bootloader_randomness(const void *buf, size_t len);
 void add_input_randomness(unsigned int type, unsigned int code,
 			  unsigned int value) __latent_entropy;
 void add_interrupt_randomness(int irq) __latent_entropy;
+<<<<<<< HEAD
 void add_hwgenerator_randomness(const void *buf, size_t len, size_t entropy);
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+void add_hwgenerator_randomness(const char *buf, size_t len, size_t entropy);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 static inline void add_latent_entropy(void)
 {
 #if defined(LATENT_ENTROPY_PLUGIN) && !defined(__CHECKER__)
 	add_device_randomness((const void *)&latent_entropy, sizeof(latent_entropy));
 #else
+<<<<<<< HEAD
 <<<<<<< HEAD
 static inline void add_latent_entropy(void) {}
 #endif
@@ -50,10 +58,13 @@ extern const struct file_operations random_fops, urandom_fops;
 =======
 	add_device_randomness(NULL, 0);
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	add_device_randomness(NULL, 0);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 #endif
 }
 
-void get_random_bytes(void *buf, size_t len);
+void get_random_bytes(void *buf, int len);
 size_t __must_check get_random_bytes_arch(void *buf, size_t len);
 u32 get_random_u32(void);
 u64 get_random_u64(void);
@@ -187,6 +198,7 @@ static inline void prandom_seed_state(struct rnd_state *state, u64 seed)
 # include <asm/archrandom.h>
 #else
 <<<<<<< HEAD
+<<<<<<< HEAD
 static inline bool __must_check arch_get_random_long(unsigned long *v)
 {
 	return false;
@@ -211,6 +223,8 @@ static inline u32 next_pseudo_random32(u32 seed)
 	return seed * 1664525 + 1013904223;
 }
 =======
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 static inline bool __must_check arch_get_random_long(unsigned long *v) { return false; }
 static inline bool __must_check arch_get_random_int(unsigned int *v) { return false; }
 static inline bool __must_check arch_get_random_seed_long(unsigned long *v) { return false; }

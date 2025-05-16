@@ -3,7 +3,7 @@
  * Copyright (C) 2015-2019 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
  */
 
-#include <crypto/blake2s.h>
+#include <crypto/internal/blake2s.h>
 #include <linux/string.h>
 
 /*
@@ -16,9 +16,13 @@
  *
  * #include <openssl/evp.h>
 <<<<<<< HEAD
+<<<<<<< HEAD
  * #include <openssl/hmac.h>
 =======
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+ * #include <openssl/hmac.h>
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
  *
  * #define BLAKE2S_TESTVEC_COUNT	256
  *
@@ -62,6 +66,9 @@
  *	printf("};\n\n");
  *
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
  *	printf("static const u8 blake2s_hmac_testvecs[][BLAKE2S_HASH_SIZE] __initconst = {\n");
  *
  *	HMAC(EVP_blake2s256(), key, sizeof(key), buf, sizeof(buf), hash, NULL);
@@ -72,8 +79,11 @@
  *
  *	printf("};\n");
  *
+<<<<<<< HEAD
 =======
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
  *	return 0;
  *}
  */
@@ -561,6 +571,9 @@ static const u8 blake2s_testvecs[][BLAKE2S_HASH_SIZE] __initconst = {
 };
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 static const u8 blake2s_hmac_testvecs[][BLAKE2S_HASH_SIZE] __initconst = {
   { 0xce, 0xe1, 0x57, 0x69, 0x82, 0xdc, 0xbf, 0x43, 0xad, 0x56, 0x4c, 0x70,
     0xed, 0x68, 0x16, 0x96, 0xcf, 0xa4, 0x73, 0xe8, 0xe8, 0xfc, 0x32, 0x79,
@@ -570,8 +583,11 @@ static const u8 blake2s_hmac_testvecs[][BLAKE2S_HASH_SIZE] __initconst = {
     0x60, 0xd9, 0x24, 0x37, 0x99, 0xd6, 0xec, 0x31, },
 };
 
+<<<<<<< HEAD
 =======
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 bool __init blake2s_selftest(void)
 {
 	u8 key[BLAKE2S_KEY_SIZE];
@@ -617,6 +633,9 @@ bool __init blake2s_selftest(void)
 	}
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	if (success) {
 		blake2s256_hmac(hash, buf, key, sizeof(buf), sizeof(key));
 		success &= !memcmp(hash, blake2s_hmac_testvecs[0], BLAKE2S_HASH_SIZE);
@@ -628,7 +647,10 @@ bool __init blake2s_selftest(void)
 			pr_err("blake2s256_hmac self-test: FAIL\n");
 	}
 
+<<<<<<< HEAD
 =======
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	return success;
 }

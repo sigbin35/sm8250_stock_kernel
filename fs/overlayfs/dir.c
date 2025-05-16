@@ -582,6 +582,7 @@ static int ovl_create_or_link(struct dentry *dentry, struct inode *inode,
 		override_cred->fsuid = inode->i_uid;
 		override_cred->fsgid = inode->i_gid;
 <<<<<<< HEAD
+<<<<<<< HEAD
 		if (!attr->hardlink) {
 			err = security_dentry_create_files_as(dentry,
 					attr->mode, &dentry->d_name,
@@ -592,13 +593,19 @@ static int ovl_create_or_link(struct dentry *dentry, struct inode *inode,
 				goto out_revert_creds;
 			}
 =======
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		err = security_dentry_create_files_as(dentry,
-				attr->mode, &dentry->d_name, old_cred,
+				attr->mode, &dentry->d_name,
+				old_cred ? old_cred : current_cred(),
 				override_cred);
 		if (err) {
 			put_cred(override_cred);
 			goto out_revert_creds;
+<<<<<<< HEAD
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		}
 		hold_cred = override_creds(override_cred);
 		put_cred(override_cred);

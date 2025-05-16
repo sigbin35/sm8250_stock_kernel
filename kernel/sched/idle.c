@@ -61,11 +61,16 @@ static noinline int __cpuidle cpu_idle_poll(void)
 
 	while (!tif_need_resched() &&
 <<<<<<< HEAD
+<<<<<<< HEAD
 		(cpu_idle_force_poll || tick_check_broadcast_expired() ||
 		is_reserved(smp_processor_id())))
 =======
 	       (cpu_idle_force_poll || tick_check_broadcast_expired()))
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	       (cpu_idle_force_poll || tick_check_broadcast_expired() ||
+		is_reserved(smp_processor_id())))
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		cpu_relax();
 
 	rcu_idle_exit();

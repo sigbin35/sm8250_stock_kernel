@@ -1931,9 +1931,13 @@ void mmc_blk_cqe_recovery(struct mmc_queue *mq)
 		mmc_blk_reset(mq->blkdata, host, MMC_BLK_CQE_RECOVERY);
 	mmc_blk_reset_success(mq->blkdata, MMC_BLK_CQE_RECOVERY);
 <<<<<<< HEAD
+<<<<<<< HEAD
 	host->need_hw_reset = false;
 =======
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	host->need_hw_reset = false;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	pr_debug("%s: CQE recovery done\n", mmc_hostname(host));
 }
@@ -2467,21 +2471,30 @@ static void mmc_blk_mq_dec_in_flight(struct mmc_queue *mq,
 				     enum mmc_issue_type issue_type)
 {
 <<<<<<< HEAD
+<<<<<<< HEAD
 	struct request_queue *q = req->q;
 	struct mmc_host *host = mq->card->host;
 =======
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	struct mmc_host *host = mq->card->host;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	unsigned long flags;
 	bool put_card;
 
 	spin_lock_irqsave(q->queue_lock, flags);
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	mq->in_flight[mmc_issue_type(mq, req)] -= 1;
 	atomic_dec(&host->active_reqs);
 =======
 	mq->in_flight[issue_type] -= 1;
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	mq->in_flight[issue_type] -= 1;
+	atomic_dec(&host->active_reqs);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	put_card = (mmc_tot_in_flight(mq) == 0);
 
@@ -3213,7 +3226,7 @@ static int mmc_add_disk(struct mmc_blk_data *md)
 	int ret;
 	struct mmc_card *card = md->queue.card;
 
-	device_add_disk(md->parent, md->disk, NULL);
+	device_add_disk(md->parent, md->disk);
 	md->force_ro.show = force_ro_show;
 	md->force_ro.store = force_ro_store;
 	sysfs_attr_init(&md->force_ro.attr);

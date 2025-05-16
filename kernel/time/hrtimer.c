@@ -980,7 +980,6 @@ static int enqueue_hrtimer(struct hrtimer *timer,
 			   enum hrtimer_mode mode)
 {
 	debug_activate(timer, mode);
-	WARN_ON_ONCE(!base->cpu_base->online);
 
 	base->cpu_base->active_bases |= 1 << base->index;
 
@@ -1160,12 +1159,18 @@ static int __hrtimer_start_range_ns(struct hrtimer *timer, ktime_t tim,
 	}
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	/* Update pinned state */
 	timer->state &= ~HRTIMER_STATE_PINNED;
 	timer->state |= (!!(mode & HRTIMER_MODE_PINNED)) << HRTIMER_PINNED_SHIFT;
 
+<<<<<<< HEAD
 	return enqueue_hrtimer(timer, new_base, mode);
 =======
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	first = enqueue_hrtimer(timer, new_base, mode);
 	if (!force_local)
 		return first;
@@ -1177,7 +1182,10 @@ static int __hrtimer_start_range_ns(struct hrtimer *timer, ktime_t tim,
 	 */
 	hrtimer_force_reprogram(new_base->cpu_base, 1);
 	return 0;
+<<<<<<< HEAD
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 }
 
 /**
@@ -1980,6 +1988,9 @@ static void migrate_hrtimer_list(struct hrtimer_clock_base *old_base,
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 static void __migrate_hrtimers(unsigned int scpu, bool remove_pinned)
 {
 	struct hrtimer_cpu_base *old_base, *new_base;
@@ -1989,6 +2000,7 @@ static void __migrate_hrtimers(unsigned int scpu, bool remove_pinned)
 	local_irq_save(flags);
 	old_base = &per_cpu(hrtimer_bases, scpu);
 	new_base = this_cpu_ptr(&hrtimer_bases);
+<<<<<<< HEAD
 =======
 int hrtimers_cpu_dying(unsigned int dying_cpu)
 {
@@ -2001,12 +2013,14 @@ int hrtimers_cpu_dying(unsigned int dying_cpu)
 	new_base = &per_cpu(hrtimer_bases, ncpu);
 
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	/*
 	 * The caller is globally serialized and nobody else
 	 * takes two locks at once, deadlock is not possible.
 	 */
-	raw_spin_lock(&old_base->lock);
-	raw_spin_lock_nested(&new_base->lock, SINGLE_DEPTH_NESTING);
+	raw_spin_lock(&new_base->lock);
+	raw_spin_lock_nested(&old_base->lock, SINGLE_DEPTH_NESTING);
 
 	for (i = 0; i < HRTIMER_MAX_CLOCK_BASES; i++) {
 		migrate_hrtimer_list(&old_base->clock_base[i],
@@ -2017,15 +2031,15 @@ int hrtimers_cpu_dying(unsigned int dying_cpu)
 	 * The migration might have changed the first expiring softirq
 	 * timer on this CPU. Update it.
 	 */
-	__hrtimer_get_next_event(new_base, HRTIMER_ACTIVE_SOFT);
-	/* Tell the other CPU to retrigger the next event */
-	smp_call_function_single(ncpu, retrigger_next_event, NULL, 0);
+	hrtimer_update_softirq_timer(new_base, false);
 
-	raw_spin_unlock(&new_base->lock);
-	old_base->online = 0;
 	raw_spin_unlock(&old_base->lock);
+	raw_spin_unlock(&new_base->lock);
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	/* Check, if we got expired work to do */
 	__hrtimer_peek_ahead_timers();
 	local_irq_restore(flags);
@@ -2045,8 +2059,11 @@ int hrtimers_dead_cpu(unsigned int scpu)
 	local_bh_disable();
 	__migrate_hrtimers(scpu, true);
 	local_bh_enable();
+<<<<<<< HEAD
 =======
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	return 0;
 }
 
@@ -2110,6 +2127,7 @@ schedule_hrtimeout_range_clock(ktime_t *expires, u64 delta,
 
 	return !t.task ? 0 : -EINTR;
 }
+EXPORT_SYMBOL_GPL(schedule_hrtimeout_range_clock);
 
 /**
  * schedule_hrtimeout_range - sleep until timeout

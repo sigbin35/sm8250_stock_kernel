@@ -94,7 +94,10 @@ appid_t get_appid(const char *key)
 	qstr_init(&q, key);
 	return __get_appid(&q);
 }
+<<<<<<< HEAD
 EXPORT_SYMBOL(get_appid);
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 static appid_t __get_ext_gid(const struct qstr *key)
 {
@@ -780,6 +783,7 @@ static ssize_t packages_list_show(struct config_item *item, char *page)
 	return count;
 }
 
+<<<<<<< HEAD
 void uid_to_packagename(u32 uid, char* output, int buf_size)
 {
 	struct hashtable_entry *hash_cur_app;
@@ -804,6 +808,8 @@ out:
 }
 EXPORT_SYMBOL(uid_to_packagename);
 
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 static ssize_t packages_remove_userid_store(struct config_item *item,
 				       const char *page, size_t count)
 {

@@ -104,8 +104,12 @@
 #include "audit.h"
 #include "avc_ss.h"
 
+<<<<<<< HEAD
 
 struct selinux_state selinux_state __rticdata;
+=======
+struct selinux_state selinux_state;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 #ifdef CONFIG_LOD_SEC
 #ifdef CONFIG_KDP_CRED
@@ -1007,6 +1011,7 @@ static int selinux_set_mnt_opts(struct super_block *sb,
 	    !strcmp(sb->s_type->name, "pstore") ||
 	    !strcmp(sb->s_type->name, "bpf") ||
 	    !strcmp(sb->s_type->name, "binder") ||
+	    !strcmp(sb->s_type->name, "bpf") ||
 	    !strcmp(sb->s_type->name, "cgroup") ||
 	    !strcmp(sb->s_type->name, "cgroup2"))
 		sbsec->flags |= SE_SBGENFS;

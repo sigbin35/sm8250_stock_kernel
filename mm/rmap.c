@@ -294,10 +294,14 @@ int anon_vma_clone(struct vm_area_struct *dst, struct vm_area_struct *src)
 		 * it has self-parent reference and at least one child.
 		 */
 <<<<<<< HEAD
+<<<<<<< HEAD
 		if (!dst->anon_vma && src->anon_vma &&
 =======
 		if (!dst->anon_vma &&
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+		if (!dst->anon_vma && src->anon_vma &&
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		    anon_vma->num_children < 2 &&
 		    anon_vma->num_active_vmas == 0)
 			dst->anon_vma = anon_vma;
@@ -416,9 +420,13 @@ void unlink_anon_vmas(struct vm_area_struct *vma)
 	if (vma->anon_vma)
 		vma->anon_vma->num_active_vmas--;
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	unlock_anon_vma_root(root);
 
 	/*

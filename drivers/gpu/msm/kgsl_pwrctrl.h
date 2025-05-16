@@ -1,5 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+<<<<<<< HEAD
+=======
+ * Copyright (c) 2010-2021, The Linux Foundation. All rights reserved.
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef __KGSL_PWRCTRL_H
@@ -23,7 +27,7 @@
 #define KGSL_GPU_CFG_PATH_LOW	1
 #define KGSL_GPU_CFG_PATH_HIGH	2
 
-#define KGSL_MAX_CLKS 17
+#define KGSL_MAX_CLKS 18
 #define KGSL_MAX_REGULATORS 2
 
 #define KGSL_MAX_PWRLEVELS 10
@@ -181,7 +185,6 @@ struct gpu_cx_ipeak_client {
  * @cooling_pwr_limit - pointer to the cooling framework limits node
  * isense_clk_indx - index of isense clock, 0 if no isense
  * isense_clk_on_level - isense clock rate is XO rate below this level.
- * tzone_name - pointer to thermal zone name of GPU temperature sensor
  * gpu_cx_ipeak_client - CX Ipeak clients used by GPU
  */
 
@@ -242,7 +245,6 @@ struct kgsl_pwrctrl {
 	struct kgsl_pwr_limit *cooling_pwr_limit;
 	unsigned int gpu_bimc_int_clk_freq;
 	bool gpu_bimc_interface_enabled;
-	const char *tzone_name;
 	struct gpu_cx_ipeak_client gpu_ipeak_client[2];
 };
 

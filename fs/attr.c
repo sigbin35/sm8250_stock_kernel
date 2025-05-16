@@ -365,7 +365,11 @@ int notify_change2(struct vfsmount *mnt, struct dentry * dentry, struct iattr * 
 
 	return error;
 }
+<<<<<<< HEAD
 EXPORT_SYMBOL(notify_change2);
+=======
+EXPORT_SYMBOL_GPL(notify_change2);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 int notify_change(struct dentry * dentry, struct iattr * attr, struct inode **delegated_inode)
 {

@@ -2838,6 +2838,7 @@ static int bpf_skb_net_shrink(struct sk_buff *skb, u32 len_diff)
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 static u32 __bpf_skb_max_len(const struct sk_buff *skb)
 {
 	if (skb_at_tc_ingress(skb) || !skb->dev)
@@ -2847,6 +2848,9 @@ static u32 __bpf_skb_max_len(const struct sk_buff *skb)
 =======
 #define BPF_SKB_MAX_LEN SKB_MAX_ALLOC
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+#define BPF_SKB_MAX_LEN SKB_MAX_ALLOC
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 static int bpf_skb_adjust_net(struct sk_buff *skb, s32 len_diff)
 {

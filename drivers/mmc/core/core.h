@@ -35,12 +35,19 @@ struct mmc_bus_ops {
 	int (*hw_reset)(struct mmc_host *);
 	int (*sw_reset)(struct mmc_host *);
 <<<<<<< HEAD
+<<<<<<< HEAD
 	int (*change_bus_speed)(struct mmc_host *host, unsigned long *freq);
 	int (*change_bus_speed_deferred)(struct mmc_host *host,
 							unsigned long *freq);
 =======
 	bool (*cache_enabled)(struct mmc_host *);
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	bool (*cache_enabled)(struct mmc_host *);
+	int (*change_bus_speed)(struct mmc_host *host, unsigned long *freq);
+	int (*change_bus_speed_deferred)(struct mmc_host *host,
+							unsigned long *freq);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 };
 
 void mmc_attach_bus(struct mmc_host *host, const struct mmc_bus_ops *ops);

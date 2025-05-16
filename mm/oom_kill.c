@@ -70,6 +70,11 @@ module_param(panic_on_adj_zero, int, 0644);
  * and mark_oom_victim
  */
 DEFINE_MUTEX(oom_lock);
+<<<<<<< HEAD
+=======
+/* Serializes oom_score_adj and oom_score_adj_min updates */
+DEFINE_MUTEX(oom_adj_mutex);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 /*
  * If ULMK has killed a process recently,

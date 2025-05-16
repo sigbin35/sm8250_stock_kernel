@@ -1331,6 +1331,7 @@ long ext4_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case FS_IOC_MEASURE_VERITY:
 	case EXT4_IOC_FSGETXATTR:
 	case EXT4_IOC_FSSETXATTR:
+<<<<<<< HEAD
 #ifdef CONFIG_FSCRYPT_SDP
 	case FS_IOC_GET_SDP_INFO:
 	case FS_IOC_SET_SDP_POLICY:
@@ -1340,6 +1341,9 @@ long ext4_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case FS_IOC_REMOVE_CHAMBER:
 	case FS_IOC_DUMP_FILE_KEY:
 #endif
+=======
+	case FS_IOC_READ_VERITY_METADATA:
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		break;
 	default:
 		return -ENOIOCTLCMD;

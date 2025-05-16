@@ -55,6 +55,12 @@ ATOMIC_NOTIFIER_HEAD(panic_notifier_list);
 
 EXPORT_SYMBOL(panic_notifier_list);
 
+<<<<<<< HEAD
+=======
+void (*vendor_panic_cb)(u64 sp);
+EXPORT_SYMBOL_GPL(vendor_panic_cb);
+
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 #ifdef CONFIG_SYSCTL
 static struct ctl_table kern_panic_table[] = {
 	{

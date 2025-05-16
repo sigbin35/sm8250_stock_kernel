@@ -2586,12 +2586,17 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i)
 	seq_printf(f, "%4d: %08X:%04X %08X:%04X %02X %08X:%08X %02X:%08lX "
 			"%08X %5u %8d %lu %d %pK %lu %lu %u %u %d",
 <<<<<<< HEAD
+<<<<<<< HEAD
 		i, src, srcp, dest, destp, seq_state,
 		tp->write_seq - tp->snd_una,
 =======
 		i, src, srcp, dest, destp, state,
 		READ_ONCE(tp->write_seq) - tp->snd_una,
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+		i, src, srcp, dest, destp, seq_state,
+		READ_ONCE(tp->write_seq) - tp->snd_una,
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		rx_queue,
 		timer_active,
 		jiffies_delta_to_clock_t(timer_expires - jiffies),

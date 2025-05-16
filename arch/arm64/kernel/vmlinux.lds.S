@@ -68,10 +68,6 @@ jiffies = jiffies_64;
 #define TRAMP_TEXT
 #endif
 
-#define RTIC_BSS					\
-	. = ALIGN(PAGE_SIZE);				\
-	KEEP(*(.bss.rtic));			\
-	. = ALIGN(PAGE_SIZE);				\
 /*
  * The size of the PE/COFF section that covers the kernel image, which
  * runs from stext to _edata, must be a round multiple of the PE/COFF
@@ -130,6 +126,7 @@ SECTIONS
 			IDMAP_TEXT
 			HIBERNATE_TEXT
 			TRAMP_TEXT
+			*(.text..L.cfi.jumptable .text..L.cfi.jumptable.*)
 			*(.fixup)
 			*(.gnu.warning)
 		. = ALIGN(16);
@@ -257,10 +254,6 @@ SECTIONS
 	STABS_DEBUG
 
 	HEAD_SYMBOLS
-
-	.bss : {			/* bss segment		*/
-         RTIC_BSS
-	}
 }
 
 /*

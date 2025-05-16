@@ -1725,7 +1725,6 @@ struct xhci_port {
 	int			hcd_portnum;
 	struct xhci_hub		*rhub;
 	struct xhci_port_cap	*port_cap;
-	unsigned int		lpm_incapable:1;
 };
 
 struct xhci_hub {
@@ -1823,7 +1822,7 @@ struct xhci_hcd {
 
 	/* Host controller watchdog timer structures */
 	unsigned int		xhc_state;
-	unsigned long		run_graceperiod;
+
 	u32			command;
 	struct s3_save		s3;
 /* Host controller is dying - not responding to commands. "I'm not dead yet!"
@@ -2079,12 +2078,18 @@ int xhci_sec_event_ring_cleanup(struct usb_hcd *hcd, unsigned int intr_num);
 /* xHCI host controller glue */
 typedef void (*xhci_get_quirks_t)(struct device *, struct xhci_hcd *);
 <<<<<<< HEAD
+<<<<<<< HEAD
 int xhci_handshake(void __iomem *ptr, u32 mask, u32 done, int usec);
 int xhci_handshake_check_state(struct xhci_hcd *xhci,
 		void __iomem *ptr, u32 mask, u32 done, int usec);
 =======
 int xhci_handshake(void __iomem *ptr, u32 mask, u32 done, u64 timeout_us);
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+int xhci_handshake(void __iomem *ptr, u32 mask, u32 done, u64 timeout_us);
+int xhci_handshake_check_state(struct xhci_hcd *xhci,
+		void __iomem *ptr, u32 mask, u32 done, u64 timeout_us);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 void xhci_quiesce(struct xhci_hcd *xhci);
 int xhci_halt(struct xhci_hcd *xhci);
 int xhci_start(struct xhci_hcd *xhci);

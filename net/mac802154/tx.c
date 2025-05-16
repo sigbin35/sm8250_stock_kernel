@@ -43,6 +43,7 @@ void ieee802154_xmit_worker(struct work_struct *work)
 		goto err_tx;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	ieee802154_xmit_complete(&local->hw, skb, false);
 
 	dev->stats.tx_packets++;
@@ -51,6 +52,12 @@ void ieee802154_xmit_worker(struct work_struct *work)
 	DEV_STATS_INC(dev, tx_packets);
 	DEV_STATS_ADD(dev, tx_bytes, skb->len);
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	dev->stats.tx_packets++;
+	dev->stats.tx_bytes += skb->len;
+
+	ieee802154_xmit_complete(&local->hw, skb, false);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	return;
 
@@ -98,12 +105,17 @@ ieee802154_tx(struct ieee802154_local *local, struct sk_buff *skb)
 		}
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 		dev->stats.tx_packets++;
 		dev->stats.tx_bytes += skb->len;
 =======
 		DEV_STATS_INC(dev, tx_packets);
 		DEV_STATS_ADD(dev, tx_bytes, len);
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+		dev->stats.tx_packets++;
+		dev->stats.tx_bytes += len;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	} else {
 		local->tx_skb = skb;
 		queue_work(local->workqueue, &local->tx_work);

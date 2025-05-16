@@ -11,4 +11,8 @@ libcomposite-y			:= usbstring.o config.o epautoconf.o
 libcomposite-y			+= composite.o functions.o configfs.o u_f.o
 
 obj-$(CONFIG_USB_GADGET)	+= udc/ function/ legacy/
+<<<<<<< HEAD
 obj-$(CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE)	+= multi_config.o
+=======
+obj-$(CONFIG_USB_CI13XXX_MSM)   += ci13xxx_msm.o
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843

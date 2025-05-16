@@ -1029,9 +1029,8 @@ static const __initconst struct x86_cpu_id cpu_vuln_whitelist[] = {
 	{}
 };
 
-<<<<<<< HEAD
 static bool __init cpu_matches(unsigned long which)
-=======
+
 #define VULNBL(vendor, family, model, blacklist)	\
 	X86_MATCH_VENDOR_FAM_MODEL(vendor, family, model, blacklist)
 
@@ -1093,7 +1092,7 @@ static const struct x86_cpu_id cpu_vuln_blacklist[] __initconst = {
 };
 
 static bool __init cpu_matches(const struct x86_cpu_id *table, unsigned long which)
->>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+
 {
 	const struct x86_cpu_id *m = x86_match_cpu(cpu_vuln_whitelist);
 
@@ -1170,9 +1169,9 @@ static void __init cpu_set_bug_bits(struct cpuinfo_x86 *c)
 	     (ia32_cap & ARCH_CAP_TSX_CTRL_MSR)))
 		setup_force_cpu_bug(X86_BUG_TAA);
 
-<<<<<<< HEAD
+
 	if (cpu_matches(NO_MELTDOWN))
-=======
+
 	/*
 	 * SRBDS affects CPUs which support RDRAND or RDSEED and are listed
 	 * in the vulnerability blacklist.
@@ -1219,7 +1218,7 @@ static void __init cpu_set_bug_bits(struct cpuinfo_x86 *c)
 		setup_force_cpu_bug(X86_BUG_GDS);
 
 	if (cpu_matches(cpu_vuln_whitelist, NO_MELTDOWN))
->>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+
 		return;
 
 	/* Rogue Data Cache Load? No! */
@@ -1691,12 +1690,11 @@ void identify_secondary_cpu(struct cpuinfo_x86 *c)
 	mtrr_ap_init();
 	validate_apic_and_package_id(c);
 	x86_spec_ctrl_setup_ap();
-<<<<<<< HEAD
-=======
 	update_srbds_msr();
+
 	if (boot_cpu_has_bug(X86_BUG_GDS))
 		update_gds_msr();
->>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+
 }
 
 static __init int setup_noclflush(char *arg)
@@ -1906,6 +1904,29 @@ static void wait_for_master_cpu(int cpu)
 		cpu_relax();
 #endif
 }
+
+#ifdef CONFIG_X86_64
+static void setup_getcpu(int cpu)
+{
+	unsigned long cpudata = vdso_encode_cpunode(cpu, early_cpu_to_node(cpu));
+	struct desc_struct d = { };
+
+	if (boot_cpu_has(X86_FEATURE_RDTSCP))
+		write_rdtscp_aux(cpudata);
+
+	/* Store CPU and node number in limit. */
+	d.limit0 = cpudata;
+	d.limit1 = cpudata >> 16;
+
+	d.type = 5;		/* RO data, expand down, accessed */
+	d.dpl = 3;		/* Visible to user code */
+	d.s = 1;		/* Not a system segment */
+	d.p = 1;		/* Present */
+	d.d = 1;		/* 32-bit */
+
+	write_gdt_entry(get_cpu_gdt_rw(cpu), GDT_ENTRY_CPUNODE, &d, DESCTYPE_S);
+}
+#endif
 
 /*
  * cpu_init() initializes state that is per-CPU. Some data is already

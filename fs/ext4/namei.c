@@ -1338,6 +1338,7 @@ int ext4_ci_compare(const struct inode *parent, const struct qstr *name,
 		/* Handle invalid character sequence as either an error
 		 * or as an opaque byte sequence.
 		 */
+<<<<<<< HEAD
 		if (sb_has_enc_strict_mode(sb))
 			return -EINVAL;
 
@@ -1345,6 +1346,14 @@ int ext4_ci_compare(const struct inode *parent, const struct qstr *name,
 			return 1;
 
 		return !!memcmp(name->name, entry->name, name->len);
+=======
+		if (sb_has_strict_encoding(sb))
+			ret = -EINVAL;
+		else if (name->len != entry.len)
+			ret = 1;
+		else
+			ret = !!memcmp(name->name, entry.name, entry.len);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	}
 
 	return ret;
@@ -1355,7 +1364,8 @@ void ext4_fname_setup_ci_filename(struct inode *dir, const struct qstr *iname,
 {
 	int len;
 
-	if (!needs_casefold(dir)) {
+	if (!IS_CASEFOLDED(dir) || !dir->i_sb->s_encoding ||
+	    (IS_ENCRYPTED(dir) && !fscrypt_has_encryption_key(dir))) {
 		cf_name->name = NULL;
 		return;
 	}
@@ -1401,7 +1411,8 @@ static inline bool ext4_match(const struct inode *parent,
 #endif
 
 #ifdef CONFIG_UNICODE
-	if (needs_casefold(parent)) {
+	if (parent->i_sb->s_encoding && IS_CASEFOLDED(parent) &&
+	    (!IS_ENCRYPTED(parent) || fscrypt_has_encryption_key(parent))) {
 		if (fname->cf_name.name) {
 			struct qstr cf = {.name = fname->cf_name.name,
 					  .len = fname->cf_name.len};
@@ -1436,6 +1447,7 @@ int ext4_search_dir(struct buffer_head *bh, char *search_buf, int buf_size,
 			/* found a match - just to be sure, do
 			 * a full check */
 <<<<<<< HEAD
+<<<<<<< HEAD
 			if (ext4_check_dir_entry(dir, NULL, de, bh, bh->b_data,
 						 bh->b_size, offset))
 				return -1;
@@ -1444,6 +1456,11 @@ int ext4_search_dir(struct buffer_head *bh, char *search_buf, int buf_size,
 						 buf_size, offset))
 				return -EFSCORRUPTED;
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+			if (ext4_check_dir_entry(dir, NULL, de, bh, search_buf,
+						 buf_size, offset))
+				return -EFSCORRUPTED;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 			*res_dir = de;
 			return 1;
 		}
@@ -1660,7 +1677,11 @@ static struct buffer_head *ext4_lookup_entry(struct inode *dir,
 	struct buffer_head *bh;
 
 	err = ext4_fname_prepare_lookup(dir, dentry, &fname);
+<<<<<<< HEAD
 	generic_set_encrypted_ci_d_ops(dir, dentry);
+=======
+	generic_set_encrypted_ci_d_ops(dentry);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	if (err == -ENOENT)
 		return NULL;
 	if (err)
@@ -2301,7 +2322,7 @@ static int ext4_add_entry(handle_t *handle, struct dentry *dentry,
 		return -EINVAL;
 
 #ifdef CONFIG_UNICODE
-	if (sb_has_enc_strict_mode(sb) && IS_CASEFOLDED(dir) &&
+	if (sb_has_strict_encoding(sb) && IS_CASEFOLDED(dir) &&
 	    sb->s_encoding && utf8_validate(sb->s_encoding, &dentry->d_name))
 		return -EINVAL;
 #endif
@@ -2581,7 +2602,11 @@ int ext4_generic_delete_entry(handle_t *handle,
 	de = (struct ext4_dir_entry_2 *)entry_buf;
 	while (i < buf_size - csum_size) {
 		if (ext4_check_dir_entry(dir, NULL, de, bh,
+<<<<<<< HEAD
 					 bh->b_data, bh->b_size, i))
+=======
+					 entry_buf, buf_size, i))
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 			return -EFSCORRUPTED;
 		if (de == de_del)  {
 			if (pde)

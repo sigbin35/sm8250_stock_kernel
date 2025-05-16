@@ -801,7 +801,11 @@ config HID_PLANTRONICS
 config HID_PLAYSTATION
 	tristate "PlayStation HID Driver"
 	depends on HID
+<<<<<<< HEAD
     select CRC32
+=======
+	select CRC32
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	select POWER_SUPPLY
 	help
 	  Provides support for Sony PS5 controllers including support for

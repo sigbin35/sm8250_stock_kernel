@@ -537,10 +537,14 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 		if (!buffer_async_write(bh))
 			continue;
 <<<<<<< HEAD
+<<<<<<< HEAD
 		ret = io_submit_add_bh(io, inode, bounce_page ?: page, bh);
 =======
 		ret = io_submit_add_bh(io, inode, page, data_page, bh);
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+		ret = io_submit_add_bh(io, inode, page, bounce_page, bh);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		if (ret) {
 			/*
 			 * We only get here on ENOMEM.  Not much else

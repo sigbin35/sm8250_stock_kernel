@@ -50,11 +50,17 @@
 #include <linux/sched/isolation.h>
 #include <linux/nmi.h>
 <<<<<<< HEAD
+<<<<<<< HEAD
 #include <linux/bug.h>
 #include <linux/delay.h>
 =======
 #include <linux/kvm_para.h>
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+#include <linux/bug.h>
+#include <linux/delay.h>
+#include <linux/kvm_para.h>
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 #include "workqueue_internal.h"
 

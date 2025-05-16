@@ -2072,6 +2072,9 @@ void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing)
 EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 void sdhci_cfg_irq(struct sdhci_host *host, bool enable, bool sync)
 {
 	if (enable && !(host->flags & SDHCI_HOST_IRQ_STATUS)) {
@@ -2086,7 +2089,11 @@ void sdhci_cfg_irq(struct sdhci_host *host, bool enable, bool sync)
 	}
 }
 EXPORT_SYMBOL(sdhci_cfg_irq);
+<<<<<<< HEAD
 =======
+=======
+
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 static bool sdhci_timing_has_preset(unsigned char timing)
 {
 	switch (timing) {
@@ -2117,17 +2124,26 @@ static bool sdhci_presetable_values_change(struct sdhci_host *host, struct mmc_i
 	return !host->preset_enabled &&
 	       (sdhci_preset_needed(host, ios->timing) || host->drv_type != ios->drv_type);
 }
+<<<<<<< HEAD
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 {
 	struct sdhci_host *host = mmc_priv(mmc);
+<<<<<<< HEAD
 <<<<<<< HEAD
 	unsigned long flags;
 =======
 	bool reinit_uhs = host->reinit_uhs;
 	bool turning_on_clk = false;
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	unsigned long flags;
+	bool reinit_uhs = host->reinit_uhs;
+	bool turning_on_clk = false;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	u8 ctrl;
 	int ret;
 
@@ -2149,6 +2165,9 @@ void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		sdhci_enable_preset_value(host, false);
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	spin_lock_irqsave(&host->lock, flags);
 	if (host->mmc && host->mmc->card &&
 			mmc_card_sdio(host->mmc->card))
@@ -2157,11 +2176,17 @@ void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	if (ios->clock &&
 	    ((ios->clock != host->clock) || (ios->timing != host->timing))) {
 		spin_unlock_irqrestore(&host->lock, flags);
+<<<<<<< HEAD
 =======
 	if (!ios->clock || ios->clock != host->clock) {
 		turning_on_clk = ios->clock && !host->clock;
 
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+
+		turning_on_clk = ios->clock && !host->clock;
+
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		host->ops->set_clock(host, ios->clock);
 		spin_lock_irqsave(&host->lock, flags);
 		host->clock = ios->clock;
@@ -2238,8 +2263,10 @@ void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	    turning_on_clk &&
 	    host->timing == ios->timing &&
 	    host->version >= SDHCI_SPEC_300 &&
-	    !sdhci_presetable_values_change(host, ios))
+	    !sdhci_presetable_values_change(host, ios)) {
+		spin_unlock_irqrestore(&host->lock, flags);
 		return;
+	}
 
 	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
 
@@ -3491,6 +3518,14 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 		} else {
 			pr_msg = true;
 		}
+
+		if (host->mmc->ops->get_cd &&
+				!host->mmc->ops->get_cd(host->mmc)) {
+			pr_msg = false;
+			pr_err("%s: Got data error(%d) during card removal\n",
+				mmc_hostname(host->mmc), host->data->error);
+		}
+
 		if (pr_msg && __ratelimit(&host->dbg_dump_rs)) {
 			pr_err("%s: data txfr (0x%08x) error: %d after %lld ms\n",
 			       mmc_hostname(host->mmc), intmask,

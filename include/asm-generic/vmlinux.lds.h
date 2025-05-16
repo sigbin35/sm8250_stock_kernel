@@ -566,8 +566,13 @@
 		*(TEXT_MAIN .text.fixup)				\
 		*(.text.unlikely .text.unlikely.*)			\
 		*(.text.unknown .text.unknown.*)			\
+<<<<<<< HEAD
 		NOINSTR_TEXT						\
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+		*(TEXT_CFI_MAIN) 					\
+		NOINSTR_TEXT						\
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		*(.text..refcount)					\
 		*(.text..ftrace)					\
 		*(.ref.text)						\

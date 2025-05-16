@@ -107,10 +107,14 @@ static void gic_do_wait_for_rwp(void __iomem *base, u32 bit)
 	u32 count = 1000000;	/* 1s! */
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	while (readl_relaxed_no_log(base + GICD_CTLR) & GICD_CTLR_RWP) {
 =======
 	while (readl_relaxed(base + GICD_CTLR) & bit) {
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	while (readl_relaxed_no_log(base + GICD_CTLR) & bit) {
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		count--;
 		if (!count) {
 			pr_err_ratelimited("RWP timeout, gone fishing\n");

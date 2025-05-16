@@ -144,7 +144,7 @@ original cred by below function.
  * same context as task->real_cred.
  */
 struct cred {
-	atomic_long_t	usage;
+	atomic_t	usage;
 #ifdef CONFIG_DEBUG_CREDENTIALS
 	atomic_t	subscribers;	/* number of processes subscribed */
 	void		*put_addr;
@@ -304,7 +304,7 @@ struct cred *get_new_cred(struct cred *cred);
 #else
 static inline struct cred *get_new_cred(struct cred *cred)
 {
-	atomic_long_inc(&cred->usage);
+	atomic_inc(&cred->usage);
 	return cred;
 }
 #endif
@@ -357,7 +357,7 @@ static inline void put_cred(const struct cred *_cred)
 
 	if (cred) {
 		validate_creds(cred);
-		if (atomic_long_dec_and_test(&(cred)->usage))
+		if (atomic_dec_and_test(&(cred)->usage))
 			__put_cred(cred);
 	}
 }

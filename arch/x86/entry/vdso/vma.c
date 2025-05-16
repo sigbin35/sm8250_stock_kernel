@@ -332,6 +332,7 @@ static __init int vdso_setup(char *s)
 	return 1;
 }
 __setup("vdso=", vdso_setup);
+
 #endif
 
 #ifdef CONFIG_X86_64
@@ -366,6 +367,7 @@ static int vgetcpu_online(unsigned int cpu)
 {
 	return smp_call_function_single(cpu, vgetcpu_cpu_init, NULL, 1);
 }
+
 
 static int __init init_vdso(void)
 {

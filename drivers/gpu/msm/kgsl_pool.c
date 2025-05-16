@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+<<<<<<< HEAD
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
  * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved. 
+=======
+ * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
  */
 
 #include <asm/cacheflush.h>
@@ -83,7 +88,11 @@ _kgsl_pool_add_page(struct kgsl_page_pool *pool, struct page *p)
 		__free_pages(p, pool->pool_order);
 		return;
 	}
+<<<<<<< HEAD
 	
+=======
+
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	kgsl_zero_page(p, pool->pool_order);
 
 	spin_lock(&pool->list_lock);
@@ -199,9 +208,7 @@ kgsl_pool_reduce(unsigned int target_pages, bool exit)
 		if (!pool->allocation_allowed && !exit)
 			continue;
 
-		total_pages -= pcount;
-
-		nr_removed = total_pages - target_pages;
+		nr_removed = total_pages - target_pages - pcount;
 		if (nr_removed <= 0)
 			return pcount;
 

@@ -1539,6 +1539,12 @@ struct ext4_sb_info {
 	struct ratelimit_state s_warning_ratelimit_state;
 	struct ratelimit_state s_msg_ratelimit_state;
 
+<<<<<<< HEAD
+=======
+	/* Encryption context for '-o test_dummy_encryption' */
+	struct fscrypt_dummy_context s_dummy_enc_ctx;
+
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	/*
 	 * Barrier between writepages ops and changing any inode's JOURNAL_DATA
 	 * or EXTENTS flag.
@@ -2476,9 +2482,15 @@ extern int __ext4_check_dir_entry(const char *, unsigned int, struct inode *,
 				  struct ext4_dir_entry_2 *,
 				  struct buffer_head *, char *, int,
 				  unsigned int);
+<<<<<<< HEAD
 #define ext4_check_dir_entry(dir, filp, de, bh, buf, size, offset)	\
 	unlikely(__ext4_check_dir_entry(__func__, __LINE__, (dir), (filp), \
 					(de), (bh), (buf), (size), (offset)))
+=======
+#define ext4_check_dir_entry(dir, filp, de, bh, buf, size, offset) \
+	unlikely(__ext4_check_dir_entry(__func__, __LINE__, (dir), (filp), \
+				(de), (bh), (buf), (size), (offset)))
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 extern int ext4_htree_store_dirent(struct file *dir_file, __u32 hash,
 				__u32 minor_hash,
 				struct ext4_dir_entry_2 *dirent,

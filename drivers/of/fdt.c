@@ -1191,6 +1191,7 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
 				     int depth, void *data)
 {
 <<<<<<< HEAD
+<<<<<<< HEAD
 	int l = 0;
 	const char *p = NULL;
 	char *cmdline = data;
@@ -1198,6 +1199,11 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
 	int l;
 	const char *p;
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	int l = 0;
+	const char *p = NULL;
+	char *cmdline = data;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	const void *rng_seed;
 
 	pr_debug("search \"chosen\", depth: %d, uname: %s\n", depth, uname);

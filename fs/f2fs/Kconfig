@@ -6,6 +6,13 @@ config F2FS_FS
 	select CRYPTO_CRC32
 	select F2FS_FS_XATTR if FS_ENCRYPTION
 	select FS_ENCRYPTION_ALGS if FS_ENCRYPTION
+	select LZ4_COMPRESS if F2FS_FS_LZ4
+	select LZ4_DECOMPRESS if F2FS_FS_LZ4
+	select LZ4HC_COMPRESS if F2FS_FS_LZ4HC
+	select LZO_COMPRESS if F2FS_FS_LZO
+	select LZO_DECOMPRESS if F2FS_FS_LZO
+	select ZSTD_COMPRESS if F2FS_FS_ZSTD
+	select ZSTD_DECOMPRESS if F2FS_FS_ZSTD
 	help
 	  F2FS is based on Log-structured File System (LFS), which supports
 	  versatile "flash-friendly" features. The design has been focused on
@@ -123,28 +130,38 @@ config F2FS_FS_COMPRESSION
 config F2FS_FS_LZO
 	bool "LZO compression support"
 	depends on F2FS_FS_COMPRESSION
-	select LZO_COMPRESS
-	select LZO_DECOMPRESS
 	default y
 	help
 	  Support LZO compress algorithm, if unsure, say Y.
 
+config F2FS_FS_LZORLE
+	bool "LZO-RLE compression support"
+	depends on F2FS_FS_LZO
+	default y
+	help
+	  Support LZO-RLE compress algorithm, if unsure, say Y.
+
 config F2FS_FS_LZ4
 	bool "LZ4 compression support"
 	depends on F2FS_FS_COMPRESSION
-	select LZ4_COMPRESS
-	select LZ4_DECOMPRESS
 	default y
 	help
 	  Support LZ4 compress algorithm, if unsure, say Y.
 
+<<<<<<< HEAD
 config F2FS_SEC_DEBUG_NODE
 	bool "SEC DEBUG NODE"
 	depends on F2FS_FS && DEBUG_FS
+=======
+config F2FS_FS_LZ4HC
+	bool "LZ4HC compression support"
+	depends on F2FS_FS_LZ4
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	default y
 	help
 	  Sys nodes for SEC debugging
 
+<<<<<<< HEAD
 	  If unsure, say N.
 
 config F2FS_SEC_BLOCK_OPERATIONS_DEBUG
@@ -155,3 +172,27 @@ config F2FS_SEC_BLOCK_OPERATIONS_DEBUG
 	  Collect block_operations() log for debugging
 
 	  If unsure, say N.
+=======
+config F2FS_FS_ZSTD
+	bool "ZSTD compression support"
+	depends on F2FS_FS_COMPRESSION
+	default y
+	help
+	  Support ZSTD compress algorithm, if unsure, say Y.
+
+config F2FS_IOSTAT
+	bool "F2FS IO statistics information"
+	depends on F2FS_FS
+	default y
+	help
+	  Support getting IO statistics through sysfs and printing out periodic
+	  IO statistics tracepoint events. You have to turn on "iostat_enable"
+	  sysfs node to enable this feature.
+
+config F2FS_UNFAIR_RWSEM
+	bool "F2FS unfair rw_semaphore"
+	depends on F2FS_FS && BLK_CGROUP
+	help
+	  Use unfair rw_semaphore, if system configured IO priority by block
+	  cgroup.
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843

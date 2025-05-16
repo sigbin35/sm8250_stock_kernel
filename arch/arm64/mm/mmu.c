@@ -1448,14 +1448,11 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
 	return dt_virt;
 }
 
-<<<<<<< HEAD
 int __init arch_ioremap_p4d_supported(void)
 {
 	return 0;
 }
 
-=======
->>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 int __init arch_ioremap_pud_supported(void)
 {
 	/*

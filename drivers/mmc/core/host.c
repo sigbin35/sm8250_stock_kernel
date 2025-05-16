@@ -169,6 +169,16 @@ int mmc_retune(struct mmc_host *host)
 		return_to_hs400 = true;
 	}
 
+	/*
+	 * Timing should be adjusted to the HS400 target
+	 * operation frequency for tuning process.
+	 * Similar handling is also done in mmc_hs200_tuning()
+	 * This is handled properly in sdhci-msm.c from msm-5.4 onwards.
+	 */
+	if (host->card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS400 &&
+		host->ios.bus_width == MMC_BUS_WIDTH_8)
+		mmc_set_timing(host, MMC_TIMING_MMC_HS400);
+
 	err = mmc_execute_tuning(host->card);
 	if (err)
 		goto out;
@@ -443,6 +453,9 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 EXPORT_SYMBOL(mmc_alloc_host);
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 static ssize_t enable_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -591,7 +604,10 @@ static struct attribute_group clk_scaling_attr_grp = {
 	.attrs = clk_scaling_attrs,
 };
 
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 static int mmc_validate_host_caps(struct mmc_host *host)
 {
 	if (host->caps & MMC_CAP_SDIO_IRQ && !host->ops->enable_sdio_irq) {
@@ -602,7 +618,10 @@ static int mmc_validate_host_caps(struct mmc_host *host)
 	return 0;
 }
 
+<<<<<<< HEAD
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 /**
  *	mmc_add_host - initialise host hardware
  *	@host: mmc host
@@ -695,6 +714,10 @@ EXPORT_SYMBOL(mmc_remove_host);
 void mmc_free_host(struct mmc_host *host)
 {
 	cancel_delayed_work_sync(&host->detect);
+<<<<<<< HEAD
+=======
+	mmc_crypto_free_host(host);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	mmc_pwrseq_free(host);
 	wake_lock_destroy(&host->detect_wake_lock);
 	put_device(&host->class_dev);

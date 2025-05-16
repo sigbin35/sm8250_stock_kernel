@@ -44,6 +44,7 @@ struct anon_vma {
 	atomic_t refcount;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	unsigned degree;		/* ANDROID: KABI preservation, DO NOT USE! */
 =======
 	/*
@@ -57,6 +58,9 @@ struct anon_vma {
 	/* Count of VMAs whose ->anon_vma pointer points to this object. */
 	unsigned long num_active_vmas;
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	unsigned degree;		/* ANDROID: KABI preservation, DO NOT USE! */
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	struct anon_vma *parent;	/* Parent of this anon_vma */
 

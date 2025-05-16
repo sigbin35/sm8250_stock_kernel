@@ -23,7 +23,12 @@ static int qcom_smd_qrtr_callback(struct rpmsg_device *rpdev,
 	struct qrtr_smd_dev *qdev = dev_get_drvdata(&rpdev->dev);
 	int rc;
 
+<<<<<<< HEAD
 	if (!qdev)
+=======
+	if (!qdev) {
+		pr_err_ratelimited("%s:Not ready\n", __func__);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		return -EAGAIN;
 
 	rc = qrtr_endpoint_post(&qdev->ep, data, len);
@@ -62,6 +67,10 @@ static int qcom_smd_qrtr_probe(struct rpmsg_device *rpdev)
 	u32 net_id;
 	bool rt;
 	int rc;
+<<<<<<< HEAD
+=======
+	pr_info("%s:Entered\n", __func__);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	qdev = devm_kzalloc(&rpdev->dev, sizeof(*qdev), GFP_KERNEL);
 	if (!qdev)
@@ -83,7 +92,11 @@ static int qcom_smd_qrtr_probe(struct rpmsg_device *rpdev)
 
 	dev_set_drvdata(&rpdev->dev, qdev);
 
+<<<<<<< HEAD
 	dev_dbg(&rpdev->dev, "Qualcomm SMD QRTR driver probed\n");
+=======
+	pr_info("%s:SMD QRTR driver probed\n", __func__);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	return 0;
 }

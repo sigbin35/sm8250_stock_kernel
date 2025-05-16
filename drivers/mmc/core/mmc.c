@@ -2488,6 +2488,9 @@ static void mmc_detect(struct mmc_host *host)
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 static int mmc_cache_card_ext_csd(struct mmc_host *host)
 {
 	int err;
@@ -2549,12 +2552,20 @@ static int mmc_test_awake_ext_csd(struct mmc_host *host)
 	kfree(ext_csd);
 
 	return err;
+<<<<<<< HEAD
 =======
+=======
+}
+
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 static bool _mmc_cache_enabled(struct mmc_host *host)
 {
 	return host->card->ext_csd.cache_size > 0 &&
 	       host->card->ext_csd.cache_ctrl & 1;
+<<<<<<< HEAD
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 }
 
 static int _mmc_suspend(struct mmc_host *host, bool is_suspend)
@@ -2972,11 +2983,17 @@ static const struct mmc_bus_ops mmc_ops = {
 	.shutdown = mmc_shutdown,
 	.hw_reset = _mmc_hw_reset,
 <<<<<<< HEAD
+<<<<<<< HEAD
 	.change_bus_speed = mmc_change_bus_speed,
 	.change_bus_speed_deferred = mmc_change_bus_speed_deferred,
 =======
 	.cache_enabled = _mmc_cache_enabled,
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	.cache_enabled = _mmc_cache_enabled,
+	.change_bus_speed = mmc_change_bus_speed,
+	.change_bus_speed_deferred = mmc_change_bus_speed_deferred,
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 };
 
 /*

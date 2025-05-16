@@ -576,6 +576,7 @@ int mhi_queue_dma(struct mhi_device *mhi_dev,
 	read_lock_bh(&mhi_chan->lock);
 	if (mhi_chan->xfer_type == MHI_XFER_RSC_DMA) {
 		/*
+<<<<<<< HEAD
 		* on RSC channel IPA HW has a minimum credit requirement before
 		* switching to DB mode
 		*/
@@ -591,6 +592,24 @@ int mhi_queue_dma(struct mhi_device *mhi_dev,
 	
 	read_unlock_bh(&mhi_chan->lock);
 	
+=======
+		 * on RSC channel IPA HW has a minimum credit requirement before
+		 * switching to DB mode
+		 */
+		n_free_tre = mhi_get_no_free_descriptors(mhi_dev,
+				DMA_FROM_DEVICE);
+		n_queued_tre = tre_ring->elements - n_free_tre;
+		if (mhi_chan->db_cfg.db_mode &&
+				n_queued_tre < MHI_RSC_MIN_CREDITS)
+			ring_db = false;
+	}
+
+	if (likely(MHI_DB_ACCESS_VALID(mhi_cntrl)) && ring_db)
+		mhi_ring_chan_db(mhi_cntrl, mhi_chan);
+
+	read_unlock_bh(&mhi_chan->lock);
+
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	read_unlock_bh(&mhi_cntrl->pm_lock);
 
 	return 0;

@@ -143,18 +143,17 @@ static void install_bp_hardening_cb(bp_hardening_cb_t fn,
 		__copy_hyp_vect_bpi(slot, hyp_vecs_start, hyp_vecs_end);
 	}
 
-<<<<<<< HEAD
 	__this_cpu_write(bp_hardening_data.hyp_vectors_slot, slot);
 	__this_cpu_write(bp_hardening_data.fn, fn);
 	__this_cpu_write(bp_hardening_data.template_start, hyp_vecs_start);
-=======
+	
 	if (fn != __this_cpu_read(bp_hardening_data.fn)) {
 		__this_cpu_write(bp_hardening_data.hyp_vectors_slot, slot);
 		__this_cpu_write(bp_hardening_data.fn, fn);
 		__this_cpu_write(bp_hardening_data.template_start,
 				 hyp_vecs_start);
 	}
->>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+
 	spin_unlock(&bp_lock);
 }
 #else
@@ -700,7 +699,7 @@ static const struct midr_range arm64_harden_el2_vectors[] = {
 
 #endif
 
-<<<<<<< HEAD
+
 #ifdef CONFIG_ARM64_ERRATUM_858921
 
 static const struct midr_range arm64_workaround_858921_cpus[] = {
@@ -735,7 +734,9 @@ static const struct midr_range arm64_workaround_845719_cpus[] = {
 	{},
 };
 
-=======
+
+#endif
+
 #ifdef CONFIG_ARM64_ERRATUM_1742098
 static struct midr_range broken_aarch32_aes[] = {
 	MIDR_RANGE(MIDR_CORTEX_A57, 0, 1, 0xf, 0xf),
@@ -768,7 +769,7 @@ static const struct midr_range erratum_spec_ssbs_list[] = {
 	MIDR_ALL_VERSIONS(MIDR_NEOVERSE_V3),
 	{}
 };
->>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+
 #endif
 
 const struct arm64_cpu_capabilities arm64_errata[] = {
@@ -935,14 +936,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
 		.matches = has_ssbd_mitigation,
 		.midr_range_list = arm64_ssb_cpus,
 	},
-	{
-		.desc = "Spectre-BHB",
-		.capability = ARM64_SPECTRE_BHB,
-		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
-		.matches = is_spectre_bhb_affected,
-		.cpu_enable = spectre_bhb_enable_mitigation,
-	},
-<<<<<<< HEAD
+
 #ifdef CONFIG_ARM64_ERRATUM_1188873
 	{
 		.desc = "ARM erratum 1188873",
@@ -950,8 +944,23 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
 		ERRATA_MIDR_RANGE_LIST(arm64_workaround_1188873_cpus),
 	},
 #endif
-=======
->>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+
+	{
+		.desc = "Spectre-BHB",
+		.capability = ARM64_SPECTRE_BHB,
+		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
+		.matches = is_spectre_bhb_affected,
+		.cpu_enable = spectre_bhb_enable_mitigation,
+	},
+
+#ifdef CONFIG_ARM64_ERRATUM_1188873
+	{
+		.desc = "ARM erratum 1188873",
+		.capability = ARM64_WORKAROUND_1188873,
+		ERRATA_MIDR_RANGE_LIST(arm64_workaround_1188873_cpus),
+	},
+#endif
+
 #ifdef CONFIG_ARM64_ERRATUM_1463225
 	{
 		.desc = "ARM erratum 1463225",
@@ -1083,10 +1092,7 @@ static void update_mitigation_state(enum mitigation_state *oldp,
  *   software mitigation in the vectors is needed.
  * - Has CSV2.3, so is unaffected.
  */
-<<<<<<< HEAD
 
-=======
->>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 static enum mitigation_state spectre_bhb_state;
 
 enum mitigation_state arm64_get_spectre_bhb_state(void)
@@ -1297,16 +1303,16 @@ static void kvm_setup_bhb_slot(const char *hyp_vecs_start)
 		__copy_hyp_vect_bpi(slot, hyp_vecs_start, hyp_vecs_end);
 	}
 
-<<<<<<< HEAD
+
 	__this_cpu_write(bp_hardening_data.hyp_vectors_slot, slot);
 	__this_cpu_write(bp_hardening_data.template_start, hyp_vecs_start);
-=======
+
 	if (hyp_vecs_start != __this_cpu_read(bp_hardening_data.template_start)) {
 		__this_cpu_write(bp_hardening_data.hyp_vectors_slot, slot);
 		__this_cpu_write(bp_hardening_data.template_start,
 				 hyp_vecs_start);
 	}
->>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+
 	spin_unlock(&bp_lock);
 }
 #else
@@ -1342,9 +1348,9 @@ void spectre_bhb_enable_mitigation(const struct arm64_cpu_capabilities *entry)
 	} else if (spectre_bhb_loop_affected(SCOPE_LOCAL_CPU)) {
 		switch (spectre_bhb_loop_affected(SCOPE_SYSTEM)) {
 		case 8:
-<<<<<<< HEAD
+
 			kvm_setup_bhb_slot(__spectre_bhb_loop_k8_start);
-=======
+
 			/*
 			 * A57/A72-r0 will already have selected the
 			 * spectre-indirect vector, which is sufficient
@@ -1352,7 +1358,7 @@ void spectre_bhb_enable_mitigation(const struct arm64_cpu_capabilities *entry)
 			 */
 			if (!__this_cpu_read(bp_hardening_data.fn))
 				kvm_setup_bhb_slot(__spectre_bhb_loop_k8_start);
->>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+
 			break;
 		case 24:
 			kvm_setup_bhb_slot(__spectre_bhb_loop_k24_start);
@@ -1404,8 +1410,8 @@ void __init spectre_bhb_patch_loop_iter(struct alt_instr *alt,
 					 AARCH64_INSN_VARIANT_64BIT,
 					 AARCH64_INSN_MOVEWIDE_ZERO);
 	*updptr++ = cpu_to_le32(insn);
-<<<<<<< HEAD
+
 }
-=======
+
 }
->>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+

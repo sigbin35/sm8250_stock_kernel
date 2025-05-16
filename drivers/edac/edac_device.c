@@ -488,6 +488,7 @@ int edac_device_add_device(struct edac_device_ctl_info *edac_dev)
 		edac_dev->op_state = OP_RUNNING_POLL;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 		/*
 		 * enable workq processing on this instance,
 		 * default = 1000 msec
@@ -496,6 +497,9 @@ int edac_device_add_device(struct edac_device_ctl_info *edac_dev)
 =======
 		edac_device_workq_setup(edac_dev, edac_dev->poll_msec ?: DEFAULT_POLL_INTERVAL);
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+		edac_device_workq_setup(edac_dev, edac_dev->poll_msec ?: DEFAULT_POLL_INTERVAL);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	} else {
 		edac_dev->op_state = OP_RUNNING_INTERRUPT;
 	}

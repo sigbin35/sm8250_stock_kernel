@@ -708,11 +708,16 @@ int verity_fec_ctr(struct dm_verity *v)
 	struct dm_verity_fec *f = v->fec;
 	struct dm_target *ti = v->ti;
 <<<<<<< HEAD
+<<<<<<< HEAD
 	struct mapped_device *md = dm_table_get_md(ti->table);
 	u64 hash_blocks;
 =======
 	u64 hash_blocks, fec_blocks;
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	struct mapped_device *md = dm_table_get_md(ti->table);
+	u64 hash_blocks, fec_blocks;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	int ret;
 
 	if (!verity_fec_is_enabled(v)) {

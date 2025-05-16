@@ -177,8 +177,8 @@ extern void timer_quiesce_cpu(void *cpup);
 extern void add_timer(struct timer_list *timer);
 
 extern int try_to_del_timer_sync(struct timer_list *timer);
-extern int timer_delete_sync(struct timer_list *timer);
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 extern struct timer_base timer_base_deferrable;
 
@@ -201,6 +201,11 @@ static inline int del_timer_sync(struct timer_list *timer)
 	return timer_delete_sync(timer);
 }
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+extern struct timer_base timer_base_deferrable;
+
+extern int del_timer_sync(struct timer_list *timer);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 #define del_singleshot_timer_sync(t) del_timer_sync(t)
 

@@ -1885,7 +1885,11 @@ static const struct mount_opts {
 	{Opt_jqfmt_vfsv0, QFMT_VFS_V0, MOPT_QFMT},
 	{Opt_jqfmt_vfsv1, QFMT_VFS_V1, MOPT_QFMT},
 	{Opt_max_dir_size_kb, 0, MOPT_GTE0},
+<<<<<<< HEAD
 	{Opt_test_dummy_encryption, 0, MOPT_GTE0},
+=======
+	{Opt_test_dummy_encryption, 0, MOPT_STRING},
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 #ifdef CONFIG_FS_ENCRYPTION_INLINE_CRYPT
 	{Opt_inlinecrypt, EXT4_MOUNT_INLINECRYPT, MOPT_SET},
 #else

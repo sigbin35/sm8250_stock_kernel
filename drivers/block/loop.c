@@ -227,6 +227,7 @@ static void __loop_update_dio(struct loop_device *lo, bool dio)
 
 /**
 <<<<<<< HEAD
+<<<<<<< HEAD
  * loop_validate_block_size() - validates the passed in block size
  * @bsize: size to validate
  */
@@ -249,6 +250,11 @@ static void loop_set_size(struct loop_device *lo, loff_t size)
 }
 
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+ * loop_validate_block_size() - validates the passed in block size
+ * @bsize: size to validate
+ */
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 static int
 loop_validate_block_size(unsigned short bsize)
 {
@@ -269,12 +275,16 @@ loop_validate_block_size(unsigned short bsize)
 static void loop_set_size(struct loop_device *lo, loff_t size)
 {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	struct block_device *bdev = lo->lo_device;
 
 	set_capacity(lo->lo_disk, size);
 	bd_set_size(bdev, size << SECTOR_SHIFT);
 	/* let user-space know about the new size */
 	kobject_uevent(&disk_to_dev(bdev->bd_disk)->kobj, KOBJ_CHANGE);
+<<<<<<< HEAD
 =======
 	loff_t size = get_size(offset, sizelimit, lo->lo_backing_file);
 	sector_t x = (sector_t)size;
@@ -284,6 +294,8 @@ static void loop_set_size(struct loop_device *lo, loff_t size)
 	loop_set_size(lo, size);
 	return 0;
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 }
 
 static inline int
@@ -953,6 +965,7 @@ static int loop_prepare_queue(struct loop_device *lo)
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 static void loop_update_rotational(struct loop_device *lo)
 {
@@ -1069,6 +1082,8 @@ out:
 }
 
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 static int
 loop_release_xfer(struct loop_device *lo)
 {
@@ -1205,8 +1220,6 @@ static int loop_configure(struct loop_device *lo, fmode_t mode,
 	mapping = file->f_mapping;
 	inode = mapping->host;
 
-	size = get_loop_size(lo, file);
-
 	if ((config->info.lo_flags & ~LOOP_CONFIGURE_SETTABLE_FLAGS) != 0) {
 		error = -EINVAL;
 		goto out_unlock;
@@ -1255,8 +1268,11 @@ static int loop_configure(struct loop_device *lo, fmode_t mode,
 	blk_queue_physical_block_size(lo->lo_queue, bsize);
 	blk_queue_io_min(lo->lo_queue, bsize);
 
+	loop_config_discard(lo);
 	loop_update_dio(lo);
 	loop_sysfs_init(lo);
+
+	size = get_loop_size(lo, file);
 	loop_set_size(lo, size);
 
 	set_blocksize(bdev, S_ISBLK(inode->i_mode) ?
@@ -1266,6 +1282,8 @@ static int loop_configure(struct loop_device *lo, fmode_t mode,
 	if (part_shift)
 		lo->lo_flags |= LO_FLAGS_PARTSCAN;
 	partscan = lo->lo_flags & LO_FLAGS_PARTSCAN;
+	if (partscan)
+		lo->lo_disk->flags &= ~GENHD_FL_NO_PART_SCAN;
 
 	/* Grab the block_device to prevent its destruction after we
 	 * put /dev/loopXX inode. Later in __loop_clr_fd() we bdput(bdev).
@@ -1429,20 +1447,14 @@ static int loop_clr_fd(struct loop_device *lo)
 	return __loop_clr_fd(lo, false);
 }
 
-/**
- * loop_set_status_from_info - configure device from loop_info
- * @lo: struct loop_device to configure
- * @info: struct loop_info64 to configure the device with
- *
- * Configures the loop device parameters according to the passed
- * in loop_info64 configuration.
- */
 static int
-loop_set_status_from_info(struct loop_device *lo,
-			  const struct loop_info64 *info)
+loop_set_status(struct loop_device *lo, const struct loop_info64 *info)
 {
 	int err;
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	struct block_device *bdev;
 	kuid_t uid = current_uid();
 	int prev_lo_flags;
@@ -1472,6 +1484,7 @@ loop_set_status_from_info(struct loop_device *lo,
 
 	/* I/O need to be drained during transfer transition */
 	blk_mq_freeze_queue(lo->lo_queue);
+<<<<<<< HEAD
 =======
 	struct loop_func_table *xfer;
 	kuid_t uid = current_uid();
@@ -1480,6 +1493,8 @@ loop_set_status_from_info(struct loop_device *lo,
 	if ((unsigned int) info->lo_encrypt_key_size > LO_KEY_SIZE)
 		return -EINVAL;
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	if (size_changed && lo->lo_device->bd_inode->i_mapping->nrpages) {
 		/* If any pages were dirtied after kill_bdev(), try again */
@@ -1494,7 +1509,7 @@ loop_set_status_from_info(struct loop_device *lo,
 
 	err = loop_set_status_from_info(lo, info);
 	if (err)
-		return err;
+		goto out_unfreeze;
 
 	/* Mask out flags that can't be set using LOOP_SET_STATUS. */
 	lo->lo_flags &= LOOP_SET_STATUS_SETTABLE_FLAGS;
@@ -1503,6 +1518,7 @@ loop_set_status_from_info(struct loop_device *lo,
 	/* For flags that can't be cleared, use previous values too */
 	lo->lo_flags |= prev_lo_flags & ~LOOP_SET_STATUS_CLEARABLE_FLAGS;
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 	if (size_changed) {
 		loff_t new_size = get_size(lo->lo_offset, lo->lo_sizelimit,
@@ -1609,6 +1625,8 @@ loop_set_status(struct loop_device *lo, const struct loop_info64 *info)
 	if (err)
 		goto out_unfreeze;
 
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	if (size_changed) {
 		loff_t new_size = get_size(lo->lo_offset, lo->lo_sizelimit,
 					   lo->lo_backing_file);
@@ -1617,7 +1635,10 @@ loop_set_status(struct loop_device *lo, const struct loop_info64 *info)
 
 	loop_config_discard(lo);
 
+<<<<<<< HEAD
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	/* update dio if lo_offset or transfer is changed */
 	__loop_update_dio(lo, lo->use_dio);
 
@@ -1657,6 +1678,11 @@ loop_get_status(struct loop_device *lo, struct loop_info64 *info)
 	info->lo_number = lo->lo_number;
 	info->lo_offset = lo->lo_offset;
 	info->lo_sizelimit = lo->lo_sizelimit;
+
+	/* loff_t vars have been assigned __u64 */
+	if (lo->lo_offset < 0 || lo->lo_sizelimit < 0)
+		return -EOVERFLOW;
+
 	info->lo_flags = lo->lo_flags;
 	memcpy(info->lo_file_name, lo->lo_file_name, LO_NAME_SIZE);
 	memcpy(info->lo_crypt_name, lo->lo_crypt_name, LO_NAME_SIZE);

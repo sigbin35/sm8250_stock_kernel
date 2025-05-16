@@ -147,7 +147,10 @@ static void sched_boost_disable(int type)
 {
 	struct sched_boost_data *sb = &sched_boosts[type];
 	int next_boost, prev_boost = sched_boost_type;
+<<<<<<< HEAD
 
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	if (sb->refcount <= 0)
 		return;
@@ -157,17 +160,24 @@ static void sched_boost_disable(int type)
 	if (sb->refcount)
 		return;
 
+	next_boost = sched_effective_boost();
+	if (next_boost == prev_boost)
+		return;
 	/*
 	 * This boost's refcount becomes zero, so it must
 	 * be disabled. Disable it first and then apply
 	 * the next boost.
 	 */
+<<<<<<< HEAD
 	sb->exit();
 
 	next_boost = sched_effective_boost();
 	if(next_boost == prev_boost)
 		return;
 
+=======
+	sched_boosts[prev_boost].exit();
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	sched_boosts[next_boost].enter();
 }
 

@@ -278,7 +278,12 @@ int ext4fs_dirhash(const struct inode *dir, const char *name, int len,
 	unsigned char *buff;
 	struct qstr qstr = {.name = name, .len = len };
 
+<<<<<<< HEAD
 	if (len && IS_CASEFOLDED(dir) && um) {
+=======
+	if (len && IS_CASEFOLDED(dir) && um &&
+	   (!IS_ENCRYPTED(dir) || fscrypt_has_encryption_key(dir))) {
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		buff = kzalloc(sizeof(char) * PATH_MAX, GFP_KERNEL);
 		if (!buff)
 			return -ENOMEM;

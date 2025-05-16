@@ -2776,10 +2776,15 @@ int snd_soc_register_card(struct snd_soc_card *card)
 	mutex_init(&card->mutex);
 	mutex_init(&card->dapm_mutex);
 <<<<<<< HEAD
+<<<<<<< HEAD
 	mutex_init(&card->dapm_power_mutex);
 =======
 	spin_lock_init(&card->dpcm_lock);
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	mutex_init(&card->dapm_power_mutex);
+	spin_lock_init(&card->dpcm_lock);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	ret = snd_soc_instantiate_card(card);
 	if (ret != 0)

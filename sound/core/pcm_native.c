@@ -859,6 +859,7 @@ static int snd_pcm_hw_free(struct snd_pcm_substream *substream)
 		result = substream->ops->hw_free(substream);
 	snd_pcm_set_state(substream, SNDRV_PCM_STATE_OPEN);
 <<<<<<< HEAD
+<<<<<<< HEAD
 	if (pm_qos_request_active(&substream->latency_pm_qos_req))
 		pm_qos_remove_request(&substream->latency_pm_qos_req);
 =======
@@ -866,6 +867,12 @@ static int snd_pcm_hw_free(struct snd_pcm_substream *substream)
  unlock:
 	snd_pcm_buffer_access_unlock(runtime);
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	if (pm_qos_request_active(&substream->latency_pm_qos_req))
+		pm_qos_remove_request(&substream->latency_pm_qos_req);
+ unlock:
+	snd_pcm_buffer_access_unlock(runtime);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	return result;
 }
 

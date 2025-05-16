@@ -374,10 +374,14 @@ static struct avc_xperms_decision_node
 
 	xpd_node = kmem_cache_zalloc(avc_xperms_decision_cachep,
 <<<<<<< HEAD
+<<<<<<< HEAD
 			GFP_NOWAIT | __GFP_NOWARN);
 =======
 				     GFP_NOWAIT | __GFP_NOWARN);
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+				     GFP_NOWAIT | __GFP_NOWARN);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	if (!xpd_node)
 		return NULL;
 
@@ -425,11 +429,15 @@ static struct avc_xperms_node *avc_xperms_alloc(void)
 	struct avc_xperms_node *xp_node;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	xp_node = kmem_cache_zalloc(avc_xperms_cachep,
 			GFP_NOWAIT | __GFP_NOWARN);
 =======
 	xp_node = kmem_cache_zalloc(avc_xperms_cachep, GFP_NOWAIT | __GFP_NOWARN);
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	xp_node = kmem_cache_zalloc(avc_xperms_cachep, GFP_NOWAIT | __GFP_NOWARN);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	if (!xp_node)
 		return xp_node;
 	INIT_LIST_HEAD(&xp_node->xpd_head);

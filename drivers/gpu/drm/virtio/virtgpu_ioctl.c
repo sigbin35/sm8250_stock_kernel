@@ -195,7 +195,7 @@ static int virtio_gpu_execbuffer_ioctl(struct drm_device *dev, void *data,
 	if (ret)
 		goto out_free;
 
-	buf = memdup_user(u64_to_user_ptr(exbuf->command), exbuf->size);
+	buf = vmemdup_user(u64_to_user_ptr(exbuf->command), exbuf->size);
 	if (IS_ERR(buf)) {
 		ret = PTR_ERR(buf);
 		goto out_unresv;
@@ -221,6 +221,7 @@ static int virtio_gpu_execbuffer_ioctl(struct drm_device *dev, void *data,
 
 	virtio_gpu_cmd_submit(vgdev, buf, exbuf->size,
 			      vfpriv->ctx_id, out_fence);
+	dma_fence_put(&out_fence->f);
 
 	ttm_eu_fence_buffer_objects(&ticket, &validate_list, &out_fence->f);
 
@@ -230,7 +231,7 @@ static int virtio_gpu_execbuffer_ioctl(struct drm_device *dev, void *data,
 	return 0;
 
 out_memdup:
-	kfree(buf);
+	kvfree(buf);
 out_unresv:
 	ttm_eu_backoff_reservation(&ticket, &validate_list);
 out_free:
@@ -329,12 +330,15 @@ static int virtio_gpu_resource_create_ioctl(struct drm_device *dev, void *data,
 	rc->res_handle = qobj->hw_res_handle; /* similiar to a VM address */
 	rc->bo_handle = handle;
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 	if (vgdev->has_virgl_3d) {
 		virtio_gpu_unref_list(&validate_list);
 		dma_fence_put(&fence->f);
 	}
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	/*
 	 * The handle owns the reference now.  But we must drop our
@@ -344,7 +348,10 @@ static int virtio_gpu_resource_create_ioctl(struct drm_device *dev, void *data,
 	 */
 	drm_gem_object_put_unlocked(obj);
 
+<<<<<<< HEAD
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	return 0;
 }
 

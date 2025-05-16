@@ -714,7 +714,8 @@ static int generate_sched_domains(cpumask_var_t **domains,
 					 housekeeping_cpumask(HK_FLAG_DOMAIN))))
 			continue;
 
-		if (is_sched_load_balance(cp))
+		if (is_sched_load_balance(cp) &&
+		    !cpumask_empty(cp->effective_cpus))
 			csa[csn++] = cp;
 
 		/* skip @cp's subtree */
@@ -869,6 +870,9 @@ void rebuild_sched_domains(void)
 	mutex_unlock(&cpuset_mutex);
 	put_online_cpus();
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 }
 
 static int update_cpus_allowed(struct cpuset *cs, struct task_struct *p,
@@ -883,8 +887,11 @@ static int update_cpus_allowed(struct cpuset *cs, struct task_struct *p,
 	}
 
 	return set_cpus_allowed_ptr(p, new_mask);
+<<<<<<< HEAD
 =======
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 }
 
 /**

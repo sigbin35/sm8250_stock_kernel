@@ -45,7 +45,10 @@
 #include <linux/security.h>
 #include <linux/string.h>
 #include <linux/list.h>
+<<<<<<< HEAD
 #include <linux/ratelimit.h>
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 #include <linux/iversion.h>
 #include "multiuser.h"
 
@@ -511,6 +514,7 @@ struct limit_search {
 extern void setup_derived_state(struct inode *inode, perm_t perm,
 			userid_t userid, uid_t uid);
 extern void get_derived_permission(struct dentry *parent, struct dentry *dentry);
+<<<<<<< HEAD
 extern void get_derived_permission_new(struct dentry *parent,
 		struct dentry *dentry, const struct qstr *name);
 extern void get_derived_permission_inode_new(struct dentry *parent,
@@ -519,6 +523,12 @@ extern void fixup_perms_recursive(struct dentry *dentry, struct limit_search *li
 
 extern void update_derived_permission_lock(struct dentry *dentry,
 		struct inode *inode);
+=======
+extern void get_derived_permission_new(struct dentry *parent, struct dentry *dentry, const struct qstr *name);
+extern void fixup_perms_recursive(struct dentry *dentry, struct limit_search *limit);
+
+extern void update_derived_permission_lock(struct dentry *dentry);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 void fixup_lower_ownership(struct dentry *dentry, const char *name);
 extern int need_graft_path(struct dentry *dentry);
 extern int is_base_obbpath(struct dentry *dentry);
@@ -579,8 +589,11 @@ out_unlock:
 	return err;
 }
 
+<<<<<<< HEAD
 #define AID_USE_ROOT_RESERVED KGIDT_INIT(5678)
 
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 /*
  * Return 1, if a disk has enough free space, otherwise 0.
  * We assume that any files can not be overwritten.
@@ -593,11 +606,14 @@ static inline int check_min_free_space(struct dentry *dentry, size_t size, int d
 	u64 avail;
 	struct sdcardfs_sb_info *sbi = SDCARDFS_SB(dentry->d_sb);
 
+<<<<<<< HEAD
 	if (uid_eq(GLOBAL_ROOT_UID, current_fsuid()) ||
 			capable(CAP_SYS_RESOURCE) ||
 			in_group_p(AID_USE_ROOT_RESERVED))
 		return 1;
 
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	if (sbi->options.reserved_mb) {
 		/* Get fs stat of lower filesystem. */
 		sdcardfs_get_lower_path(dentry, &lower_path);
@@ -605,11 +621,19 @@ static inline int check_min_free_space(struct dentry *dentry, size_t size, int d
 		sdcardfs_put_lower_path(dentry, &lower_path);
 
 		if (unlikely(err))
+<<<<<<< HEAD
 			goto out_invalid;
 
 		/* Invalid statfs informations. */
 		if (unlikely(statfs.f_bsize == 0))
 			goto out_invalid;
+=======
+			return 0;
+
+		/* Invalid statfs informations. */
+		if (unlikely(statfs.f_bsize == 0))
+			return 0;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 		/* if you are checking directory, set size to f_bsize. */
 		if (unlikely(dir))
@@ -620,12 +644,17 @@ static inline int check_min_free_space(struct dentry *dentry, size_t size, int d
 
 		/* not enough space */
 		if ((u64)size > avail)
+<<<<<<< HEAD
 			goto out_nospc;
+=======
+			return 0;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 		/* enough space */
 		if ((avail - size) > (sbi->options.reserved_mb * 1024 * 1024))
 			return 1;
 
+<<<<<<< HEAD
 		goto out_nospc;
 	} else
 		return 1;
@@ -648,6 +677,11 @@ out_nospc:
 	pr_info_ratelimited("sdcardfs: f_bavail: %llu f_bsize: %ld required: %llu\n",
 		statfs.f_bavail, statfs.f_bsize, (u64) size);
 	return 0;
+=======
+		return 0;
+	} else
+		return 1;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 }
 
 /*

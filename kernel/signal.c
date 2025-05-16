@@ -45,6 +45,10 @@
 #include <linux/livepatch.h>
 #include <linux/oom.h>
 #include <linux/capability.h>
+<<<<<<< HEAD
+=======
+#include <linux/cgroup.h>
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/signal.h>
@@ -1948,8 +1952,12 @@ bool do_notify_parent(struct task_struct *tsk, int sig)
 		if (psig->action[SIGCHLD-1].sa.sa_handler == SIG_IGN)
 			sig = 0;
 	}
+	/*
+	 * Send with __send_signal as si_pid and si_uid are in the
+	 * parent's namespaces.
+	 */
 	if (valid_signal(sig) && sig)
-		__group_send_sig_info(sig, &info, tsk->parent);
+		__send_signal(sig, &info, tsk->parent, PIDTYPE_TGID, false);
 	__wake_up_parent(tsk, tsk->parent);
 	spin_unlock_irqrestore(&psig->siglock, flags);
 

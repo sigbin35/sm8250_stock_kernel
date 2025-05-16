@@ -995,6 +995,16 @@ static int mmc_sdio_resume(struct mmc_host *host)
 		 */
 		mmc_retune_hold_now(host);
 		err = sdio_enable_4bit_bus(host->card);
+<<<<<<< HEAD
+=======
+		if (err > 0) {
+			if (host->caps & MMC_CAP_8_BIT_DATA)
+				mmc_set_bus_width(host, MMC_BUS_WIDTH_8);
+			else if (host->caps & MMC_CAP_4_BIT_DATA)
+				mmc_set_bus_width(host, MMC_BUS_WIDTH_4);
+			err = 0;
+		}
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		mmc_retune_release(host);
 	}
 
@@ -1010,6 +1020,8 @@ static int mmc_sdio_resume(struct mmc_host *host)
 		else if (host->caps & MMC_CAP_SDIO_IRQ)
 			host->ops->enable_sdio_irq(host, 1);
 	}
+
+	mmc_retune_needed(host);
 
 out:
 	mmc_log_string(host, "Exit err: %d\n", err);

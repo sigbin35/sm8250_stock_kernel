@@ -119,14 +119,9 @@ static inline void apply_alternatives_module(void *start, size_t length) { }
 	.popsection
 	.pushsection .altinstr_replacement, "ax"
 663:	\insn2
-<<<<<<< HEAD
 664:	.popsection
-	.org	. - (664b-663b) + (662b-661b)
-=======
-664:	.org	. - (664b-663b) + (662b-661b)
->>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	.org	. - (662b-661b) + (664b-663b)
-	.previous
+	.popsection
 	.endif
 .endm
 

@@ -1280,6 +1280,7 @@ void tick_irq_enter(void)
  * High resolution timer specific code
  */
 #ifdef CONFIG_HIGH_RES_TIMERS
+<<<<<<< HEAD
 static void wakeup_user(void)
 {
 	unsigned long jiffy_gap;
@@ -1290,6 +1291,18 @@ static void wakeup_user(void)
 		queue_work(rq_wq, &rq_info.def_timer_work);
 	}
 }
+=======
+static void (*wake_callback)(void);
+
+void register_tick_sched_wakeup_callback(void (*cb)(void))
+{
+	if (!wake_callback)
+		wake_callback = cb;
+	else
+		pr_warn("tick-sched wake cb already exists; skipping.\n");
+}
+EXPORT_SYMBOL_GPL(register_tick_sched_wakeup_callback);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 /*
  * We rearm the timer until we get disabled by the idle code.
@@ -1310,12 +1323,20 @@ static enum hrtimer_restart tick_sched_timer(struct hrtimer *timer)
 	 */
 	if (regs) {
 		tick_sched_handle(ts, regs);
+<<<<<<< HEAD
 		if (rq_info.init == 1 &&
+=======
+		if (rq_info.init == 1 && wake_callback &&
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 				tick_do_timer_cpu == smp_processor_id()) {
 			/*
 			 * wakeup user if needed
 			 */
+<<<<<<< HEAD
 			wakeup_user();
+=======
+			wake_callback();
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		}
 	}
 	else

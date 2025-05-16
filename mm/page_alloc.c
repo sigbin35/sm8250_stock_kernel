@@ -951,15 +951,22 @@ static inline void __free_one_page(struct page *page,
 
 continue_merging:
 <<<<<<< HEAD
+<<<<<<< HEAD
 	while (order < max_order - 1) {
+=======
+	while (order < max_order) {
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		if (compaction_capture(capc, page, order, migratetype)) {
 			__mod_zone_freepage_state(zone, -(1 << order),
 								migratetype);
 			return;
 		}
+<<<<<<< HEAD
 =======
 	while (order < max_order) {
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		buddy_pfn = __find_buddy_pfn(pfn, order);
 		buddy = page + (buddy_pfn - pfn);
 
@@ -4768,11 +4775,17 @@ retry:
 	 * of free memory (see __compaction_suitable)
 	 */
 <<<<<<< HEAD
+<<<<<<< HEAD
 	if ((did_some_progress > 0 ||
 			IS_ENABLED(CONFIG_HAVE_LOW_MEMORY_KILLER)) &&
 =======
 	if (did_some_progress > 0 && can_compact &&
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	if ((did_some_progress > 0 ||
+			IS_ENABLED(CONFIG_HAVE_LOW_MEMORY_KILLER)) &&
+			can_compact &&
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 			should_compact_retry(ac, order, alloc_flags,
 				compact_result, &compact_priority,
 				&compaction_retries))

@@ -2326,6 +2326,7 @@ static ssize_t mm_stat_show(struct device *dev,
 			max_used << PAGE_SHIFT,
 			(u64)atomic64_read(&zram->stats.same_pages),
 <<<<<<< HEAD
+<<<<<<< HEAD
 			pool_stats.pages_compacted,
 			(u64)atomic64_read(&zram->stats.huge_pages),
 			zram_dedup_dup_size(zram),
@@ -2334,6 +2335,12 @@ static ssize_t mm_stat_show(struct device *dev,
 			atomic_long_read(&pool_stats.pages_compacted),
 			(u64)atomic64_read(&zram->stats.huge_pages));
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+			atomic_long_read(&pool_stats.pages_compacted),
+			(u64)atomic64_read(&zram->stats.huge_pages),
+			zram_dedup_dup_size(zram),
+			zram_dedup_meta_size(zram));
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	up_read(&zram->init_lock);
 
 	return ret;
@@ -3442,7 +3449,8 @@ static int zram_add(void)
 
 	zram->disk->queue->backing_dev_info->capabilities |=
 			(BDI_CAP_STABLE_WRITES | BDI_CAP_SYNCHRONOUS_IO);
-	device_add_disk(NULL, zram->disk, zram_disk_attr_groups);
+	disk_to_dev(zram->disk)->groups = zram_disk_attr_groups;
+	add_disk(zram->disk);
 
 	strlcpy(zram->compressor, default_compressor, sizeof(zram->compressor));
 
@@ -3481,7 +3489,6 @@ static int zram_remove(struct zram *zram)
 	stop_lru_writeback(zram);
 #endif
 	zram_debugfs_unregister(zram);
-
 	/* Make sure all the pending I/O are finished */
 	fsync_bdev(bdev);
 	zram_reset_device(zram);

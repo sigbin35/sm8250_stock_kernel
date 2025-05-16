@@ -280,7 +280,10 @@ static void __cqhci_enable(struct cqhci_host *cq_host)
 		cqcfg |= CQHCI_TASK_DESC_SZ;
 
 	if (cqhci_host_is_crypto_supported(cq_host)) {
+<<<<<<< HEAD
 //		cqhci_crypto_enable(cq_host);
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		cqcfg |= CQHCI_ICE_ENABLE;
 		/* For SDHC v5.0 onwards, ICE 3.0 specific registers are added
 		 * in CQ register space, due to which few CQ registers are
@@ -293,6 +296,9 @@ static void __cqhci_enable(struct cqhci_host *cq_host)
 
 	cqcfg |= CQHCI_ENABLE;
 	cqhci_writel(cq_host, cqcfg, CQHCI_CFG);
+
+	if (cqhci_readl(cq_host, CQHCI_CTL) & CQHCI_HALT)
+		cqhci_writel(cq_host, 0, CQHCI_CTL);
 
 	cqhci_writel(cq_host, lower_32_bits(cq_host->desc_dma_base),
 		     CQHCI_TDLBA);
@@ -307,6 +313,7 @@ static void __cqhci_enable(struct cqhci_host *cq_host)
 	cqhci_set_irqs(cq_host, 0);
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 	cqcfg |= CQHCI_ENABLE;
 
@@ -316,6 +323,8 @@ static void __cqhci_enable(struct cqhci_host *cq_host)
 		cqhci_writel(cq_host, 0, CQHCI_CTL);
 
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	mmc->cqe_on = true;
 
 	if (cq_host->ops->enable)
@@ -334,9 +343,12 @@ static void __cqhci_disable(struct cqhci_host *cq_host)
 {
 	u32 cqcfg;
 
+<<<<<<< HEAD
 //	if (cqhci_host_is_crypto_supported(cq_host))
 //		cqhci_crypto_disable(cq_host);
 
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	cqcfg = cqhci_readl(cq_host, CQHCI_CFG);
 	cqcfg &= ~CQHCI_ENABLE;
 	cqhci_writel(cq_host, cqcfg, CQHCI_CFG);
@@ -384,7 +396,13 @@ static int cqhci_enable(struct mmc_host *mmc, struct mmc_card *card)
     if (cqhci_host_is_crypto_supported(cq_host))
         cqhci_crypto_enable(cq_host);
 
+	if (cqhci_host_is_crypto_supported(cq_host))
+		cqhci_crypto_enable(cq_host);
+
 	__cqhci_enable(cq_host);
+
+	if (cq_host->ops->enhanced_strobe_mask)
+		cq_host->ops->enhanced_strobe_mask(mmc, true);
 
 	cq_host->enabled = true;
 
@@ -443,7 +461,13 @@ static void cqhci_disable(struct mmc_host *mmc)
     if (cqhci_host_is_crypto_supported(cq_host))
         cqhci_crypto_disable(cq_host);
 
+	if (cqhci_host_is_crypto_supported(cq_host))
+		cqhci_crypto_disable(cq_host);
+
 	__cqhci_disable(cq_host);
+
+	if (cq_host->ops->enhanced_strobe_mask)
+		cq_host->ops->enhanced_strobe_mask(mmc, false);
 
 	dmam_free_coherent(mmc_dev(mmc), cq_host->data_size,
 			   cq_host->trans_desc_base,
@@ -1100,10 +1124,14 @@ static bool cqhci_halt(struct mmc_host *mmc, unsigned int timeout)
 
 	if (!ret)
 <<<<<<< HEAD
+<<<<<<< HEAD
 		pr_err("%s: cqhci: Failed to halt\n", mmc_hostname(mmc));
 =======
 		pr_warn("%s: cqhci: Failed to halt\n", mmc_hostname(mmc));
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+		pr_warn("%s: cqhci: Failed to halt\n", mmc_hostname(mmc));
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	mmc_log_string(mmc, "halt done with ret %d\n", ret);
 	return ret;
@@ -1116,10 +1144,14 @@ static bool cqhci_halt(struct mmc_host *mmc, unsigned int timeout)
  * the recovery, so set a timeout that would reasonably allow I/O to complete.
  */
 <<<<<<< HEAD
+<<<<<<< HEAD
 #define CQHCI_START_HALT_TIMEOUT	5000
 =======
 #define CQHCI_START_HALT_TIMEOUT	500
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+#define CQHCI_START_HALT_TIMEOUT	5000
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 static void cqhci_recovery_start(struct mmc_host *mmc)
 {

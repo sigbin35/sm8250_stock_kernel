@@ -121,8 +121,13 @@ static size_t fifo_tx_avail(struct fifo_pipe *pipe)
 		avail = tail - head;
 
 	if (WARN_ON_ONCE(avail > pipe->length))
+<<<<<<< HEAD
 		 avail = 0;
 	 
+=======
+		avail = 0;
+
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	return avail;
 }
 

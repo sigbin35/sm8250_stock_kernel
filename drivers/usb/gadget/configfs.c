@@ -178,6 +178,7 @@ struct gadget_config_name {
 };
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 #define MAX_USB_STRING_LEN	126
 #define MAX_USB_STRING_WITH_NULL_LEN	(MAX_USB_STRING_LEN+1)
 #ifdef CONFIG_USB_TYPEC_MANAGER_NOTIFIER
@@ -206,12 +207,16 @@ EXPORT_SYMBOL(dwc3_gadget_get_cmply_link_state_wrapper);
 =======
 #define USB_MAX_STRING_WITH_NULL_LEN	(USB_MAX_STRING_LEN+1)
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+#define USB_MAX_STRING_WITH_NULL_LEN	(USB_MAX_STRING_LEN+1)
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 static int usb_string_copy(const char *s, char **s_copy)
 {
 	int ret;
 	char *str;
 	char *copy = *s_copy;
+<<<<<<< HEAD
 <<<<<<< HEAD
 	ret = strlen(s);
 	if (ret > MAX_USB_STRING_LEN)
@@ -226,6 +231,8 @@ static int usb_string_copy(const char *s, char **s_copy)
 	}
 	strlcpy(str, s, MAX_USB_STRING_WITH_NULL_LEN);
 =======
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	ret = strlen(s);
 	if (ret > USB_MAX_STRING_LEN)
@@ -241,7 +248,10 @@ static int usb_string_copy(const char *s, char **s_copy)
 			return -ENOMEM;
 	}
 	strcpy(str, s);
+<<<<<<< HEAD
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	if (str[ret - 1] == '\n')
 		str[ret - 1] = '\0';
 	*s_copy = str;
@@ -1858,7 +1868,14 @@ static int android_setup(struct usb_gadget *gadget,
 static void android_disconnect(struct usb_gadget *gadget)
 {
 	struct usb_composite_dev        *cdev = get_gadget_data(gadget);
-	struct gadget_info *gi = container_of(cdev, struct gadget_info, cdev);
+	struct gadget_info *gi;
+
+	if (!cdev) {
+		pr_err("%s: gadget is not connected\n", __func__);
+		return;
+	}
+
+	gi = container_of(cdev, struct gadget_info, cdev);
 
 	/* FIXME: There's a race between usb_gadget_udc_stop() which is likely
 	 * to set the gadget driver to NULL in the udc driver and this drivers

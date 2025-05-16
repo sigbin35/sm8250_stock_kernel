@@ -323,12 +323,19 @@ void fscrypt_generate_iv(union fscrypt_iv *iv, u64 lblk_num,
 			 const struct fscrypt_info *ci);
 
 /* fname.c */
+<<<<<<< HEAD
 extern int fscrypt_fname_encrypt(const struct inode *inode,
 				 const struct qstr *iname,
 				 u8 *out, unsigned int olen);
 extern bool fscrypt_fname_encrypted_size(const struct inode *inode,
 					 u32 orig_len, u32 max_len,
 					 u32 *encrypted_len_ret);
+=======
+int fscrypt_fname_encrypt(const struct inode *inode, const struct qstr *iname,
+			  u8 *out, unsigned int olen);
+bool fscrypt_fname_encrypted_size(const struct inode *inode, u32 orig_len,
+				  u32 max_len, u32 *encrypted_len_ret);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 /* hkdf.c */
 
@@ -405,6 +412,8 @@ fscrypt_is_key_prepared(struct fscrypt_prepared_key *prep_key,
 	return READ_ONCE(prep_key->tfm) != NULL;
 }
 
+extern int fscrypt_find_storage_type(char **device);
+
 #else /* CONFIG_FS_ENCRYPTION_INLINE_CRYPT */
 
 static inline int fscrypt_select_encryption_impl(struct fscrypt_info *ci,
@@ -450,6 +459,11 @@ fscrypt_is_key_prepared(struct fscrypt_prepared_key *prep_key,
 			const struct fscrypt_info *ci)
 {
 	return READ_ONCE(prep_key->tfm) != NULL;
+}
+
+static inline int fscrypt_find_storage_type(char **device)
+{
+	return -EOPNOTSUPP;
 }
 #endif /* !CONFIG_FS_ENCRYPTION_INLINE_CRYPT */
 
@@ -621,6 +635,7 @@ struct fscrypt_mode {
 
 extern struct fscrypt_mode fscrypt_modes[];
 
+<<<<<<< HEAD
 extern int fscrypt_prepare_key(struct fscrypt_prepared_key *prep_key,
 			       const u8 *raw_key, unsigned int raw_key_size,
 			       bool is_hw_wrapped,
@@ -630,6 +645,13 @@ extern void fscrypt_destroy_prepared_key(struct fscrypt_prepared_key *prep_key);
 
 extern int fscrypt_set_per_file_enc_key(struct fscrypt_info *ci,
 					const u8 *raw_key);
+=======
+int fscrypt_prepare_key(struct fscrypt_prepared_key *prep_key,
+			const u8 *raw_key, unsigned int raw_key_size,
+			bool is_hw_wrapped, const struct fscrypt_info *ci);
+
+void fscrypt_destroy_prepared_key(struct fscrypt_prepared_key *prep_key);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 extern int fscrypt_derive_dirhash_key(struct fscrypt_info *ci,
 				      const struct fscrypt_master_key *mk);

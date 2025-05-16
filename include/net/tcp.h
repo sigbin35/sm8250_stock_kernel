@@ -479,6 +479,9 @@ ssize_t tcp_splice_read(struct socket *sk, loff_t *ppos,
 			unsigned int flags);
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 /* sysctl master controller */
 extern int tcp_use_userconfig_sysctl_handler(struct ctl_table *table,
 				int write, void __user *buffer, size_t *length,
@@ -487,12 +490,16 @@ extern int tcp_proc_delayed_ack_control(struct ctl_table *table, int write,
 				void __user *buffer, size_t *length,
 				loff_t *ppos);
 
+<<<<<<< HEAD
 void tcp_enter_quickack_mode(struct sock *sk, unsigned int max_quickacks);
 static inline void tcp_dec_quickack_mode(struct sock *sk,
 					 const unsigned int pkts)
 =======
 static inline void tcp_dec_quickack_mode(struct sock *sk)
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+static inline void tcp_dec_quickack_mode(struct sock *sk)
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 
@@ -537,7 +544,6 @@ void tcp_update_metrics(struct sock *sk);
 void tcp_init_metrics(struct sock *sk);
 void tcp_metrics_init(void);
 bool tcp_peer_is_proven(struct request_sock *req, struct dst_entry *dst);
-void __tcp_close(struct sock *sk, long timeout);
 void tcp_close(struct sock *sk, long timeout);
 void tcp_init_sock(struct sock *sk);
 void tcp_init_transfer(struct sock *sk, int bpf_op);
@@ -1103,8 +1109,6 @@ static inline int tcp_v6_sdif(const struct sk_buff *skb)
 #endif
 	return 0;
 }
-
-void tcp_v6_early_demux(struct sk_buff *skb);
 #endif
 
 static inline bool inet_exact_dif_match(struct net *net, struct sk_buff *skb)
@@ -1537,7 +1541,7 @@ static inline void tcp_sack_reset(struct tcp_options_received *rx_opt)
 	rx_opt->num_sacks = 0;
 }
 
-u32 tcp_default_init_rwnd(const struct sock *sk, u32 mss);
+u32 tcp_default_init_rwnd(u32 mss);
 void tcp_cwnd_restart(struct sock *sk, s32 delta);
 
 static inline void tcp_slow_start_after_idle_check(struct sock *sk)
@@ -2106,16 +2110,12 @@ static inline u32 tcp_notsent_lowat(const struct tcp_sock *tp)
 	return val ?: READ_ONCE(net->ipv4.sysctl_tcp_notsent_lowat);
 }
 
-/* @wake is one when sk_stream_write_space() calls us.
- * This sends EPOLLOUT only if notsent_bytes is half the limit.
- * This mimics the strategy used in sock_def_write_space().
- */
-static inline bool tcp_stream_memory_free(const struct sock *sk, int wake)
+static inline bool tcp_stream_memory_free(const struct sock *sk)
 {
 	const struct tcp_sock *tp = tcp_sk(sk);
 	u32 notsent_bytes = READ_ONCE(tp->write_seq) - tp->snd_nxt;
 
-	return (notsent_bytes << wake) < tcp_notsent_lowat(tp);
+	return notsent_bytes < tcp_notsent_lowat(tp);
 }
 
 #ifdef CONFIG_PROC_FS

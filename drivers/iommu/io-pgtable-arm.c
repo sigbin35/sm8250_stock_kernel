@@ -417,16 +417,20 @@ static arm_lpae_iopte arm_lpae_install_table(arm_lpae_iopte *table,
 					     arm_lpae_iopte *ptep,
 					     arm_lpae_iopte curr,
 <<<<<<< HEAD
+<<<<<<< HEAD
 					     struct io_pgtable_cfg *cfg,
 					     int ref_count)
 =======
 					     struct arm_lpae_io_pgtable *data)
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+					     struct io_pgtable_cfg *cfg,
+					     int ref_count)
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 {
 	arm_lpae_iopte old, new;
-	struct io_pgtable_cfg *cfg = &data->iop.cfg;
 
-	new = paddr_to_iopte(__pa(table), data) | ARM_LPAE_PTE_TYPE_TABLE;
+	new = __pa(table) | ARM_LPAE_PTE_TYPE_TABLE;
 	if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_NS)
 		new |= ARM_LPAE_PTE_NSTABLE;
 	iopte_tblcnt_set(&new, ref_count);
@@ -528,10 +532,14 @@ static int __arm_lpae_map(struct arm_lpae_io_pgtable *data, unsigned long iova,
 			return -ENOMEM;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 		pte = arm_lpae_install_table(cptep, ptep, 0, cfg, 0);
 =======
 		pte = arm_lpae_install_table(cptep, ptep, 0, data);
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+		pte = arm_lpae_install_table(cptep, ptep, 0, cfg, 0);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		if (pte)
 			__arm_lpae_free_pages(cptep, tblsz, cfg, cookie);
 
@@ -801,10 +809,14 @@ static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
 	}
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	pte = arm_lpae_install_table(tablep, ptep, blk_pte, cfg, child_cnt);
 =======
 	pte = arm_lpae_install_table(tablep, ptep, blk_pte, data);
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	pte = arm_lpae_install_table(tablep, ptep, blk_pte, cfg, child_cnt);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	if (pte != blk_pte) {
 		__arm_lpae_free_pages(tablep, tablesz, cfg, cookie);
 		/*

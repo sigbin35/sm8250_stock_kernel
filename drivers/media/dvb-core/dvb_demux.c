@@ -530,6 +530,9 @@ static inline int dvb_dmx_swfilter_payload(struct dvb_demux_feed *feed,
 
 	cc = buf[3] & 0x0f;
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	if (feed->first_cc)
 		ccok = 1;
 	else
@@ -546,6 +549,7 @@ static inline int dvb_dmx_swfilter_payload(struct dvb_demux_feed *feed,
 		feed->pes_tei_counter = 0;
 		feed->pes_cont_err_counter = 0;
 		feed->pes_ts_packets_num = 0;
+<<<<<<< HEAD
 =======
 	ccok = ((feed->cc + 1) & 0x0f) == cc;
 	if (!ccok) {
@@ -553,8 +557,9 @@ static inline int dvb_dmx_swfilter_payload(struct dvb_demux_feed *feed,
 		dprintk_sect_loss("missed packet: %d instead of %d!\n",
 				  cc, (feed->cc + 1) & 0x0f);
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	}
-	feed->cc = cc;
 
 	if (feed->pusi_seen == 0)
 		return 0;
@@ -771,6 +776,9 @@ static int dvb_dmx_swfilter_section_one_packet(struct dvb_demux_feed *feed,
 
 	cc = buf[3] & 0x0f;
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	if (feed->first_cc)
 		ccok = 1;
 	else
@@ -781,10 +789,13 @@ static int dvb_dmx_swfilter_section_one_packet(struct dvb_demux_feed *feed,
 		return -EINVAL;
 
 	feed->first_cc = 0;
+<<<<<<< HEAD
 	feed->cc = cc;
 =======
 	ccok = ((feed->cc + 1) & 0x0f) == cc;
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	if (buf[3] & 0x20) {
 		/* adaption field present, check for discontinuity_indicator */

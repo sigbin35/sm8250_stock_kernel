@@ -99,6 +99,7 @@ static inline int virtio_net_hdr_to_skb(struct sk_buff *skb,
 =======
 			struct flow_keys_basic keys;
 
+<<<<<<< HEAD
 			if (!skb->protocol) {
 				__be16 protocol = dev_parse_header_protocol(skb);
 
@@ -110,6 +111,10 @@ static inline int virtio_net_hdr_to_skb(struct sk_buff *skb,
 					skb->protocol = protocol;
 			}
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+			if (!skb->protocol)
+				virtio_net_hdr_set_proto(skb, hdr);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 retry:
 			skb_probe_transport_header(skb, -1);
 			if (!skb_transport_header_was_set(skb)) {

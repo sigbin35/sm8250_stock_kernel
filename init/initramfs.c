@@ -619,6 +619,9 @@ static void __init clean_rootfs(void)
 #endif
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 static int __initdata do_skip_initramfs;
 
 static int __init skip_initramfs_param(char *str)
@@ -629,7 +632,11 @@ static int __init skip_initramfs_param(char *str)
 	return 1;
 }
 __setup("skip_initramfs", skip_initramfs_param);
+<<<<<<< HEAD
 =======
+=======
+
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 #ifdef CONFIG_BLK_DEV_RAM
 static void __init populate_initrd_image(char *err)
 {
@@ -653,7 +660,10 @@ static void __init populate_initrd_image(char *err)
 	fput(file);
 }
 #endif /* CONFIG_BLK_DEV_RAM */
+<<<<<<< HEAD
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 static int __init populate_rootfs(void)
 {

@@ -1945,7 +1945,7 @@ do_time_wait:
 	goto discard_it;
 }
 
-void tcp_v6_early_demux(struct sk_buff *skb)
+static void tcp_v6_early_demux(struct sk_buff *skb)
 {
 	const struct ipv6hdr *hdr;
 	const struct tcphdr *th;
@@ -2182,12 +2182,17 @@ static void get_tcp6_sock(struct seq_file *seq, struct sock *sp, int i)
 		   dest->s6_addr32[0], dest->s6_addr32[1],
 		   dest->s6_addr32[2], dest->s6_addr32[3], destp,
 <<<<<<< HEAD
+<<<<<<< HEAD
 		   state_seq,
 		   tp->write_seq - tp->snd_una,
 =======
 		   state,
 		   READ_ONCE(tp->write_seq) - tp->snd_una,
 >>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+		   state_seq,
+		   READ_ONCE(tp->write_seq) - tp->snd_una,
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		   rx_queue,
 		   timer_active,
 		   jiffies_delta_to_clock_t(timer_expires - jiffies),
@@ -2337,7 +2342,12 @@ struct proto tcpv6_prot = {
 #endif
 };
 
-static const struct inet6_protocol tcpv6_protocol = {
+/* thinking of making this const? Don't.
+ * early_demux can change based on sysctl.
+ */
+static struct inet6_protocol tcpv6_protocol = {
+	.early_demux	=	tcp_v6_early_demux,
+	.early_demux_handler =  tcp_v6_early_demux,
 	.handler	=	tcp_v6_rcv,
 	.err_handler	=	tcp_v6_err,
 	.flags		=	INET6_PROTO_NOPOLICY|INET6_PROTO_FINAL,
