@@ -8,7 +8,6 @@
 #include <linux/init.h>
 #include <linux/export.h>
 #include <linux/kernel.h>
-#include <linux/module.h>
 #include <linux/err.h>
 #include <linux/elf.h>
 #include <linux/errno.h>
@@ -418,15 +417,14 @@ static int msm_minidump_add_header(void)
 	struct elf_phdr *phdr;
 	unsigned int strtbl_off, elfh_size, phdr_off;
 	char *banner;
-	size_t linux_banner_len = strlen(linux_banner_ptr);
-
+	size_t linux_banner_len = strlen(linux_banner);
 
 	/* Header buffer contains:
 	 * elf header, MAX_NUM_ENTRIES+4 of section and program elf headers,
 	 * string table section and linux banner.
 	 */
 	elfh_size = sizeof(*ehdr) + MAX_STRTBL_SIZE +
-			(strlen(linux_banner_ptr) + 1) +
+			(strlen(linux_banner) + 1) +
 			((sizeof(*shdr) + sizeof(*phdr))
 			 * (MAX_NUM_ENTRIES + 4));
 
@@ -490,21 +488,21 @@ static int msm_minidump_add_header(void)
 
 	/* 4th section is linux banner */
 	banner = (char *)ehdr + strtbl_off + MAX_STRTBL_SIZE;
-	strlcpy(banner, linux_banner_ptr, linux_banner_len + 1);
+	strlcpy(banner, linux_banner, linux_banner_len + 1);
 
 	shdr->sh_type = SHT_PROGBITS;
 	shdr->sh_offset = (elf_addr_t)(strtbl_off + MAX_STRTBL_SIZE);
-	shdr->sh_size = strlen(linux_banner_ptr) + 1;
-	shdr->sh_addr = (elf_addr_t)linux_banner_ptr;
+	shdr->sh_size = strlen(linux_banner) + 1;
+	shdr->sh_addr = (elf_addr_t)linux_banner;
 	shdr->sh_entsize = 0;
 	shdr->sh_flags = SHF_WRITE;
 	shdr->sh_name = set_section_name("linux_banner");
 
 	phdr->p_type = PT_LOAD;
 	phdr->p_offset = (elf_addr_t)(strtbl_off + MAX_STRTBL_SIZE);
-	phdr->p_vaddr = (elf_addr_t)linux_banner_ptr;
-	phdr->p_paddr = virt_to_phys(linux_banner_ptr);
-	phdr->p_filesz = phdr->p_memsz = strlen(linux_banner_ptr) + 1;
+	phdr->p_vaddr = (elf_addr_t)linux_banner;
+	phdr->p_paddr = virt_to_phys(linux_banner);
+	phdr->p_filesz = phdr->p_memsz = strlen(linux_banner) + 1;
 	phdr->p_flags = PF_R | PF_W;
 
 	/* Update headers count*/
@@ -575,5 +573,3 @@ static int __init msm_minidump_init(void)
 	return 0;
 }
 subsys_initcall(msm_minidump_init)
-
-MODULE_LICENSE("GPL v2");

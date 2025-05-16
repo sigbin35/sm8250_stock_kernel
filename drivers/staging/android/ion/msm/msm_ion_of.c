@@ -5,7 +5,6 @@
 
 #include <linux/err.h>
 #include <linux/io.h>
-#include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/of.h>
@@ -14,6 +13,13 @@
 #include <linux/dma-contiguous.h>
 #include <linux/cma.h>
 #include "../ion.h"
+
+#ifdef CONFIG_ION_RBIN_HEAP_EXCEPTION
+#include <linux/of_fdt.h>
+#include <linux/of_reserved_mem.h>
+#include <linux/mm.h>
+#include <linux/memblock.h>
+#endif
 
 #define ION_COMPAT_STR	"qcom,msm-ion"
 
@@ -58,6 +64,10 @@ static struct ion_heap_desc ion_heap_meta[] = {
 		.name	= ION_SPSS_HEAP_NAME,
 	},
 	{
+		.id	= ION_CAMERA_HEAP_ID,
+		.name	= ION_CAMERA_HEAP_NAME,
+	},
+	{
 		.id	= ION_ADSP_HEAP_ID,
 		.name	= ION_ADSP_HEAP_NAME,
 	},
@@ -87,6 +97,7 @@ static struct heap_types_info {
 	MAKE_HEAP_TYPE_MAPPING(SYSTEM),
 	MAKE_HEAP_TYPE_MAPPING(SYSTEM_CONTIG),
 	MAKE_HEAP_TYPE_MAPPING(CARVEOUT),
+	MAKE_HEAP_TYPE_MAPPING(RBIN),
 	MAKE_HEAP_TYPE_MAPPING(SECURE_CARVEOUT),
 	MAKE_HEAP_TYPE_MAPPING(CHUNK),
 	MAKE_HEAP_TYPE_MAPPING(DMA),
@@ -177,6 +188,18 @@ static int msm_ion_get_heap_dt_data(struct device_node *node,
 				ret = 0;
 		}
 
+#ifdef CONFIG_ION_RBIN_HEAP_EXCEPTION
+		if (ret && of_get_property(pnode, "ion,recyclable", NULL)) {
+			struct reserved_mem *rmem;
+
+			rmem = of_reserved_mem_lookup(pnode);
+			if (rmem) {
+				base = rmem->base;
+				size = rmem->size;
+				ret = 0;
+			}
+		}
+#endif
 		if (!ret) {
 			heap->base = base;
 			heap->size = size;

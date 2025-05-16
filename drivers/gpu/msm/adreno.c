@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2002,2007-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/delay.h>
 #include <linux/input.h>
@@ -27,6 +28,10 @@
 
 /* Include the master list of GPU cores that are supported */
 #include "adreno-gpulist.h"
+
+#if defined(CONFIG_SEC_ABC)
+#include <linux/sti/abc_common.h>
+#endif
 
 static void adreno_input_work(struct work_struct *work);
 static unsigned int counter_delta(struct kgsl_device *device,
@@ -558,6 +563,9 @@ void adreno_hang_int_callback(struct adreno_device *adreno_dev, int bit)
 {
 	dev_crit_ratelimited(KGSL_DEVICE(adreno_dev)->dev,
 				"MISC: GPU hang detected\n");
+#if defined(CONFIG_SEC_ABC)
+        sec_abc_send_event("MODULE=gpu_qc@ERROR=gpu_fault");
+#endif
 	adreno_irqctrl(adreno_dev, 0);
 
 	/* Trigger a fault in the dispatcher - this will effect a restart */
@@ -648,6 +656,7 @@ static irqreturn_t adreno_irq_handler(struct kgsl_device *device)
 	}
 
 	adreno_readreg(adreno_dev, ADRENO_REG_RBBM_INT_0_STATUS, &status);
+	gpudev->rbbm_status = status;
 
 	/*
 	 * Clear all the interrupt bits but ADRENO_INT_RBBM_AHB_ERROR. Because
@@ -870,8 +879,6 @@ MODULE_DEVICE_TABLE(platform, adreno_id_table);
 
 static const struct of_device_id adreno_match_table[] = {
 	{ .compatible = "qcom,kgsl-3d0", .data = &device_3d0 },
-	{ .compatible = "qcom,gpu-gmu" },
-	{ .compatible = "qcom,kgsl-smmu-v2" },
 	{}
 };
 
@@ -995,26 +1002,6 @@ static int adreno_of_parse_pwrlevels(struct adreno_device *adreno_dev,
 	return 0;
 }
 
-static void adreno_of_get_bimc_iface_clk(struct adreno_device *adreno_dev,
-		struct device_node *node)
-{
-	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
-	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
-
-	/* Getting gfx-bimc-interface-clk frequency */
-	if (!of_property_read_u32(node, "qcom,gpu-bimc-interface-clk-freq",
-				&pwr->gpu_bimc_int_clk_freq)) {
-		pwr->gpu_bimc_int_clk = devm_clk_get(&device->pdev->dev,
-				"bimc_gpu_clk");
-		if (IS_ERR_OR_NULL(pwr->gpu_bimc_int_clk)) {
-			dev_err(&device->pdev->dev,
-					"dt: Couldn't get bimc_gpu_clk (%d)\n",
-					PTR_ERR(pwr->gpu_bimc_int_clk));
-			pwr->gpu_bimc_int_clk = NULL;
-		}
-	}
-}
-
 static void adreno_of_get_initial_pwrlevel(struct adreno_device *adreno_dev,
 		struct device_node *node)
 {
@@ -1072,8 +1059,6 @@ static int adreno_of_get_legacy_pwrlevels(struct adreno_device *adreno_dev,
 
 	adreno_of_get_limits(adreno_dev, parent);
 
-	adreno_of_get_bimc_iface_clk(adreno_dev, parent);
-
 	return 0;
 }
 
@@ -1100,8 +1085,6 @@ static int adreno_of_get_pwrlevels(struct adreno_device *adreno_dev,
 				return ret;
 
 			adreno_of_get_initial_pwrlevel(adreno_dev, child);
-
-			adreno_of_get_bimc_iface_clk(adreno_dev, child);
 
 			/*
 			 * Check for global throttle-pwrlevel first and override
@@ -1417,15 +1400,6 @@ static int adreno_probe(struct platform_device *pdev)
 	if (!of_id)
 		return -EINVAL;
 
-	/*
-	 * The gmu and the kgsl-iommu device shouldn't be left hanging as an
-	 * unprobed device. So hacking up to just probe it without doing
-	 * anything.
-	 */
-	if (!strcmp(of_id->compatible, "qcom,gpu-gmu") ||
-	    !strcmp(of_id->compatible, "qcom,kgsl-smmu-v2"))
-		return 0;
-
 	adreno_dev = (struct adreno_device *) of_id->data;
 	device = KGSL_DEVICE(adreno_dev);
 
@@ -1476,6 +1450,14 @@ static int adreno_probe(struct platform_device *pdev)
 
 	if (adreno_is_a6xx(adreno_dev))
 		device->mmu.features |= KGSL_MMU_SMMU_APERTURE;
+
+	if (ADRENO_FEATURE(adreno_dev, ADRENO_USE_SHMEM))
+		device->flags |= KGSL_FLAG_USE_SHMEM;
+
+	if (ADRENO_FEATURE(adreno_dev, ADRENO_PROCESS_RECLAIM)) {
+		device->flags |= KGSL_FLAG_USE_SHMEM;
+		device->flags |= KGSL_FLAG_PROCESS_RECLAIM;
+	}
 
 	device->pwrctrl.bus_width = adreno_dev->gpucore->bus_width;
 
@@ -1530,6 +1512,8 @@ static int adreno_probe(struct platform_device *pdev)
 
 	adreno_debugfs_init(adreno_dev);
 	adreno_profile_init(adreno_dev);
+	
+	adreno_dev->perfcounter = false;
 
 	adreno_sysfs_init(adreno_dev);
 
@@ -2480,14 +2464,6 @@ int adreno_reset(struct kgsl_device *device, int fault)
 		}
 	}
 	if (ret) {
-		unsigned long flags = device->pwrctrl.ctrl_flags;
-
-		/*
-		 * Clear ctrl_flags to ensure clocks and regulators are
-		 * turned off
-		 */
-		device->pwrctrl.ctrl_flags = 0;
-
 		/* If soft reset failed/skipped, then pull the power */
 		kgsl_pwrctrl_change_state(device, KGSL_STATE_INIT);
 		/* since device is officially off now clear start bit */
@@ -2505,8 +2481,6 @@ int adreno_reset(struct kgsl_device *device, int fault)
 					break;
 			}
 		}
-
-		device->pwrctrl.ctrl_flags = flags;
 	}
 	if (ret)
 		return ret;
@@ -3102,7 +3076,7 @@ void adreno_spin_idle_debug(struct adreno_device *adreno_dev,
 	unsigned int status, status3, intstatus;
 	unsigned int hwfault, cx_status;
 
-	dev_err(device->dev, str);
+	dev_err(device->dev, "%s", str);
 
 	adreno_readreg(adreno_dev, ADRENO_REG_CP_RB_RPTR, &rptr);
 	adreno_readreg(adreno_dev, ADRENO_REG_CP_RB_WPTR, &wptr);
@@ -4137,29 +4111,19 @@ static int __init kgsl_3d_init(void)
 {
 	int ret;
 
-	ret = kgsl_core_init();
+	ret = platform_driver_register(&kgsl_bus_platform_driver);
 	if (ret)
 		return ret;
 
-	ret = platform_driver_register(&kgsl_bus_platform_driver);
-	if (ret) {
-		kgsl_core_exit();
-		return ret;
-	}
-
 	ret = platform_driver_register(&adreno_platform_driver);
-	if (ret) {
-		kgsl_core_exit();
+	if (ret)
 		platform_driver_unregister(&kgsl_bus_platform_driver);
-	}
 
 	return ret;
 }
 
 static void __exit kgsl_3d_exit(void)
 {
-	kgsl_core_exit();
-
 	platform_driver_unregister(&adreno_platform_driver);
 	platform_driver_unregister(&kgsl_bus_platform_driver);
 }

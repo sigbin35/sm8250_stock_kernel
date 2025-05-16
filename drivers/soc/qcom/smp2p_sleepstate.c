@@ -11,12 +11,11 @@
 #include <linux/of_irq.h>
 #include <linux/of.h>
 #include <linux/pm_wakeup.h>
-#include <linux/delay.h>
 
 #define PROC_AWAKE_ID 12 /* 12th bit */
 #define AWAKE_BIT BIT(PROC_AWAKE_ID)
 static struct qcom_smem_state *state;
-static struct wakeup_source *g_notify_ws;
+static struct wakeup_source *notify_ws;
 
 /**
  * sleepstate_pm_notifier() - PM notifier callback function.
@@ -33,7 +32,6 @@ static int sleepstate_pm_notifier(struct notifier_block *nb,
 	switch (event) {
 	case PM_SUSPEND_PREPARE:
 		qcom_smem_state_update_bits(state, AWAKE_BIT, 0);
-		usleep_range(10000, 10500); /* Tuned based on SMP2P latencies */
 		break;
 
 	case PM_POST_SUSPEND:
@@ -51,7 +49,7 @@ static struct notifier_block sleepstate_pm_nb = {
 
 static irqreturn_t smp2p_sleepstate_handler(int irq, void *ctxt)
 {
-	__pm_wakeup_event(g_notify_ws, 200);
+	__pm_wakeup_event(notify_ws, 200);
 	return IRQ_HANDLED;
 }
 
@@ -73,8 +71,8 @@ static int smp2p_sleepstate_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	g_notify_ws = wakeup_source_register(&pdev->dev, "smp2p-sleepstate");
-	if (!g_notify_ws) {
+	notify_ws = wakeup_source_register(&pdev->dev, "smp2p-sleepstate");
+	if (!notify_ws) {
 		return -ENOMEM;
 		goto err_ws;
 	}
@@ -96,7 +94,7 @@ static int smp2p_sleepstate_probe(struct platform_device *pdev)
 	}
 	return 0;
 err:
-	wakeup_source_unregister(g_notify_ws);
+	wakeup_source_unregister(notify_ws);
 err_ws:
 	unregister_pm_notifier(&sleepstate_pm_nb);
 	return ret;

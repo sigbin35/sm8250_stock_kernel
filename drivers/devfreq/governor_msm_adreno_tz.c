@@ -10,7 +10,6 @@
 #include <linux/slab.h>
 #include <linux/io.h>
 #include <linux/ftrace.h>
-#include <linux/governor_msm_adreno_tz.h>
 #include <linux/mm.h>
 #include <linux/msm_adreno_devfreq.h>
 #include <asm/cacheflush.h>
@@ -22,10 +21,6 @@
 static DEFINE_SPINLOCK(tz_lock);
 static DEFINE_SPINLOCK(sample_lock);
 static DEFINE_SPINLOCK(suspend_lock);
-
-struct devfreq_notifiers msm_adreno_tz_notifiers = { NULL, NULL };
-EXPORT_SYMBOL_GPL(msm_adreno_tz_notifiers);
-
 /*
  * FLOOR is 5msec to capture up to 3 re-draws
  * per frame for 60fps content.
@@ -527,14 +522,7 @@ static int tz_start(struct devfreq *devfreq)
 	for (i = 0; adreno_tz_attr_list[i] != NULL; i++)
 		device_create_file(&devfreq->dev, adreno_tz_attr_list[i]);
 
-	if (msm_adreno_tz_notifiers.add) {
-		ret = msm_adreno_tz_notifiers.add(devfreq->dev.parent,
-						  &priv->nb);
-	} else {
-		pr_err(TAG "msm_adreno_tz_notifiers.add callback is NULL!\n",
-		       __func__);
-	}
-	return ret;
+	return kgsl_devfreq_add_notifier(devfreq->dev.parent, &priv->nb);
 }
 
 static int tz_stop(struct devfreq *devfreq)
@@ -542,12 +530,7 @@ static int tz_stop(struct devfreq *devfreq)
 	int i;
 	struct devfreq_msm_adreno_tz_data *priv = devfreq->data;
 
-	if (msm_adreno_tz_notifiers.delete) {
-		msm_adreno_tz_notifiers.delete(devfreq->dev.parent, &priv->nb);
-	} else {
-		pr_err(TAG "msm_adreno_tz_notifiers.delete callback is NULL!\n",
-		       __func__);
-	}
+	kgsl_devfreq_del_notifier(devfreq->dev.parent, &priv->nb);
 
 	for (i = 0; adreno_tz_attr_list[i] != NULL; i++)
 		device_remove_file(&devfreq->dev, adreno_tz_attr_list[i]);
@@ -691,19 +674,12 @@ static struct devfreq_governor msm_adreno_tz = {
 
 static int __init msm_adreno_tz_init(void)
 {
-	int ret = 0;
 	workqueue = create_freezable_workqueue("governor_msm_adreno_tz_wq");
 
 	if (workqueue == NULL)
 		return -ENOMEM;
 
-	ret = devfreq_add_governor(&msm_adreno_tz);
-	if (!ret) {
-		pr_info(TAG "MSM Adreno TZ governor registered.\n");
-	} else {
-		pr_err(TAG "MSM Adreno TZ governor registration failed!\n");
-	}
-	return ret;
+	return devfreq_add_governor(&msm_adreno_tz);
 }
 subsys_initcall(msm_adreno_tz_init);
 
@@ -721,4 +697,3 @@ static void __exit msm_adreno_tz_exit(void)
 module_exit(msm_adreno_tz_exit);
 
 MODULE_LICENSE("GPL v2");
-MODULE_SOFTDEP("pre: governor_bw_vbif governor_gpubw_mon");

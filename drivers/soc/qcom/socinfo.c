@@ -15,12 +15,13 @@
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/types.h>
+#include <linux/bug.h>
 
 #include <asm/system_misc.h>
 
 #include <soc/qcom/socinfo.h>
 #include <linux/soc/qcom/smem.h>
-#include "boot_stats.h"
+#include <soc/qcom/boot_stats.h>
 
 #define BUILD_ID_LENGTH 32
 #define CHIP_ID_LENGTH 32
@@ -41,7 +42,7 @@ enum {
 	HW_PLATFORM_FFA     = 2,
 	HW_PLATFORM_FLUID   = 3,
 	HW_PLATFORM_SVLTE_FFA	= 4,
-	HW_PLATFORM_OEM     = 5,
+	HW_PLATFORM_SVLTE_SURF	= 5,
 	HW_PLATFORM_MTP_MDM = 7,
 	HW_PLATFORM_MTP  = 8,
 	HW_PLATFORM_LIQUID  = 9,
@@ -64,7 +65,7 @@ const char *hw_platform[] = {
 	[HW_PLATFORM_FFA] = "FFA",
 	[HW_PLATFORM_FLUID] = "Fluid",
 	[HW_PLATFORM_SVLTE_FFA] = "SVLTE_FFA",
-	[HW_PLATFORM_OEM] = "OEM",
+	[HW_PLATFORM_SVLTE_SURF] = "SLVTE_SURF",
 	[HW_PLATFORM_MTP_MDM] = "MDM_MTP_NO_DISPLAY",
 	[HW_PLATFORM_MTP] = "MTP",
 	[HW_PLATFORM_RCM] = "RCM",
@@ -206,9 +207,6 @@ struct socinfo_v0_14 {
 struct socinfo_v0_15 {
 	struct socinfo_v0_14 v0_14;
 	uint32_t nmodem_supported;
-	uint32_t g_hw_platform;
-	uint32_t g_platform_version;
-	uint32_t g_hw_platform_subtype;
 };
 
 static union {
@@ -390,7 +388,6 @@ uint32_t socinfo_get_version(void)
 {
 	return (socinfo) ? socinfo->v0_1.version : 0;
 }
-EXPORT_SYMBOL_GPL(socinfo_get_version);
 
 char *socinfo_get_build_id(void)
 {
@@ -419,6 +416,55 @@ static char *msm_read_hardware_id(void)
 	return msm_soc_str;
 err_path:
 	return "UNKNOWN SOC TYPE";
+}
+
+const char * __init arch_read_machine_name(void)
+{
+	static char msm_machine_name[256] = "Qualcomm Technologies, Inc. ";
+	static bool string_generated;
+	u32 len = 0;
+	const char *name;
+
+	if (string_generated)
+		return msm_machine_name;
+
+	len = strlen(msm_machine_name);
+	name = of_get_flat_dt_prop(of_get_flat_dt_root(),
+				"qcom,msm-name", NULL);
+	if (name)
+		len += snprintf(msm_machine_name + len,
+					sizeof(msm_machine_name) - len,
+					"%s", name);
+	else
+		goto no_prop_path;
+
+	name = of_get_flat_dt_prop(of_get_flat_dt_root(),
+				"qcom,pmic-name", NULL);
+	if (name) {
+		len += snprintf(msm_machine_name + len,
+					sizeof(msm_machine_name) - len,
+					"%s", " ");
+		len += snprintf(msm_machine_name + len,
+					sizeof(msm_machine_name) - len,
+					"%s", name);
+	} else
+		goto no_prop_path;
+
+	name = of_flat_dt_get_machine_name();
+	if (name) {
+		len += snprintf(msm_machine_name + len,
+					sizeof(msm_machine_name) - len,
+					"%s", " ");
+		len += snprintf(msm_machine_name + len,
+					sizeof(msm_machine_name) - len,
+					"%s", name);
+	} else
+		goto no_prop_path;
+
+	string_generated = true;
+	return msm_machine_name;
+no_prop_path:
+	return of_flat_dt_get_machine_name();
 }
 
 uint32_t socinfo_get_raw_id(void)
@@ -569,33 +615,6 @@ static uint32_t socinfo_get_nmodem_supported(void)
 		: 0;
 }
 
-uint32_t socinfo_get_g_platform_type(void)
-{
-	return socinfo ?
-		(socinfo_format >= SOCINFO_VERSION(0, 15) ?
-			socinfo->v0_15.g_hw_platform : 0)
-		: 0;
-}
-EXPORT_SYMBOL_GPL(socinfo_get_g_platform_type);
-
-uint32_t socinfo_get_g_platform_version(void)
-{
-	return socinfo ?
-		(socinfo_format >= SOCINFO_VERSION(0, 15) ?
-			socinfo->v0_15.g_platform_version : 0)
-		: 0;
-}
-EXPORT_SYMBOL_GPL(socinfo_get_g_platform_version);
-
-uint32_t socinfo_get_g_platform_subtype(void)
-{
-	return socinfo ?
-		(socinfo_format >= SOCINFO_VERSION(0, 15) ?
-			socinfo->v0_15.g_hw_platform_subtype : 0)
-		: 0;
-}
-EXPORT_SYMBOL_GPL(socinfo_get_g_platform_subtype);
-
 enum pmic_model socinfo_get_pmic_model(void)
 {
 	return socinfo ?
@@ -631,6 +650,18 @@ msm_get_vendor(struct device *dev,
 		struct device_attribute *attr,
 		char *buf)
 {
+	return snprintf(buf, PAGE_SIZE, "Qualcomm Technologies, Inc\n");
+}
+
+static ssize_t
+msm_get_crash(struct device *dev,
+		struct device_attribute *attr,
+		char *buf)
+{
+	pr_err("intentional cdsp runtime failed! comment out-just footprint!\n");
+#ifndef CONFIG_SEC_CDSP_NOT_CRASH_ENG
+	//BUG_ON(1);
+#endif /* CONFIG_SEC_CDSP_NOT_CRASH_ENG */
 	return snprintf(buf, PAGE_SIZE, "Qualcomm Technologies, Inc\n");
 }
 
@@ -1061,39 +1092,6 @@ msm_get_images(struct device *dev,
 	return pos;
 }
 
-static ssize_t
-msm_get_g_hw_platform(struct device *dev,
-			struct device_attribute *attr,
-			char *buf)
-{
-	uint32_t g_hw_type;
-
-	g_hw_type = socinfo_get_g_platform_type();
-	return snprintf(buf, PAGE_SIZE, "%-.32s\n",
-			hw_platform[g_hw_type]);
-}
-
-static ssize_t
-msm_get_g_platform_version(struct device *dev,
-				struct device_attribute *attr,
-				char *buf)
-{
-	return snprintf(buf, PAGE_SIZE, "%u\n",
-		socinfo_get_g_platform_version());
-}
-
-static ssize_t
-msm_get_g_platform_subtype_id(struct device *dev,
-			struct device_attribute *attr,
-			char *buf)
-{
-	uint32_t g_hw_subtype;
-
-	g_hw_subtype = socinfo_get_g_platform_subtype();
-	return snprintf(buf, PAGE_SIZE, "%u\n",
-		g_hw_subtype);
-}
-
 static struct device_attribute msm_soc_attr_raw_version =
 	__ATTR(raw_version, 0444, msm_get_raw_version,  NULL);
 
@@ -1102,6 +1100,9 @@ static struct device_attribute msm_soc_attr_raw_id =
 
 static struct device_attribute msm_soc_attr_vendor =
 	__ATTR(vendor, 0444, msm_get_vendor,  NULL);
+
+static struct device_attribute msm_soc_attr_crash =
+	__ATTR(crash, 0444, msm_get_crash,  NULL);
 
 static struct device_attribute msm_soc_attr_build_id =
 	__ATTR(build_id, 0444, msm_get_build_id, NULL);
@@ -1203,17 +1204,6 @@ static struct device_attribute select_image =
 
 static struct device_attribute images =
 	__ATTR(images, 0444, msm_get_images, NULL);
-
-static struct device_attribute msm_soc_attr_g_hw_platform =
-	__ATTR(g_hw_platform, 0444, msm_get_g_hw_platform, NULL);
-
-static struct device_attribute msm_soc_attr_g_platform_version =
-	__ATTR(g_platform_version, 0444,
-			msm_get_g_platform_version, NULL);
-
-static struct device_attribute msm_soc_attr_g_platform_subtype_id =
-	__ATTR(g_platform_subtype_id, 0444,
-			msm_get_g_platform_subtype_id, NULL);
 
 static void * __init setup_dummy_socinfo(void)
 {
@@ -1319,6 +1309,7 @@ static void * __init setup_dummy_socinfo(void)
 static void __init populate_soc_sysfs_files(struct device *msm_soc_device)
 {
 	device_create_file(msm_soc_device, &msm_soc_attr_vendor);
+	device_create_file(msm_soc_device, &msm_soc_attr_crash);
 	device_create_file(msm_soc_device, &image_version);
 	device_create_file(msm_soc_device, &image_variant);
 	device_create_file(msm_soc_device, &image_crm_version);
@@ -1327,12 +1318,6 @@ static void __init populate_soc_sysfs_files(struct device *msm_soc_device)
 
 	switch (socinfo_format) {
 	case SOCINFO_VERSION(0, 15):
-		device_create_file(msm_soc_device,
-					&msm_soc_attr_g_platform_subtype_id);
-		device_create_file(msm_soc_device,
-					&msm_soc_attr_g_platform_version);
-		device_create_file(msm_soc_device,
-					&msm_soc_attr_g_hw_platform);
 		device_create_file(msm_soc_device,
 					&msm_soc_attr_nmodem_supported);
 	case SOCINFO_VERSION(0, 14):
@@ -1443,6 +1428,9 @@ static int __init socinfo_init_sysfs(void)
 	return 0;
 }
 
+late_initcall(socinfo_init_sysfs);
+
+#ifndef CONFIG_SAMSUNG_PRODUCT_SHIP
 static void socinfo_print(void)
 {
 	uint32_t f_maj = SOCINFO_VERSION_MAJOR(socinfo_format);
@@ -1601,7 +1589,7 @@ static void socinfo_print(void)
 		break;
 
 	case SOCINFO_VERSION(0, 15):
-		pr_info("v%u.%u, id=%u, ver=%u.%u, raw_id=%u, raw_ver=%u, hw_plat=%u, hw_plat_ver=%u\n accessory_chip=%u, hw_plat_subtype=%u, pmic_model=%u, pmic_die_revision=%u foundry_id=%u serial_number=%u num_pmics=%u chip_family=0x%x raw_device_family=0x%x raw_device_number=0x%x nproduct_id=0x%x num_clusters=0x%x ncluster_array_offset=0x%x num_defective_parts=0x%x ndefective_parts_array_offset=0x%x nmodem_supported=0x%x g_hw_plat=%u g_hw_plat_ver=%u g_hw_plat_subtype=%u\n",
+		pr_info("v%u.%u, id=%u, ver=%u.%u, raw_id=%u, raw_ver=%u, hw_plat=%u, hw_plat_ver=%u\n accessory_chip=%u, hw_plat_subtype=%u, pmic_model=%u, pmic_die_revision=%u foundry_id=%u serial_number=%u num_pmics=%u chip_family=0x%x raw_device_family=0x%x raw_device_number=0x%x nproduct_id=0x%x num_clusters=0x%x ncluster_array_offset=0x%x num_defective_parts=0x%x ndefective_parts_array_offset=0x%x nmodem_supported=0x%x\n",
 			f_maj, f_min, socinfo->v0_1.id, v_maj, v_min,
 			socinfo->v0_2.raw_id, socinfo->v0_2.raw_version,
 			socinfo->v0_3.hw_platform,
@@ -1621,10 +1609,7 @@ static void socinfo_print(void)
 			socinfo->v0_14.ncluster_array_offset,
 			socinfo->v0_14.num_defective_parts,
 			socinfo->v0_14.ndefective_parts_array_offset,
-			socinfo->v0_15.nmodem_supported,
-			socinfo->v0_15.g_hw_platform,
-			socinfo->v0_15.g_platform_version,
-			socinfo->v0_15.g_hw_platform_subtype);
+			socinfo->v0_15.nmodem_supported);
 		break;
 
 	default:
@@ -1632,6 +1617,7 @@ static void socinfo_print(void)
 		break;
 	}
 }
+#endif
 
 static void socinfo_select_format(void)
 {
@@ -1680,15 +1666,12 @@ int __init socinfo_init(void)
 
 	cur_cpu = cpu_of_id[socinfo->v0_1.id].generic_soc_type;
 	boot_stats_init();
+#ifndef CONFIG_SAMSUNG_PRODUCT_SHIP
 	socinfo_print();
+#endif
 	arch_read_hardware_id = msm_read_hardware_id;
 	socinfo_init_done = true;
-
-	socinfo_init_sysfs();
 
 	return 0;
 }
 subsys_initcall(socinfo_init);
-
-MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("Qualcomm Socinfo driver");

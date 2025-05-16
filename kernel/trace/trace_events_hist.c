@@ -690,7 +690,7 @@ static notrace void trace_event_raw_event_synth(void *__data,
 		}
 	}
 
-	trace_event_buffer_commit(&fbuffer);
+	trace_event_buffer_commit(&fbuffer, sizeof(*entry) + fields_size);
 out:
 	ring_buffer_nest_end(buffer);
 }
@@ -4225,6 +4225,7 @@ static int parse_var_defs(struct hist_trigger_data *hist_data)
 
 			s = kstrdup(field_str, GFP_KERNEL);
 			if (!s) {
+				kfree(hist_data->attrs->var_defs.name[n_vars]);
 				ret = -ENOMEM;
 				goto free;
 			}

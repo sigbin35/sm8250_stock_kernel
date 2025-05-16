@@ -7,6 +7,9 @@ obj-$(CONFIG_QCOM_MDT_LOADER)	+= mdt_loader.o
 obj-$(CONFIG_QCOM_PM)	+=	spm.o
 obj-$(CONFIG_QCOM_QMI_HELPERS)	+= qmi_helpers.o
 qmi_helpers-y	+= qmi_encdec.o qmi_interface.o
+obj-$(CONFIG_QCOM_QMI_RMNET)	+= qmi_rmnet.o
+obj-$(CONFIG_QCOM_QMI_DFC)	+= dfc_qmi.o dfc_qmap.o
+obj-$(CONFIG_QCOM_QMI_POWER_COLLAPSE) += wda_qmi.o
 obj-$(CONFIG_QCOM_RMTFS_MEM)	+= rmtfs_mem.o
 obj-$(CONFIG_QCOM_RPMH)		+= qcom_rpmh.o
 qcom_rpmh-y			+= rpmh-rsc.o
@@ -27,12 +30,12 @@ obj-$(CONFIG_QCOM_LLCC_PERFMON) += llcc_perfmon.o
 obj-$(CONFIG_QCOM_APR) += apr.o
 obj-$(CONFIG_QCOM_SECURE_BUFFER) += secure_buffer.o
 obj-$(CONFIG_MSM_TZ_SMMU) += msm_tz_smmu.o
-obj-$(CONFIG_QTEE_SHM_BRIDGE) += qtee_shm_bridge.o
-qtee_shm_bridge-objs += qtee_shmbridge.o
 CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
-qtee_shm_bridge-$(CONFIG_QCOM_SCM)  +=      scm.o
+obj-$(CONFIG_QCOM_SCM)  +=      scm.o
 obj-$(CONFIG_QCOM_EARLY_RANDOM) += early_random.o
 obj-$(CONFIG_MSM_SPSS_UTILS) += spss_utils.o
+obj-$(CONFIG_QTEE_SHM_BRIDGE) += qtee_shmbridge.o
+obj-$(CONFIG_MSM_BOOT_STATS) += boot_stats.o
 obj-$(CONFIG_MSM_CORE_HANG_DETECT) += core_hang_detect.o
 obj-$(CONFIG_MSM_GLADIATOR_HANG_DETECT) += gladiator_hang_detect.o
 obj-$(CONFIG_MSM_GLADIATOR_ERP) += gladiator_erp.o
@@ -42,6 +45,7 @@ obj-$(CONFIG_QCOM_DCC_V2) += dcc_v2.o
 obj-$(CONFIG_MSM_SERVICE_NOTIFIER) += service-notifier.o
 obj-$(CONFIG_MSM_SERVICE_LOCATOR) += service-locator.o
 obj-$(CONFIG_MSM_SYSMON_GLINK_COMM) += sysmon-glink.o
+obj-$(CONFIG_MSM_SYSMON_QMI_COMM) += sysmon-qmi.o
 obj-$(CONFIG_MSM_PIL_MSS_QDSP6V5) += pil-q6v5.o pil-msa.o pil-q6v5-mss.o
 obj-$(CONFIG_MSM_PIL_SSR_GENERIC) += subsys-pil-tz.o
 obj-$(CONFIG_MEM_SHARE_QMI_SERVICE)		+= memshare/
@@ -53,17 +57,13 @@ obj-$(CONFIG_QCOM_SMCINVOKE) += smcinvoke.o
 obj-$(CONFIG_QCOM_RUN_QUEUE_STATS) += rq_stats.o
 
 ifdef CONFIG_MSM_SUBSYSTEM_RESTART
-	obj-$(CONFIG_MSM_SUBSYSTEM_RESTART) += subsystem_notif.o
-	obj-$(CONFIG_MSM_SUBSYSTEM_RESTART) += subsystem-restart.o
-	subsystem-restart-objs := subsystem_restart.o
-	subsystem-restart-objs += sysmon-qmi.o
-	obj-$(CONFIG_MSM_SUBSYSTEM_RESTART) += ramdump.o
-	obj-$(CONFIG_MSM_SUBSYSTEM_RESTART) += microdump_collector.o
+	obj-y += subsystem_notif.o
+	obj-y += subsystem_restart.o
+	obj-y += ramdump.o
+	obj-y += microdump_collector.o
 endif
 obj-$(CONFIG_QCOM_EUD) += eud.o
-obj-$(CONFIG_QCOM_SOCINFO) += qcom_socinfo.o
-qcom_socinfo-objs += socinfo.o
-qcom_socinfo-$(CONFIG_MSM_BOOT_STATS) += boot_stats.o
+obj-$(CONFIG_SOC_BUS) += socinfo.o
 obj-$(CONFIG_QCOM_WATCHDOG_V2) += watchdog_v2.o
 obj-$(CONFIG_QCOM_SDM845_LLCC) += llcc-sdm845.o
 CFLAGS_rpmh-rsc.o := -I$(src)
@@ -82,7 +82,7 @@ obj-$(CONFIG_MSM_REMOTEQDSS) += remoteqdss.o
 obj-$(CONFIG_MSM_EVENT_TIMER) += event_timer.o
 obj-$(CONFIG_MSM_IDLE_STATS)	+= lpm-stats.o
 ifdef CONFIG_QCOM_RPMH
-       obj-$(CONFIG_QTI_RPM_STATS_LOG) += rpmh_master_stat.o
+       obj-$(CONFIG_QTI_RPM_STATS_LOG) += rpmh_master_stat.o subsystem_sleep_debug.o
 else
        obj-$(CONFIG_QTI_RPM_STATS_LOG) += rpm_master_stat.o
 endif
@@ -97,10 +97,9 @@ obj-$(CONFIG_MSM_RPM_SMD)   +=  rpm-smd-debug.o
 endif
 obj-$(CONFIG_QCOM_CDSP_RM) += cdsprm.o
 obj-$(CONFIG_ICNSS) += msm_icnss.o
-msm_icnss-objs += icnss.o
+msm_icnss-y := icnss.o
 msm_icnss-$(CONFIG_ICNSS_QMI) += icnss_qmi.o wlan_firmware_service_v01.o
 obj-$(CONFIG_RMNET_CTL) += rmnet_ctl/
-obj-$(CONFIG_MODEMSMEM) += modemsmem/
 obj-$(CONFIG_QCOM_CX_IPEAK) += cx_ipeak.o
 obj-$(CONFIG_QTI_L2_REUSE) += l2_reuse.o
 obj-$(CONFIG_ICNSS2) += icnss2/

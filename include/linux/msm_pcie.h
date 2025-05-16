@@ -32,6 +32,7 @@ enum msm_pcie_event {
 	MSM_PCIE_EVENT_L1SS_TIMEOUT = BIT(3),
 	MSM_PCIE_EVENT_DRV_CONNECT = BIT(4),
 	MSM_PCIE_EVENT_DRV_DISCONNECT = BIT(5),
+	MSM_PCIE_EVENT_LINK_RECOVER = BIT(6),
 };
 
 enum msm_pcie_trigger {
@@ -66,24 +67,6 @@ static inline int msm_msi_init(struct device *dev)
 #endif
 
 #ifdef CONFIG_PCI_MSM
-
-/**
- * msm_pcie_set_target_link_speed - sets the maximum GEN speed PCIe can link up
- * with
- * @rc_idx:		root complex port number that endpoint is connected to
- * @target_link_speed:	maximum GEN speed PCIe can link up with
- *
- * Provide PCIe clients the option to control which maximum GEN speed PCIe
- * can link up with. Clients may choose only GEN speed within root complex's
- * controller capability or up to what is defined in devicetree,
- * qcom,target-link-speed.
- *
- * Client may also pass 0 for target_link_speed to have
- * PCIe root complex reset and use the default maximum GEN speed.
- *
- * Return 0 on success, negative value on error
- */
-int msm_pcie_set_target_link_speed(u32 rc_idx, u32 target_link_speed);
 
 /**
  * msm_pcie_allow_l1 - allow PCIe link to re-enter L1
@@ -242,12 +225,6 @@ static inline int msm_pcie_pm_control(enum msm_pcie_pm_opt pm_opt, u32 busnr,
 	return -ENODEV;
 }
 
-static inline int msm_pcie_set_target_link_speed(u32 rc_idx,
-						u32 target_link_speed)
-{
-	return -ENODEV;
-}
-
 static inline void msm_pcie_allow_l1(struct pci_dev *pci_dev)
 {
 }
@@ -298,5 +275,36 @@ static inline int msm_pcie_debug_info(struct pci_dev *dev, u32 option, u32 base,
 	return -ENODEV;
 }
 #endif /* CONFIG_PCI_MSM */
+
+#ifdef CONFIG_SEC_PCIE_L1SS
+enum l1ss_ctrl_ids {
+        L1SS_SYSFS,
+        L1SS_MST,
+        L1SS_AUDIO,
+        L1SS_MAX
+};
+
+void sec_pcie_set_use_ep_loaded(struct pci_dev *dev);
+void sec_pcie_set_ep_driver_loaded(struct pci_dev *dev, bool is_loaded);
+
+
+int sec_pcie_l1ss_enable(int ctrl_id);
+int sec_pcie_l1ss_disable(int ctrl_id);
+#else
+
+#define sec_pcie_set_use_ep_loaded(dev) do { } while(0)
+#define sec_pcie_set_ep_driver_loaded(dev, is_loaded) do { } while(0)
+
+inline int sec_pcie_l1ss_enable(int ctrl_id)
+{
+        return -ENODEV;
+}
+
+inline int sec_pcie_l1ss_disable(int ctrl_id)
+{
+        return -ENODEV;
+}
+#endif
+
 
 #endif /* __MSM_PCIE_H */

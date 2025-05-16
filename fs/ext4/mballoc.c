@@ -741,6 +741,13 @@ void ext4_mb_generate_buddy(struct super_block *sb,
 	grp->bb_fragments = fragments;
 
 	if (free != grp->bb_free) {
+		struct ext4_group_desc *desc;
+		ext4_fsblk_t bitmap_blk;
+
+		desc = ext4_get_group_desc(sb, group, NULL);
+		bitmap_blk = ext4_block_bitmap(sb, desc);
+
+		print_block_data(sb, bitmap_blk, bitmap, 0, EXT4_BLOCK_SIZE(sb));
 		ext4_grp_locked_error(sb, group, 0, 0,
 				      "block bitmap and bg descriptor "
 				      "inconsistent: %u vs %u free clusters",
@@ -1445,16 +1452,22 @@ static void mb_free_blocks(struct inode *inode, struct ext4_buddy *e4b,
 
 	if (unlikely(block != -1)) {
 		struct ext4_sb_info *sbi = EXT4_SB(sb);
-		ext4_fsblk_t blocknr;
+		struct ext4_group_desc *desc;
+		ext4_fsblk_t blocknr, bitmap_blk;
+
+		desc = ext4_get_group_desc(sb, e4b->bd_group, NULL);
+		bitmap_blk = ext4_block_bitmap(sb, desc);
 
 		blocknr = ext4_group_first_block_no(sb, e4b->bd_group);
 		blocknr += EXT4_C2B(sbi, block);
+
+		print_block_data(sb, bitmap_blk, e4b->bd_bitmap, 0,
+				EXT4_BLOCK_SIZE(sb));
+
 		ext4_grp_locked_error(sb, e4b->bd_group,
-				      inode ? inode->i_ino : 0,
-				      blocknr,
-				      "freeing already freed block "
-				      "(bit %u); block bitmap corrupt.",
-				      block);
+				inode ? inode->i_ino : 0, blocknr,
+				"freeing already freed block "
+				"(bit %u); block bitmap corrupt.", block);
 		ext4_mark_group_bitmap_corrupted(sb, e4b->bd_group,
 				EXT4_GROUP_INFO_BBITMAP_CORRUPT);
 		mb_regenerate_buddy(e4b);
@@ -1901,15 +1914,8 @@ void ext4_mb_simple_scan_group(struct ext4_allocation_context *ac,
 		BUG_ON(buddy == NULL);
 
 		k = mb_find_next_zero_bit(buddy, max, 0);
-		if (k >= max) {
-			ext4_grp_locked_error(ac->ac_sb, e4b->bd_group, 0, 0,
-				"%d free clusters of order %d. But found 0",
-				grp->bb_counters[i], i);
-			ext4_mark_group_bitmap_corrupted(ac->ac_sb,
-					 e4b->bd_group,
-					EXT4_GROUP_INFO_BBITMAP_CORRUPT);
-			break;
-		}
+		BUG_ON(k >= max);
+
 		ac->ac_found++;
 
 		ac->ac_b_ex.fe_len = 1 << i;
@@ -1943,8 +1949,7 @@ void ext4_mb_complex_scan_group(struct ext4_allocation_context *ac,
 	int free;
 
 	free = e4b->bd_info->bb_free;
-	if (WARN_ON(free <= 0))
-		return;
+	BUG_ON(free <= 0);
 
 	i = e4b->bd_info->bb_first_free;
 
@@ -1967,8 +1972,7 @@ void ext4_mb_complex_scan_group(struct ext4_allocation_context *ac,
 		}
 
 		mb_find_extent(e4b, i, ac->ac_g_ex.fe_len, &ex);
-		if (WARN_ON(ex.fe_len <= 0))
-			break;
+		BUG_ON(ex.fe_len <= 0);
 		if (free < ex.fe_len) {
 			ext4_grp_locked_error(sb, e4b->bd_group, 0, 0,
 					"%d free clusters as per "
@@ -2347,6 +2351,55 @@ const struct seq_operations ext4_mb_seq_groups_ops = {
 	.stop   = ext4_mb_seq_groups_stop,
 	.show   = ext4_mb_seq_groups_show,
 };
+
+ssize_t ext4_mb_freefrag_show(struct ext4_sb_info *sbi, char *buf)
+{
+#define EXT4_FREEFRAG_COLUMN 14 /* sb->s_blocksize_bits + 2 */
+	ext4_group_t group = 0;
+	int i;
+	ext4_fsblk_t freeblock[EXT4_FREEFRAG_COLUMN] = {0,};
+	char *size[EXT4_FREEFRAG_COLUMN] = {"4K", "8K", "16K", "32K", "64K",
+		"128K", "256K", "512K", "1M", "2M", "4M", "8M", "16M", "32M"};
+
+	for (group = 0; group < sbi->s_groups_count; group++) {
+		struct super_block *sb = sbi->s_sb;
+		int err, buddy_loaded = 0;
+		struct ext4_buddy e4b;
+		struct ext4_group_info *grinfo;
+		struct sg {
+			struct ext4_group_info info;
+			ext4_grpblk_t counters[EXT4_FREEFRAG_COLUMN+2];
+		} sg;
+
+		i = (sb->s_blocksize_bits + 2) * sizeof(sg.info.bb_counters[0])
+			+ sizeof(struct ext4_group_info);
+		grinfo = ext4_get_group_info(sb, group);
+		/* Load the group info in memory only if not already loaded. */
+		if (unlikely(EXT4_MB_GRP_NEED_INIT(grinfo))) {
+			err = ext4_mb_load_buddy(sb, group, &e4b);
+			if (err) {
+				freeblock[0] = ULLONG_MAX;
+				goto out;
+			}
+			buddy_loaded = 1;
+		}
+
+		memcpy(&sg, ext4_get_group_info(sb, group), i);
+
+		if (buddy_loaded)
+			ext4_mb_unload_buddy(&e4b);
+		for (i = 0; i < EXT4_FREEFRAG_COLUMN; i++)
+			freeblock[i] += (i <= sb->s_blocksize_bits + 1) ?
+					sg.info.bb_counters[i] : 0;
+	}
+out:
+	for (i = 0; i < EXT4_FREEFRAG_COLUMN; i++)
+		snprintf(buf, PAGE_SIZE, "%s\"%s\":\"%llu\",", buf, size[i],
+			(unsigned long long)freeblock[i]);
+	buf[strlen(buf)-1] = '\n';
+
+	return strlen(buf);
+}
 
 static struct kmem_cache *get_groupinfo_cache(int blocksize_bits)
 {
@@ -4690,7 +4743,6 @@ ext4_mb_free_metadata(handle_t *handle, struct ext4_buddy *e4b,
 				ext4_group_first_block_no(sb, group) +
 				EXT4_C2B(sbi, cluster),
 				"Block already on to-be-freed list");
-			kmem_cache_free(ext4_free_data_cachep, new_entry);
 			return 0;
 		}
 	}

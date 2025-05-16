@@ -62,12 +62,6 @@ endif
 ifneq ($(dtbo-y),)
 include scripts/Makefile.dtbo
 endif
-ifneq ($(dtbo-bramble),)
-include scripts/Makefile.dtbo
-endif
-ifneq ($(dtbo-redfin),)
-include scripts/Makefile.dtbo
-endif
 
 ifndef obj
 $(warning kbuild: Makefile.build is included improperly)
@@ -318,18 +312,18 @@ objtool_dep = $(objtool_obj)					\
 			 include/config/stack/validation.h)
 
 define rule_cc_o_c
-	$(call cmd,checksrc)
-	$(call cmd_and_fixdep,cc_o_c)
-	$(call cmd,checkdoc)
-	$(call cmd,objtool)
-	$(call cmd,modversions_c)
-	$(call cmd,record_mcount)
+	$(call echo-cmd,checksrc) $(cmd_checksrc)			  \
+	$(call cmd_and_fixdep,cc_o_c)					  \
+	$(cmd_checkdoc)							  \
+	$(call echo-cmd,objtool) $(cmd_objtool)				  \
+	$(cmd_modversions_c)						  \
+	$(call echo-cmd,record_mcount) $(cmd_record_mcount)
 endef
 
 define rule_as_o_S
-	$(call cmd_and_fixdep,as_o_S)
-	$(call cmd,objtool)
-	$(call cmd,modversions_S)
+	$(call cmd_and_fixdep,as_o_S)					  \
+	$(call echo-cmd,objtool) $(cmd_objtool)				  \
+	$(cmd_modversions_S)
 endef
 
 # List module undefined symbols (or empty line if not enabled)
@@ -473,8 +467,8 @@ $(sort $(subdir-obj-y)): $(subdir-ym) ;
 ifdef CONFIG_LTO_CLANG
   ifdef CONFIG_MODVERSIONS
     # combine symversions for later processing
-    update_lto_symversions =				\
-	rm -f $@.symversions; 				\
+    update_lto_symversions =						\
+	rm -f $@.symversions; 						\
 	for i in $(foreach n,						\
 			$(filter-out FORCE,$^),				\
 			$(if $(wildcard $(n).symversions),$(n))); do	\

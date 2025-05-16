@@ -1001,14 +1001,11 @@ int xhci_suspend(struct xhci_hcd *xhci, bool do_wakeup)
 			xhci->shared_hcd->state != HC_STATE_SUSPENDED)
 		return -EINVAL;
 
+	xhci_dbc_suspend(xhci);
+
 	/* Clear root port wake on bits if wakeup not allowed. */
 	if (!do_wakeup)
 		xhci_disable_port_wake_on_bits(xhci);
-
-	if (!HCD_HW_ACCESSIBLE(hcd))
-		return 0;
-
-	xhci_dbc_suspend(xhci);
 
 	/* Don't poll the roothubs on bus suspend. */
 	xhci_dbg(xhci, "%s: stopping port polling.\n", __func__);
@@ -1185,10 +1182,8 @@ int xhci_resume(struct xhci_hcd *xhci, bool hibernated)
 		xhci_dbg(xhci, "Stop HCD\n");
 		xhci_halt(xhci);
 		xhci_zero_64b_regs(xhci);
-		retval = xhci_reset(xhci);
+		xhci_reset(xhci);
 		spin_unlock_irq(&xhci->lock);
-		if (retval)
-			return retval;
 		xhci_cleanup_msix(xhci);
 
 		xhci_dbg(xhci, "// Disabling event ring interrupts\n");
@@ -1443,7 +1438,6 @@ static int xhci_check_maxpacket(struct xhci_hcd *xhci, unsigned int slot_id,
 				xhci->devs[slot_id]->out_ctx, ep_index);
 
 		ep_ctx = xhci_get_ep_ctx(xhci, command->in_ctx, ep_index);
-		ep_ctx->ep_info &= cpu_to_le32(~EP_STATE_MASK);/* must clear */
 		ep_ctx->ep_info2 &= cpu_to_le32(~MAX_PACKET_MASK);
 		ep_ctx->ep_info2 |= cpu_to_le32(MAX_PACKET(max_packet_size));
 
@@ -3192,11 +3186,10 @@ static void xhci_endpoint_reset(struct usb_hcd *hcd,
 
 	wait_for_completion(cfg_cmd->completion);
 
+	ep->ep_state &= ~EP_SOFT_CLEAR_TOGGLE;
 	xhci_free_command(xhci, cfg_cmd);
 cleanup:
 	xhci_free_command(xhci, stop_cmd);
-	if (ep->ep_state & EP_SOFT_CLEAR_TOGGLE)
-		ep->ep_state &= ~EP_SOFT_CLEAR_TOGGLE;
 }
 
 static int xhci_check_streams_endpoint(struct xhci_hcd *xhci,
@@ -4344,9 +4337,6 @@ static int xhci_set_usb2_hardware_lpm(struct usb_hcd *hcd,
 	int		hird, exit_latency;
 	int		ret;
 
-	if (xhci->quirks & XHCI_HW_LPM_DISABLE)
-		return -EPERM;
-
 	if (hcd->speed >= HCD_USB3 || !xhci->hw_lpm_support ||
 			!udev->lpm_capable)
 		return -EPERM;
@@ -4369,7 +4359,7 @@ static int xhci_set_usb2_hardware_lpm(struct usb_hcd *hcd,
 	xhci_dbg(xhci, "%s port %d USB2 hardware LPM\n",
 			enable ? "enable" : "disable", port_num + 1);
 
-	if (enable) {
+	if (enable && !(xhci->quirks & XHCI_HW_LPM_DISABLE)) {
 		/* Host supports BESL timeout instead of HIRD */
 		if (udev->usb2_hw_lpm_besl_capable) {
 			/* if device doesn't have a preferred BESL value use a
@@ -4428,9 +4418,6 @@ static int xhci_set_usb2_hardware_lpm(struct usb_hcd *hcd,
 			mutex_lock(hcd->bandwidth_mutex);
 			xhci_change_max_exit_latency(xhci, udev, 0);
 			mutex_unlock(hcd->bandwidth_mutex);
-			readl_poll_timeout(ports[port_num]->addr, pm_val,
-					   (pm_val & PORT_PLS_MASK) == XDEV_U0,
-					   100, 10000);
 			return 0;
 		}
 	}
@@ -4593,18 +4580,18 @@ static u16 xhci_calculate_u1_timeout(struct xhci_hcd *xhci,
 {
 	unsigned long long timeout_ns;
 
-	if (xhci->quirks & XHCI_INTEL_HOST)
-		timeout_ns = xhci_calculate_intel_u1_timeout(udev, desc);
-	else
-		timeout_ns = udev->u1_params.sel;
-
 	/* Prevent U1 if service interval is shorter than U1 exit latency */
 	if (usb_endpoint_xfer_int(desc) || usb_endpoint_xfer_isoc(desc)) {
-		if (xhci_service_interval_to_ns(desc) <= timeout_ns) {
+		if (xhci_service_interval_to_ns(desc) <= udev->u1_params.mel) {
 			dev_dbg(&udev->dev, "Disable U1, ESIT shorter than exit latency\n");
 			return USB3_LPM_DISABLED;
 		}
 	}
+
+	if (xhci->quirks & XHCI_INTEL_HOST)
+		timeout_ns = xhci_calculate_intel_u1_timeout(udev, desc);
+	else
+		timeout_ns = udev->u1_params.sel;
 
 	/* The U1 timeout is encoded in 1us intervals.
 	 * Don't return a timeout of zero, because that's USB3_LPM_DISABLED.
@@ -4657,18 +4644,18 @@ static u16 xhci_calculate_u2_timeout(struct xhci_hcd *xhci,
 {
 	unsigned long long timeout_ns;
 
-	if (xhci->quirks & XHCI_INTEL_HOST)
-		timeout_ns = xhci_calculate_intel_u2_timeout(udev, desc);
-	else
-		timeout_ns = udev->u2_params.sel;
-
 	/* Prevent U2 if service interval is shorter than U2 exit latency */
 	if (usb_endpoint_xfer_int(desc) || usb_endpoint_xfer_isoc(desc)) {
-		if (xhci_service_interval_to_ns(desc) <= timeout_ns) {
+		if (xhci_service_interval_to_ns(desc) <= udev->u2_params.mel) {
 			dev_dbg(&udev->dev, "Disable U2, ESIT shorter than exit latency\n");
 			return USB3_LPM_DISABLED;
 		}
 	}
+
+	if (xhci->quirks & XHCI_INTEL_HOST)
+		timeout_ns = xhci_calculate_intel_u2_timeout(udev, desc);
+	else
+		timeout_ns = udev->u2_params.sel;
 
 	/* The U2 timeout is encoded in 256us intervals */
 	timeout_ns = DIV_ROUND_UP_ULL(timeout_ns, 256 * 1000);
@@ -5238,6 +5225,7 @@ static phys_addr_t xhci_get_sec_event_ring_phys_addr(struct usb_hcd *hcd,
 	struct device *dev = hcd->self.sysdev;
 	struct sg_table sgt;
 	phys_addr_t pa;
+	int result = 0;
 
 	if (intr_num >= xhci->max_interrupters) {
 		xhci_err(xhci, "intr num %d >= max intrs %d\n", intr_num,
@@ -5249,10 +5237,15 @@ static phys_addr_t xhci_get_sec_event_ring_phys_addr(struct usb_hcd *hcd,
 		xhci->sec_event_ring && xhci->sec_event_ring[intr_num]
 		&& xhci->sec_event_ring[intr_num]->first_seg) {
 
-		dma_get_sgtable(dev, &sgt,
+		result = dma_get_sgtable(dev, &sgt,
 			xhci->sec_event_ring[intr_num]->first_seg->trbs,
 			xhci->sec_event_ring[intr_num]->first_seg->dma,
 			TRB_SEGMENT_SIZE);
+
+		if(result < 0) {
+			xhci_err(xhci, "%s: error occured=%d\n", __func__, result);
+			return 0;
+		}
 
 		*dma = xhci->sec_event_ring[intr_num]->first_seg->dma;
 
@@ -5275,6 +5268,7 @@ static phys_addr_t xhci_get_xfer_ring_phys_addr(struct usb_hcd *hcd,
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
 	struct sg_table sgt;
 	phys_addr_t pa;
+	int result = 0;
 
 	ret = xhci_check_args(hcd, udev, ep, 1, true, __func__);
 	if (ret <= 0) {
@@ -5288,11 +5282,16 @@ static phys_addr_t xhci_get_xfer_ring_phys_addr(struct usb_hcd *hcd,
 	if (virt_dev->eps[ep_index].ring &&
 		virt_dev->eps[ep_index].ring->first_seg) {
 
-		dma_get_sgtable(dev, &sgt,
+		result = dma_get_sgtable(dev, &sgt,
 			virt_dev->eps[ep_index].ring->first_seg->trbs,
 			virt_dev->eps[ep_index].ring->first_seg->dma,
 			TRB_SEGMENT_SIZE);
 
+		if(result < 0) {
+			xhci_err(xhci, "%s: error occured=%d\n", __func__, result);
+			return 0;
+		}
+			
 		*dma = virt_dev->eps[ep_index].ring->first_seg->dma;
 
 		pa = page_to_phys(sg_page(sgt.sgl));
@@ -5314,17 +5313,13 @@ int xhci_get_core_id(struct usb_hcd *hcd)
 static int  xhci_stop_endpoint(struct usb_hcd *hcd,
 	struct usb_device *udev, struct usb_host_endpoint *ep)
 {
-	struct xhci_hcd *xhci;
+	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
 	unsigned int ep_index;
 	struct xhci_virt_device *virt_dev;
 	struct xhci_command *cmd;
 	unsigned long flags;
 	int ret = 0;
 
-	if (!hcd || !udev || !ep)
-		return -EINVAL;
-
-	xhci = hcd_to_xhci(hcd);
 	cmd = xhci_alloc_command(xhci, true, GFP_NOIO);
 	if (!cmd)
 		return -ENOMEM;
@@ -5367,6 +5362,8 @@ free_cmd:
 	xhci_free_command(xhci, cmd);
 	return ret;
 }
+
+
 
 static const struct hc_driver xhci_hc_driver = {
 	.description =		"xhci-hcd",

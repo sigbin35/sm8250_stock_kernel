@@ -162,7 +162,6 @@ struct spi_geni_master {
 	bool gsi_mode; /* GSI Mode */
 	bool shared_ee; /* Dual EE use case */
 	bool dis_autosuspend;
-	bool pinctrl_sleep_at_probe;
 	bool cmd_done;
 	bool set_miso_sampling;
 	u32 miso_sampling_ctrl_val;
@@ -605,10 +604,11 @@ static int setup_gsi_xfer(struct spi_transfer *xfer,
 	}
 
 	cs |= spi_slv->chip_select;
-	if (!list_is_last(&xfer->transfer_list, &spi->cur_msg->transfers) ==
-	    !xfer->cs_change)
-		go_flags |= FRAGMENTATION;
-
+	if (!xfer->cs_change) {
+		if (!list_is_last(&xfer->transfer_list,
+					&spi->cur_msg->transfers))
+			go_flags |= FRAGMENTATION;
+	}
 	go_tre = setup_go_tre(cmd, cs, rx_len, go_flags, mas);
 
 	sg_init_table(xfer_tx_sg, tx_nent);
@@ -840,6 +840,8 @@ static void spi_geni_set_sampling_rate(struct spi_geni_master *mas,
 	}
 
 	geni_write_reg(cfg_reg108, mas->base, SE_GENI_CFG_REG108);
+	/* Ensure reg write went through */
+	mb();
 
 	if (cpol == 0 && cpha == 0)
 		cfg_reg109 = 1;
@@ -868,6 +870,17 @@ static int spi_geni_prepare_transfer_hardware(struct spi_master *spi)
 
 	/* Adjust the IB based on the max speed of the slave.*/
 	rsc->ib = max_speed * DEFAULT_BUS_WIDTH;
+	if (mas->gsi_mode && !mas->shared_ee) {
+		struct se_geni_rsc *rsc;
+		int ret = 0;
+
+		rsc = &mas->spi_rsc;
+		ret = pinctrl_select_state(rsc->geni_pinctrl,
+						rsc->geni_gpio_active);
+		if (ret)
+			GENI_SE_ERR(mas->ipc, false, NULL,
+			"%s: Error %d pinctrl_select_state\n", __func__, ret);
+	}
 
 	if (!mas->setup || !mas->shared_ee) {
 		ret = pm_runtime_get_sync(mas->dev);
@@ -887,18 +900,6 @@ static int spi_geni_prepare_transfer_hardware(struct spi_master *spi)
 				"resume usage count mismatch:%d", count);
 		}
 	}
-
-	if ((mas->gsi_mode && !mas->shared_ee)
-			|| mas->pinctrl_sleep_at_probe) {
-		int ret = 0;
-
-		ret = pinctrl_select_state(rsc->geni_pinctrl,
-						rsc->geni_gpio_active);
-		if (ret)
-			GENI_SE_ERR(mas->ipc, false, NULL,
-			"%s: Error %d pinctrl_select_state\n", __func__, ret);
-	}
-
 	if (unlikely(!mas->setup)) {
 		int proto = get_se_proto(mas->base);
 		unsigned int major;
@@ -992,7 +993,6 @@ setup_ipc:
 				"%s:Major:%d Minor:%d step:%dos%d\n",
 			__func__, major, minor, step, mas->oversampling);
 		}
-
 		if (mas->set_miso_sampling)
 			spi_geni_set_sampling_rate(mas, major, minor);
 
@@ -1107,9 +1107,11 @@ static int setup_fifo_xfer(struct spi_transfer *xfer,
 		trans_len = (xfer->len / bytes_per_word) & TRANS_LEN_MSK;
 	}
 
-	if (!list_is_last(&xfer->transfer_list, &spi->cur_msg->transfers) ==
-	    !xfer->cs_change)
-		m_param |= FRAGMENTATION;
+	if (!xfer->cs_change) {
+		if (!list_is_last(&xfer->transfer_list,
+					&spi->cur_msg->transfers))
+			m_param |= FRAGMENTATION;
+	}
 
 	/* Add pre command delay */
 	if (mas->set_pre_cmd_dly) {
@@ -1422,16 +1424,11 @@ static void geni_spi_handle_rx(struct spi_geni_master *mas)
 	int rx_wc = 0;
 	u8 *rx_buf = NULL;
 
-	rx_wc = (rx_fifo_status & RX_FIFO_WC_MSK);
-
-	/* Dummy read the fifo in case of unexpected rx fifo wm */
-	if (!mas->cur_xfer) {
-		for (i = 0; i < rx_wc; i++)
-			geni_read_reg(mas->base, SE_GENI_RX_FIFOn);
+	if (!mas->cur_xfer)
 		return;
-	}
 
 	rx_buf = mas->cur_xfer->rx_buf;
+	rx_wc = (rx_fifo_status & RX_FIFO_WC_MSK);
 	if (rx_fifo_status & RX_LAST) {
 		int rx_last_byte_valid =
 			(rx_fifo_status & RX_LAST_BYTE_VALID_MSK)
@@ -1478,7 +1475,6 @@ static irqreturn_t geni_spi_irq(int irq, void *data)
 		goto exit_geni_spi_irq;
 	}
 	m_irq = geni_read_reg(mas->base, SE_GENI_M_IRQ_STATUS);
-	GENI_SE_DBG(mas->ipc, false, mas->dev, "m_irq : 0x%x\n", m_irq);
 	if (mas->cur_xfer_mode == FIFO_MODE) {
 		if ((m_irq & M_RX_FIFO_WATERMARK_EN) ||
 						(m_irq & M_RX_FIFO_LAST_EN))
@@ -1598,6 +1594,12 @@ static int spi_geni_probe(struct platform_device *pdev)
 
 	rsc->geni_gpio_active = pinctrl_lookup_state(rsc->geni_pinctrl,
 							PINCTRL_DEFAULT);
+#if defined(CONFIG_NFC_FEATURE_SN100U)
+	if (of_property_read_bool(pdev->dev.of_node, "sec,pinctrl_active")) {
+		rsc->geni_gpio_active = pinctrl_lookup_state(rsc->geni_pinctrl,
+				"active");
+	}
+#endif
 	if (IS_ERR_OR_NULL(rsc->geni_gpio_active)) {
 		dev_err(&pdev->dev, "No default config specified!\n");
 		ret = PTR_ERR(rsc->geni_gpio_active);
@@ -1611,6 +1613,27 @@ static int spi_geni_probe(struct platform_device *pdev)
 		ret = PTR_ERR(rsc->geni_gpio_sleep);
 		goto spi_geni_probe_err;
 	}
+#if defined(CONFIG_SENSORS_VL53L5)
+	/* This is control pins of Range sensor to avoid MISO's floating */
+	if (of_property_read_bool(pdev->dev.of_node, "vl53l5,pinctrl_vddoff")) {
+		struct pinctrl_state *geni_gpio_vddoff = NULL;
+		dev_info(&pdev->dev, "pinctrl for vl53l5 vddoff state\n");
+		
+		geni_gpio_vddoff = pinctrl_lookup_state(rsc->geni_pinctrl,"vddoff");
+		if (IS_ERR_OR_NULL(geni_gpio_vddoff)) {
+			dev_err(&pdev->dev, "Failed pinctrl_lookup:vl53l5 vddoff\n");
+		}
+		else {
+			ret = pinctrl_select_state(rsc->geni_pinctrl, geni_gpio_vddoff);
+			if (ret)
+				dev_err(&pdev->dev, "Failed pinctrl_select:vl53l5 vddoff\n");
+		}
+	}
+	else {
+#endif
+#if defined(CONFIG_NFC_FEATURE_SN100U)
+	if (!of_property_read_bool(pdev->dev.of_node, "sec,pinctrl_skip_sleep")) {
+#endif
 
 	ret = pinctrl_select_state(rsc->geni_pinctrl,
 					rsc->geni_gpio_sleep);
@@ -1618,6 +1641,13 @@ static int spi_geni_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Failed to set sleep configuration\n");
 		goto spi_geni_probe_err;
 	}
+
+#if defined(CONFIG_NFC_FEATURE_SN100U)
+	}
+#endif
+#if defined(CONFIG_SENSORS_VL53L5)
+	}
+#endif
 
 	rsc->se_clk = devm_clk_get(&pdev->dev, "se-clk");
 	if (IS_ERR(rsc->se_clk)) {
@@ -1679,13 +1709,13 @@ static int spi_geni_probe(struct platform_device *pdev)
 				"qcom,shared_ee");
 
 	geni_mas->set_miso_sampling = of_property_read_bool(pdev->dev.of_node,
-				"qcom,set-miso-sampling");
+			"qcom,set-miso-sampling");
 	if (geni_mas->set_miso_sampling) {
 		if (!of_property_read_u32(pdev->dev.of_node,
 				"qcom,miso-sampling-ctrl-val",
 				&geni_mas->miso_sampling_ctrl_val))
 			dev_info(&pdev->dev, "MISO_SAMPLING_SET: %d\n",
-				geni_mas->miso_sampling_ctrl_val);
+		geni_mas->miso_sampling_ctrl_val);
 	}
 
 	/* On minicore based targets like bengal, increasing the cs delay
@@ -1740,19 +1770,6 @@ static int spi_geni_probe(struct platform_device *pdev)
 	init_completion(&geni_mas->xfer_done);
 	init_completion(&geni_mas->tx_cb);
 	init_completion(&geni_mas->rx_cb);
-
-	/* Set the pinctrl state to sleep.  Pinctrl will be set to active in
-	 * spi_geni_prepare_transfer_hardware.
-	 */
-	ret = pinctrl_select_state(rsc->geni_pinctrl, rsc->geni_gpio_sleep);
-	if (ret) {
-		dev_err(&pdev->dev, "pinctrl_select_state failed err:%d\n",
-				ret);
-		goto spi_geni_probe_unmap;
-	}
-
-	geni_mas->pinctrl_sleep_at_probe = true;
-
 	pm_runtime_set_suspended(&pdev->dev);
 	if (!geni_mas->dis_autosuspend) {
 		pm_runtime_set_autosuspend_delay(&pdev->dev,
@@ -1760,7 +1777,6 @@ static int spi_geni_probe(struct platform_device *pdev)
 		pm_runtime_use_autosuspend(&pdev->dev);
 	}
 	pm_runtime_enable(&pdev->dev);
-
 	ret = spi_register_master(spi);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to register SPI master\n");

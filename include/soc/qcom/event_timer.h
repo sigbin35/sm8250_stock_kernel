@@ -11,7 +11,7 @@
 
 struct event_timer_info;
 
-#if IS_ENABLED(CONFIG_MSM_EVENT_TIMER)
+#ifdef CONFIG_MSM_EVENT_TIMER
 /**
  * add_event_timer() : Add a wakeup event. Intended to be called
  *                     by clients once. Returns a handle to be used

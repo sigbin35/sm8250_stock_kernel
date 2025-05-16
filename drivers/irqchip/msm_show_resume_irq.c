@@ -7,8 +7,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 
-int msm_show_resume_irq_mask;
-EXPORT_SYMBOL_GPL(msm_show_resume_irq_mask);
+int msm_show_resume_irq_mask = 1;
 
 module_param_named(
 	debug_mask, msm_show_resume_irq_mask, int, 0664);

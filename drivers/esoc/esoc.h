@@ -17,6 +17,7 @@
 #include <soc/qcom/subsystem_restart.h>
 #include <soc/qcom/subsystem_notif.h>
 #include <linux/ipc_logging.h>
+#include <linux/reboot.h>
 
 #define ESOC_MDM_IPC_PAGES	10
 
@@ -95,11 +96,9 @@ struct esoc_clink {
 	bool primary;
 	bool statusline_not_a_powersource;
 	bool userspace_handle_shutdown;
+	struct notifier_block reboot_nb;
 	struct esoc_client_hook *client_hook[ESOC_MAX_HOOKS];
 };
-
-extern void (*notify_esoc_clients_cb)(struct esoc_clink *esoc_clink, unsigned
-				      long evt);
 
 /**
  * struct esoc_clink_ops: Operations to control external soc
@@ -178,7 +177,7 @@ int esoc_clink_register_ssr(struct esoc_clink *esoc_clink);
 int esoc_clink_request_ssr(struct esoc_clink *esoc_clink);
 void esoc_clink_unregister_ssr(struct esoc_clink *esoc_clink);
 /* client notification */
-#if IS_ENABLED(CONFIG_ESOC_CLIENT)
+#ifdef CONFIG_ESOC_CLIENT
 void notify_esoc_clients(struct esoc_clink *esoc_clink, unsigned long evt);
 #else
 static inline void notify_esoc_clients(struct esoc_clink *esoc_clink,
@@ -193,3 +192,12 @@ bool esoc_cmd_eng_enabled(struct esoc_clink *esoc_clink);
 /* Modem boot fail actions */
 int esoc_set_boot_fail_action(struct esoc_clink *esoc_clink, u32 action);
 int esoc_set_n_pon_tries(struct esoc_clink *esoc_clink, u32 n_tries);
+
+#ifdef CONFIG_ESOC_MDM_4x
+extern int esoc_do_silentreset(void);
+#else
+int esoc_do_silentreset(void)
+{
+	return -1;
+}
+#endif

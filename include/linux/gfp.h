@@ -224,7 +224,7 @@ struct vm_area_struct;
 #define __GFP_BITS_MASK ((__force gfp_t)((1 << __GFP_BITS_SHIFT) - 1))
 #else
 #define __GFP_BITS_MASK (((__force gfp_t)((1 << __GFP_BITS_SHIFT) - 1)) & \
-				~0x800000u) /* ghost of ___GFP_NOLOCKDEP */
+				~0x800000u)
 #endif
 
 /**
@@ -536,6 +536,11 @@ static inline struct page *alloc_pages_node(int nid, gfp_t gfp_mask,
 
 	return __alloc_pages_node(nid, gfp_mask, order);
 }
+
+#ifdef CONFIG_KZEROD
+extern struct page *alloc_zeroed_page(void);
+extern unsigned long kzerod_get_zeroed_size(void);
+#endif
 
 #ifdef CONFIG_NUMA
 extern struct page *alloc_pages_current(gfp_t gfp_mask, unsigned order);

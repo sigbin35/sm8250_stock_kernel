@@ -119,7 +119,7 @@ extern struct qmi_elem_info data_ep_id_type_v01_ei[];
 
 void *qmi_rmnet_has_dfc_client(struct qmi_info *qmi);
 
-#if IS_ENABLED(CONFIG_QCOM_QMI_DFC)
+#ifdef CONFIG_QCOM_QMI_DFC
 struct rmnet_flow_map *
 qmi_rmnet_get_flow_map(struct qos_info *qos_info,
 		       u32 flow_id, int ip_type);
@@ -151,6 +151,7 @@ int dfc_qmap_client_init(void *port, int index, struct svc_info *psvc,
 void dfc_qmap_client_exit(void *dfc_data);
 
 void dfc_qmap_send_ack(struct qos_info *qos, u8 bearer_id, u16 seq, u8 type);
+
 
 struct rmnet_bearer_map *qmi_rmnet_get_bearer_noref(struct qos_info *qos_info,
 						    u8 bearer_id);
@@ -208,7 +209,7 @@ static inline void qmi_rmnet_watchdog_remove(struct rmnet_bearer_map *bearer)
 }
 #endif
 
-#if IS_ENABLED(CONFIG_QCOM_QMI_POWER_COLLAPSE)
+#ifdef CONFIG_QCOM_QMI_POWER_COLLAPSE
 int
 wda_qmi_client_init(void *port, struct svc_info *psvc, struct qmi_info *qmi);
 void wda_qmi_client_exit(void *wda_data);

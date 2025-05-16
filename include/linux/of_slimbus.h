@@ -6,7 +6,7 @@
 #include <linux/slimbus/slimbus.h>
 #include <linux/of_irq.h>
 
-#if IS_ENABLED(CONFIG_OF_SLIMBUS)
+#ifdef CONFIG_OF_SLIMBUS
 /*
  * of_slim_register_devices() - Register devices in the SLIMbus Device Tree
  * @ctrl: slim_controller which devices should be registered to.

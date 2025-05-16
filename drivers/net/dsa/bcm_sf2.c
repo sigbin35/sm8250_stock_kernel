@@ -423,19 +423,15 @@ static int bcm_sf2_mdio_register(struct dsa_switch *ds)
 	/* Find our integrated MDIO bus node */
 	dn = of_find_compatible_node(NULL, NULL, "brcm,unimac-mdio");
 	priv->master_mii_bus = of_mdio_find_bus(dn);
-	if (!priv->master_mii_bus) {
-		of_node_put(dn);
+	if (!priv->master_mii_bus)
 		return -EPROBE_DEFER;
-	}
 
 	get_device(&priv->master_mii_bus->dev);
 	priv->master_mii_dn = dn;
 
 	priv->slave_mii_bus = devm_mdiobus_alloc(ds->dev);
-	if (!priv->slave_mii_bus) {
-		of_node_put(dn);
+	if (!priv->slave_mii_bus)
 		return -ENOMEM;
-	}
 
 	priv->slave_mii_bus->priv = priv;
 	priv->slave_mii_bus->name = "sf2 slave mii";
@@ -465,7 +461,7 @@ static int bcm_sf2_mdio_register(struct dsa_switch *ds)
 	priv->slave_mii_bus->parent = ds->dev->parent;
 	priv->slave_mii_bus->phy_mask = ~priv->indir_phy_mask;
 
-	err = mdiobus_register(priv->slave_mii_bus);
+	err = of_mdiobus_register(priv->slave_mii_bus, dn);
 	if (err && dn)
 		of_node_put(dn);
 
@@ -1018,7 +1014,6 @@ static int bcm_sf2_sw_probe(struct platform_device *pdev)
 	const struct bcm_sf2_of_data *data;
 	struct b53_platform_data *pdata;
 	struct dsa_switch_ops *ops;
-	struct device_node *ports;
 	struct bcm_sf2_priv *priv;
 	struct b53_device *dev;
 	struct dsa_switch *ds;
@@ -1082,13 +1077,7 @@ static int bcm_sf2_sw_probe(struct platform_device *pdev)
 	set_bit(0, priv->cfp.used);
 	set_bit(0, priv->cfp.unique);
 
-	/* Balance of_node_put() done by of_find_node_by_name() */
-	of_node_get(dn);
-	ports = of_find_node_by_name(dn, "ports");
-	if (ports) {
-		bcm_sf2_identify_ports(priv, ports);
-		of_node_put(ports);
-	}
+	bcm_sf2_identify_ports(priv, dn->child);
 
 	priv->irq0 = irq_of_parse_and_map(dn, 0);
 	priv->irq1 = irq_of_parse_and_map(dn, 1);

@@ -15,6 +15,8 @@
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/alarmtimer.h>
+#include <linux/netlog.h>
+#include <linux/rtc.h>
 
 #define NLMSG_FLOW_ACTIVATE 1
 #define NLMSG_FLOW_DEACTIVATE 2
@@ -48,7 +50,7 @@ unsigned int rmnet_wq_frequency __read_mostly = 1000;
 #define PS_INTERVAL_KT (ms_to_ktime(1000))
 #define WATCHDOG_EXPIRE_JF (msecs_to_jiffies(50))
 
-#if IS_ENABLED(CONFIG_QCOM_QMI_DFC)
+#ifdef CONFIG_QCOM_QMI_DFC
 static unsigned int qmi_rmnet_scale_factor = 5;
 static LIST_HEAD(qos_cleanup_list);
 #endif
@@ -130,7 +132,7 @@ qmi_rmnet_has_pending(struct qmi_info *qmi)
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_QCOM_QMI_DFC)
+#ifdef CONFIG_QCOM_QMI_DFC
 static void
 qmi_rmnet_clean_flow_list(struct qos_info *qos)
 {
@@ -194,14 +196,23 @@ static void qmi_rmnet_update_flow_map(struct rmnet_flow_map *itm,
 int qmi_rmnet_flow_control(struct net_device *dev, u32 mq_idx, int enable)
 {
 	struct netdev_queue *q;
-
+	struct timespec ts;
+	struct rtc_time tm;
+	
 	if (unlikely(mq_idx >= dev->num_tx_queues))
 		return 0;
 
 	q = netdev_get_tx_queue(dev, mq_idx);
 	if (unlikely(!q))
 		return 0;
-
+	
+	getnstimeofday(&ts);
+	rtc_time_to_tm(ts.tv_sec, &tm);
+	net_log("%d-%02d-%02d %02d:%02d:%02d.%06lu, %s[%d] %s_queue\n", 
+				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+				tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec/1000,
+				dev->name, mq_idx, enable ? "wake" : "stop");
+				
 	if (enable)
 		netif_tx_wake_queue(q);
 	else
@@ -398,9 +409,17 @@ static void __qmi_rmnet_update_mq(struct net_device *dev,
 		qmi_rmnet_flow_control(dev, itm->mq_idx,
 				       bearer->grant_size > 0 ? 1 : 0);
 
-		if (dfc_mode == DFC_MODE_SA)
+		net_log("%s m=%d b=%u gr=%u f=%u q=%d en",
+			dev->name, qos_info->mux_id, itm->bearer_id,
+			bearer->grant_size,	itm->flow_id, itm->mq_idx);
+
+		if (dfc_mode == DFC_MODE_SA) {
 			qmi_rmnet_flow_control(dev, bearer->ack_mq_idx,
 					bearer->grant_size > 0 ? 1 : 0);
+			net_log("%s m=%d b=%u gr=%u f=%u q=%d en",
+				dev->name, qos_info->mux_id, itm->bearer_id,
+				bearer->grant_size,	itm->flow_id, bearer->ack_mq_idx);
+		}
 	}
 }
 
@@ -450,7 +469,10 @@ static int qmi_rmnet_add_flow(struct net_device *dev, struct tcmsg *tcm,
 	new_map.mq_idx = tcm->tcm_handle;
 	trace_dfc_flow_info(dev->name, new_map.bearer_id, new_map.flow_id,
 			    new_map.ip_type, new_map.mq_idx, 1);
-
+	net_log("add flow: %s m=%d b=%d f=%d ip=%d q=%d\n",
+			dev->name, qos_info->mux_id, new_map.bearer_id,
+			new_map.flow_id,
+			new_map.ip_type, new_map.mq_idx);
 again:
 	spin_lock_bh(&qos_info->qos_lock);
 
@@ -539,8 +561,11 @@ qmi_rmnet_del_flow(struct net_device *dev, struct tcmsg *tcm,
 		kfree(itm);
 	}
 
-	if (list_empty(&qos_info->flow_head))
+	if (list_empty(&qos_info->flow_head)) {
 		netif_tx_wake_all_queues(dev);
+		net_log("no action: %s m=%d b=%u gr=%u f=%u q=%d en",
+			dev->name, qos_info->mux_id, 0xff, DEFAULT_GRANT, 0, 0);
+	}
 
 	spin_unlock_bh(&qos_info->qos_lock);
 
@@ -856,7 +881,7 @@ bool qmi_rmnet_all_flows_enabled(struct net_device *dev)
 }
 EXPORT_SYMBOL(qmi_rmnet_all_flows_enabled);
 
-#if IS_ENABLED(CONFIG_QCOM_QMI_DFC)
+#ifdef CONFIG_QCOM_QMI_DFC
 void qmi_rmnet_burst_fc_check(struct net_device *dev,
 			      int ip_type, u32 mark, unsigned int len)
 {
@@ -1042,7 +1067,7 @@ void qmi_rmnet_qos_exit_post(void)
 EXPORT_SYMBOL(qmi_rmnet_qos_exit_post);
 #endif
 
-#if IS_ENABLED(CONFIG_QCOM_QMI_POWER_COLLAPSE)
+#ifdef CONFIG_QCOM_QMI_POWER_COLLAPSE
 static struct workqueue_struct  *rmnet_ps_wq;
 static struct rmnet_powersave_work *rmnet_work;
 static bool rmnet_work_quit;
@@ -1203,7 +1228,6 @@ static void qmi_rmnet_check_stats(struct work_struct *work)
 			use_alarm_timer = false;
 			goto end;
 		}
-
 		/* Deregister to suppress QMI DFC and DL marker */
 		if (qmi_rmnet_set_powersave_mode(real_work->port, 1) < 0)
 			goto end;

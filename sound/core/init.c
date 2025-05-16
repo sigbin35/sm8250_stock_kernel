@@ -224,6 +224,18 @@ static void release_card_device(struct device *dev)
 	snd_card_do_free(dev_to_snd_card(dev));
 }
 
+#ifdef CONFIG_USB_AUDIO_ENHANCED_DETECT_TIME
+int get_next_snd_card_number(struct module *module)
+{
+	int idx = 0;
+	
+	idx = get_slot_from_bitmask(-1, check_empty_slot, module);
+
+	return idx;
+}
+EXPORT_SYMBOL_GPL(get_next_snd_card_number);
+#endif
+
 /**
  *  snd_card_new - create and initialize a soundcard structure
  *  @parent: the parent device object
@@ -1061,7 +1073,7 @@ void snd_card_change_online_state(struct snd_card *card, int online)
 	xchg(&card->offline_change, 1);
 	wake_up_interruptible(&card->offline_poll_wait);
 }
-EXPORT_SYMBOL_GPL(snd_card_change_online_state);
+EXPORT_SYMBOL(snd_card_change_online_state);
 
 /**
  * snd_card_is_online_state - return true if card is online state

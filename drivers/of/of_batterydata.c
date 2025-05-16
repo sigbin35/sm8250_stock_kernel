@@ -391,7 +391,6 @@ struct device_node *of_batterydata_get_best_profile(
 
 	return best_node;
 }
-EXPORT_SYMBOL_GPL(of_batterydata_get_best_profile);
 
 struct device_node *of_batterydata_get_best_aged_profile(
 		const struct device_node *batterydata_container_node,
@@ -469,7 +468,6 @@ struct device_node *of_batterydata_get_best_aged_profile(
 
 	return best_node;
 }
-EXPORT_SYMBOL_GPL(of_batterydata_get_best_aged_profile);
 
 int of_batterydata_get_aged_profile_count(
 		const struct device_node *batterydata_node,
@@ -523,7 +521,6 @@ int of_batterydata_get_aged_profile_count(
 	*count = i;
 	return 0;
 }
-EXPORT_SYMBOL_GPL(of_batterydata_get_aged_profile_count);
 
 int of_batterydata_read_soh_aged_profiles(
 		const struct device_node *batterydata_node,
@@ -601,7 +598,6 @@ int of_batterydata_read_soh_aged_profiles(
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(of_batterydata_read_soh_aged_profiles);
 
 int of_batterydata_read_data(struct device_node *batterydata_container_node,
 				struct bms_battery_data *batt_data,

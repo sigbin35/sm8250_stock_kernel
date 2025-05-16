@@ -43,7 +43,18 @@
 #include "../clk/clk.h"
 #define CREATE_TRACE_POINTS
 #include <trace/events/trace_msm_low_power.h>
-#include <linux/gpio.h>
+
+#ifdef CONFIG_SEC_PM_DEBUG
+#include <linux/sec-pinmux.h>
+#ifdef CONFIG_SEC_GPIO_DVS
+#include <linux/secgpio_dvs.h>
+#endif /* CONFIG_SEC_GPIO_DVS */
+#endif /* CONFIG_SEC_PM_DEBUG */
+
+#include <linux/sec_debug.h>
+#ifdef CONFIG_SEC_PM
+#include <linux/regulator/consumer.h>
+#endif /* CONFIG_SEC_PM */
 
 #define SCLK_HZ (32768)
 #define PSCI_POWER_STATE(reset) (reset << 30)
@@ -120,6 +131,13 @@ static void cluster_prepare(struct lpm_cluster *cluster,
 		const struct cpumask *cpu, int child_idx, bool from_idle,
 		int64_t time);
 
+#ifdef CONFIG_SEC_PM_DEBUG
+extern void sec_gpio_debug_print(void);
+extern void msm_gpio_print_enabled(void);
+static int msm_pm_sleep_sec_debug;
+module_param_named(secdebug, msm_pm_sleep_sec_debug, int, 0664);
+#endif /* CONFIG_SEC_PM_DEBUG */
+
 static bool print_parsed_dt;
 module_param_named(print_parsed_dt, print_parsed_dt, bool, 0664);
 
@@ -146,7 +164,6 @@ uint32_t register_system_pm_ops(struct system_pm_ops *pm_ops)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(register_system_pm_ops);
 
 static uint32_t least_cluster_latency(struct lpm_cluster *cluster,
 					struct latency_level *lat_level)
@@ -1109,6 +1126,10 @@ static int cluster_configure(struct lpm_cluster *cluster, int idx,
 		return -EPERM;
 
 	if (idx != cluster->default_level) {
+		sec_debug_cluster_lpm_log(cluster->cluster_name, idx,
+			cluster->num_children_in_sync.bits[0],
+			cluster->child_cpus.bits[0], from_idle, 1);
+
 		update_debug_pc_event(CLUSTER_ENTER, idx,
 			cluster->num_children_in_sync.bits[0],
 			cluster->child_cpus.bits[0], from_idle);
@@ -1272,6 +1293,10 @@ static void cluster_unprepare(struct lpm_cluster *cluster,
 			cluster->num_children_in_sync.bits[0],
 			cluster->child_cpus.bits[0], from_idle);
 
+	sec_debug_cluster_lpm_log(cluster->cluster_name, cluster->last_level,
+			cluster->num_children_in_sync.bits[0],
+			cluster->child_cpus.bits[0], from_idle, 0);
+
 	last_level = cluster->last_level;
 	cluster->last_level = cluster->default_level;
 
@@ -1383,13 +1408,6 @@ static bool psci_enter_sleep(struct lpm_cpu *cpu, int idx, bool from_idle)
 			0xdeaffeed, 0xdeaffeed, from_idle);
 	stop_critical_timings();
 
-#ifdef CONFIG_DEBUG_FS
-	if (!from_idle && pm_gpio_debug_mask) {
-		msm_gpio_dump(NULL);
-		pmic_gpio_dump(NULL);
-	}
-#endif
-
 	success = !arm_cpuidle_suspend(state_id);
 
 	start_critical_timings();
@@ -1413,7 +1431,7 @@ static int lpm_cpuidle_select(struct cpuidle_driver *drv,
 	return cpu_power_select(dev, cpu);
 }
 
-static void update_ipi_history(int cpu)
+void update_ipi_history(int cpu)
 {
 	struct ipi_history *history = &per_cpu(cpu_ipi_history, cpu);
 	ktime_t now = ktime_get();
@@ -1479,7 +1497,10 @@ static int lpm_cpuidle_enter(struct cpuidle_device *dev,
 	if (need_resched())
 		goto exit;
 
+	sec_debug_cpu_lpm_log(dev->cpu, idx, 0, 1);
+	sec_debug_sched_msg("+Idle(%s)", cpu->levels[idx].name);
 	success = psci_enter_sleep(cpu, idx, true);
+	sec_debug_sched_msg("-Idle(%s)", cpu->levels[idx].name);
 
 exit:
 	end_time = ktime_to_ns(ktime_get());
@@ -1490,6 +1511,8 @@ exit:
 	dev->last_residency = ktime_us_delta(ktime_get(), start);
 	update_history(dev, idx);
 	trace_cpu_idle_exit(idx, success);
+	sec_debug_cpu_lpm_log(dev->cpu, idx, success, 0);
+
 	if (lpm_prediction && cpu->lpm_prediction) {
 		histtimer_cancel();
 		clusttimer_cancel();
@@ -1657,6 +1680,8 @@ static int __init init_lpm(void)
 	return cpuidle_register_governor(&lpm_governor);
 }
 
+postcore_initcall(init_lpm);
+
 static void register_cpu_lpm_stats(struct lpm_cpu *cpu,
 		struct lpm_cluster *parent)
 {
@@ -1717,6 +1742,40 @@ static void register_cluster_lpm_stats(struct lpm_cluster *cl,
 static int lpm_suspend_prepare(void)
 {
 	suspend_in_progress = true;
+
+#ifdef CONFIG_SEC_GPIO_DVS
+	/************************ Caution !!! ****************************
+	 * This functiongit a must be located in appropriate
+	 * SLEEP position in accordance with the specification
+	 * of each BB vendor.
+	 ************************ Caution !!! ****************************/
+	gpio_dvs_check_sleepgpio();
+#ifdef SECGPIO_SLEEP_DEBUGGING
+	/************************ Caution !!! ****************************/
+	/* This func. must be located in an appropriate position for
+	 * GPIO SLEEP debugging in accordance with the specification
+	 * of each BB vendor, and the func. must be called after calling
+	 * the function "gpio_dvs_check_sleepgpio"
+	 ************************ Caution !!! ****************************/
+	gpio_dvs_set_sleepgpio();
+#endif /* SECGPIO_SLEEP_DEBUGGING */
+#endif /* CONFIG_SEC_GPIO_DVS */
+
+#ifdef CONFIG_SEC_PM
+	regulator_showall_enabled();
+	clock_debug_print_enabled();
+
+	debug_masterstats_show("entry");
+	debug_rpmstats_show("entry");
+#endif /* CONFIG_SEC_PM */
+
+#ifdef CONFIG_SEC_PM_DEBUG
+	if (msm_pm_sleep_sec_debug) {
+		msm_gpio_print_enabled();
+//		sec_gpio_debug_print();
+	}
+#endif /* CONFIG_SEC_PM_DEBUG */
+
 	lpm_stats_suspend_enter();
 
 	return 0;
@@ -1726,6 +1785,11 @@ static void lpm_suspend_wake(void)
 {
 	suspend_in_progress = false;
 	lpm_stats_suspend_exit();
+
+#ifdef CONFIG_SEC_PM
+	debug_rpmstats_show("exit");
+	debug_masterstats_show("exit");
+#endif
 }
 
 static int lpm_suspend_enter(suspend_state_t state)
@@ -1745,18 +1809,6 @@ static int lpm_suspend_enter(suspend_state_t state)
 		pr_err("Failed suspend\n");
 		return 0;
 	}
-
-	/*
-	 * Print the clocks and regulators which are enabled during
-	 * system suspend.  This debug information is useful to know
-	 * which resources are enabled and preventing the system level
-	 * LPMs (XO and Vmin).
-	 */
-#ifdef CONFIG_DEBUG_FS
-	clock_debug_print_enabled();
-	regulator_debug_print_enabled();
-#endif
-
 	cpu_prepare(lpm_cpu, idx, false);
 	cluster_prepare(cluster, cpumask, idx, false, 0);
 
@@ -1850,8 +1902,6 @@ static int lpm_probe(struct platform_device *pdev)
 		goto failed;
 	}
 
-	set_update_ipi_history_callback(update_ipi_history);
-
 	/* Add lpm_debug to Minidump*/
 	strlcpy(md_entry.name, "KLPMDEBUG", sizeof(md_entry.name));
 	md_entry.virt_addr = (uintptr_t)lpm_debug;
@@ -1885,15 +1935,10 @@ static struct platform_driver lpm_driver = {
 static int __init lpm_levels_module_init(void)
 {
 	int rc;
-	int cpu __maybe_unused;
-
-#ifdef MODULE
-	rc = init_lpm();
-	if (rc)
-		return rc;
-#endif
 
 #ifdef CONFIG_ARM
+	int cpu;
+
 	for_each_possible_cpu(cpu) {
 		rc = arm_cpuidle_init(cpu);
 		if (rc) {
@@ -1908,17 +1953,6 @@ static int __init lpm_levels_module_init(void)
 		pr_info("Error registering %s rc=%d\n", lpm_driver.driver.name,
 									rc);
 
-	if (!rc)
-		set_update_ipi_history_callback(update_ipi_history);
-
 	return rc;
 }
-
-#ifndef MODULE
-postcore_initcall(init_lpm);
-#endif
-
 late_initcall(lpm_levels_module_init);
-
-MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("Qualcomm Technologies, Inc. (QTI) Power Management Drivers");

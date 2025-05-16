@@ -35,6 +35,9 @@
 #include "pcm.h"
 #include "clock.h"
 #include "power.h"
+#ifdef CONFIG_USB_NOTIFY_PROC_LOG
+#include <linux/usb_notify.h>
+#endif
 
 #define SUBSTREAM_FLAG_DATA_EP_STARTED	0
 #define SUBSTREAM_FLAG_SYNC_EP_STARTED	1
@@ -399,7 +402,6 @@ static int set_sync_ep_implicit_fb_quirk(struct snd_usb_substream *subs,
 	switch (subs->stream->chip->usb_id) {
 	case USB_ID(0x0763, 0x2030): /* M-Audio Fast Track C400 */
 	case USB_ID(0x0763, 0x2031): /* M-Audio Fast Track C600 */
-	case USB_ID(0x22f0, 0x0006): /* Allen&Heath Qu-16 */
 		ep = 0x81;
 		ifnum = 3;
 		goto add_sync_ep_from_ifnum;
@@ -409,16 +411,11 @@ static int set_sync_ep_implicit_fb_quirk(struct snd_usb_substream *subs,
 		ifnum = 2;
 		goto add_sync_ep_from_ifnum;
 	case USB_ID(0x2466, 0x8003): /* Fractal Audio Axe-Fx II */
-	case USB_ID(0x0499, 0x172a): /* Yamaha MODX */
 		ep = 0x86;
 		ifnum = 2;
 		goto add_sync_ep_from_ifnum;
 	case USB_ID(0x2466, 0x8010): /* Fractal Audio Axe-Fx III */
 		ep = 0x81;
-		ifnum = 2;
-		goto add_sync_ep_from_ifnum;
-	case USB_ID(0x1686, 0xf029): /* Zoom UAC-2 */
-		ep = 0x82;
 		ifnum = 2;
 		goto add_sync_ep_from_ifnum;
 	case USB_ID(0x1397, 0x0001): /* Behringer UFX1604 */
@@ -655,12 +652,6 @@ static int set_format(struct snd_usb_substream *subs, struct audioformat *fmt)
 
 static int snd_usb_pcm_change_state(struct snd_usb_substream *subs, int state);
 
-/**
- * snd_usb_enable_audio_stream - Enable/disable the specified usb substream.
- * @subs: pointer to the usb substream.
- * @datainterval: data packet interval.
- * @enable: if true, enable the usb substream. Else disable.
- */
 int snd_usb_enable_audio_stream(struct snd_usb_substream *subs,
 	int datainterval, bool enable)
 {
@@ -668,9 +659,9 @@ int snd_usb_enable_audio_stream(struct snd_usb_substream *subs,
 	struct usb_host_interface *alts;
 	struct usb_interface *iface;
 	int ret;
-
-	if (!subs || !subs->stream)
-		return -EINVAL;
+#ifdef CONFIG_USB_NOTIFY_PROC_LOG
+	int on, type;
+#endif
 
 	if (!enable) {
 		if (subs->interface >= 0) {
@@ -682,6 +673,14 @@ int snd_usb_enable_audio_stream(struct snd_usb_substream *subs,
 		}
 
 		snd_usb_autosuspend(subs->stream->chip);
+#ifdef CONFIG_USB_NOTIFY_PROC_LOG
+		if (subs->direction == SNDRV_PCM_STREAM_PLAYBACK)
+			type = NOTIFY_PCM_PLAYBACK;
+		else
+			type = NOTIFY_PCM_CAPTURE;
+		on = 0;
+		store_usblog_notify(type, (void *)&on, NULL);
+#endif
 		return 0;
 	}
 
@@ -704,19 +703,12 @@ int snd_usb_enable_audio_stream(struct snd_usb_substream *subs,
 
 	subs->altset_idx = 0;
 	subs->interface = -1;
-
-	if (!subs->stream->chip)
-		return -EINVAL;
-
 	if (atomic_read(&subs->stream->chip->shutdown)) {
 		ret = -ENODEV;
 	} else {
 		ret = set_format(subs, fmt);
 		if (ret < 0)
 			return ret;
-
-		if (!subs->cur_audiofmt)
-			return -EINVAL;
 
 		iface = usb_ifnum_to_if(subs->dev, subs->cur_audiofmt->iface);
 		if (!iface) {
@@ -741,9 +733,17 @@ int snd_usb_enable_audio_stream(struct snd_usb_substream *subs,
 	subs->interface = fmt->iface;
 	subs->altset_idx = fmt->altset_idx;
 
+#ifdef CONFIG_USB_NOTIFY_PROC_LOG
+	if (subs->direction == SNDRV_PCM_STREAM_PLAYBACK)
+		type = NOTIFY_PCM_PLAYBACK;
+	else
+		type = NOTIFY_PCM_CAPTURE;
+	on = 1;
+	store_usblog_notify(type, (void *)&on, NULL);
+#endif
+
 	return 0;
 }
-EXPORT_SYMBOL_GPL(snd_usb_enable_audio_stream);
 
 /*
  * Return the score of matching two audioformats.

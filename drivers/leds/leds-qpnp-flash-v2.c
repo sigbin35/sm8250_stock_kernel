@@ -800,11 +800,8 @@ static int get_property_from_fg(struct qpnp_flash_led *led,
 	union power_supply_propval pval = {0, };
 
 	if (!led->bms_psy) {
-		led->bms_psy = power_supply_get_by_name("bms");
-		if (!led->bms_psy) {
-			pr_err_ratelimited("Couldn't get bms_psy\n");
-			return -ENODEV;
-		}
+		pr_err("no bms psy found\n");
+		return -EINVAL;
 	}
 
 	rc = power_supply_get_property(led->bms_psy, prop, &pval);
@@ -1786,7 +1783,6 @@ static int qpnp_flash_leds_prepare(struct led_trigger *trig, int options,
 
 	return rc;
 }
-EXPORT_SYMBOL_GPL(qpnp_flash_leds_prepare);
 
 static void qpnp_flash_led_brightness_set(struct led_classdev *led_cdev,
 						enum led_brightness value)
@@ -1874,6 +1870,41 @@ static struct device_attribute qpnp_flash_led_attrs[] = {
 	__ATTR(max_current, 0664, qpnp_flash_led_max_current_show, NULL),
 	__ATTR(enable, 0664, NULL, qpnp_flash_led_prepare_store),
 };
+
+static int flash_led_psy_notifier_call(struct notifier_block *nb,
+		unsigned long ev, void *v)
+{
+	struct power_supply *psy = v;
+	struct qpnp_flash_led *led =
+			container_of(nb, struct qpnp_flash_led, nb);
+
+	if (ev != PSY_EVENT_PROP_CHANGED)
+		return NOTIFY_OK;
+
+	if (!strcmp(psy->desc->name, "bms")) {
+		led->bms_psy = power_supply_get_by_name("bms");
+		if (!led->bms_psy)
+			pr_err("Failed to get bms power_supply\n");
+		else
+			power_supply_unreg_notifier(&led->nb);
+	}
+
+	return NOTIFY_OK;
+}
+
+static int flash_led_psy_register_notifier(struct qpnp_flash_led *led)
+{
+	int rc;
+
+	led->nb.notifier_call = flash_led_psy_notifier_call;
+	rc = power_supply_reg_notifier(&led->nb);
+	if (rc < 0) {
+		pr_err("Couldn't register psy notifier, rc = %d\n", rc);
+		return rc;
+	}
+
+	return 0;
+}
 
 /* irq handler */
 static irqreturn_t qpnp_flash_led_irq_handler(int irq, void *_led)
@@ -3059,6 +3090,15 @@ static int qpnp_flash_led_probe(struct platform_device *pdev)
 	if (rc < 0)
 		goto error_switch_register;
 
+	led->bms_psy = power_supply_get_by_name("bms");
+	if (!led->bms_psy) {
+		rc = flash_led_psy_register_notifier(led);
+		if (rc < 0) {
+			pr_err("Couldn't register psy notifier, rc = %d\n", rc);
+			goto error_switch_register;
+		}
+	}
+
 	rc = qpnp_flash_led_init_settings(led);
 	if (rc < 0) {
 		pr_err("Failed to initialize flash LED, rc=%d\n", rc);
@@ -3102,8 +3142,6 @@ sysfs_fail:
 unreg_notifier:
 	power_supply_unreg_notifier(&led->nb);
 error_switch_register:
-	if (led->bms_psy)
-		power_supply_put(led->bms_psy);
 	while (i > 0)
 		led_classdev_unregister(&led->snode[--i].cdev);
 	i = led->num_fnodes;
@@ -3137,12 +3175,6 @@ static int qpnp_flash_led_remove(struct platform_device *pdev)
 		led_classdev_unregister(&led->fnode[--i].cdev);
 
 	power_supply_unreg_notifier(&led->nb);
-	if (led->bms_psy)
-		power_supply_put(led->bms_psy);
-	if (led->main_psy)
-		power_supply_put(led->main_psy);
-	if (led->usb_psy)
-		power_supply_put(led->usb_psy);
 	return 0;
 }
 

@@ -81,7 +81,6 @@ int esoc_set_boot_fail_action(struct esoc_clink *esoc_clink, u32 action)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(esoc_set_boot_fail_action);
 
 int esoc_set_n_pon_tries(struct esoc_clink *esoc_clink, u32 n_tries)
 {
@@ -103,7 +102,6 @@ int esoc_set_n_pon_tries(struct esoc_clink *esoc_clink, u32 n_tries)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(esoc_set_n_pon_tries);
 
 static int esoc_msm_restart_handler(struct notifier_block *nb,
 		unsigned long action, void *data)
@@ -422,7 +420,7 @@ static int mdm_handle_boot_fail(struct esoc_clink *esoc_clink, u8 *pon_trial)
 		break;
 	case BOOT_FAIL_ACTION_PANIC:
 		esoc_mdm_log("Calling panic!!\n");
-		panic("Panic requested on external modem boot failure\n");
+		panic("Panic requested on unrecoverable external_modem boot failure\n");
 		break;
 	case BOOT_FAIL_ACTION_NOP:
 		esoc_mdm_log("Leaving the modem in its curent state\n");

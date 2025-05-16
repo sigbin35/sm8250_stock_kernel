@@ -176,7 +176,6 @@ int __qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus)
 {
 	return -ENOTSUPP;
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_set_cold_boot_addr);
 
 /**
  * qcom_scm_set_warm_boot_addr() - Set the warm boot address for cpus
@@ -192,7 +191,6 @@ int __qcom_scm_set_warm_boot_addr(struct device *dev, void *entry,
 {
 	return -ENOTSUPP;
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_set_warm_boot_addr);
 
 /**
  * qcom_scm_cpu_power_down() - Power down the cpu
@@ -205,7 +203,6 @@ EXPORT_SYMBOL_GPL(__qcom_scm_set_warm_boot_addr);
 void __qcom_scm_cpu_power_down(u32 flags)
 {
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_cpu_power_down);
 
 int __qcom_scm_is_call_available(struct device *dev, u32 svc_id, u32 cmd_id)
 {
@@ -222,7 +219,6 @@ int __qcom_scm_is_call_available(struct device *dev, u32 svc_id, u32 cmd_id)
 
 	return ret ? : res.a1;
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_is_call_available);
 
 int __qcom_scm_hdcp_req(struct device *dev, struct qcom_scm_hdcp_req *req,
 			u32 req_cnt, u32 *resp)
@@ -252,7 +248,6 @@ int __qcom_scm_hdcp_req(struct device *dev, struct qcom_scm_hdcp_req *req,
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_hdcp_req);
 
 void __qcom_scm_init(void)
 {
@@ -272,7 +267,6 @@ void __qcom_scm_init(void)
 	else
 		qcom_smccc_convention = ARM_SMCCC_SMC_32;
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_init);
 
 bool __qcom_scm_pas_supported(struct device *dev, u32 peripheral)
 {
@@ -289,7 +283,6 @@ bool __qcom_scm_pas_supported(struct device *dev, u32 peripheral)
 
 	return ret ? false : !!res.a1;
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_pas_supported);
 
 int __qcom_scm_pas_init_image(struct device *dev, u32 peripheral,
 			      dma_addr_t metadata_phys)
@@ -307,7 +300,6 @@ int __qcom_scm_pas_init_image(struct device *dev, u32 peripheral,
 
 	return ret ? : res.a1;
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_pas_init_image);
 
 int __qcom_scm_pas_mem_setup(struct device *dev, u32 peripheral,
 			      phys_addr_t addr, phys_addr_t size)
@@ -326,7 +318,6 @@ int __qcom_scm_pas_mem_setup(struct device *dev, u32 peripheral,
 
 	return ret ? : res.a1;
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_pas_mem_setup);
 
 int __qcom_scm_pas_auth_and_reset(struct device *dev, u32 peripheral)
 {
@@ -343,7 +334,6 @@ int __qcom_scm_pas_auth_and_reset(struct device *dev, u32 peripheral)
 
 	return ret ? : res.a1;
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_pas_auth_and_reset);
 
 int __qcom_scm_pas_shutdown(struct device *dev, u32 peripheral)
 {
@@ -359,7 +349,6 @@ int __qcom_scm_pas_shutdown(struct device *dev, u32 peripheral)
 
 	return ret ? : res.a1;
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_pas_shutdown);
 
 int __qcom_scm_pas_mss_reset(struct device *dev, bool reset)
 {
@@ -376,7 +365,6 @@ int __qcom_scm_pas_mss_reset(struct device *dev, bool reset)
 
 	return ret ? : res.a1;
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_pas_mss_reset);
 
 int __qcom_scm_set_remote_state(struct device *dev, u32 state, u32 id)
 {
@@ -393,7 +381,6 @@ int __qcom_scm_set_remote_state(struct device *dev, u32 state, u32 id)
 
 	return ret ? : res.a1;
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_set_remote_state);
 
 int __qcom_scm_assign_mem(struct device *dev, phys_addr_t mem_region,
 			  size_t mem_sz, phys_addr_t src, size_t src_sz,
@@ -421,7 +408,6 @@ int __qcom_scm_assign_mem(struct device *dev, phys_addr_t mem_region,
 
 	return ret ? : res.a1;
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_assign_mem);
 
 int __qcom_scm_restore_sec_cfg(struct device *dev, u32 device_id, u32 spare)
 {
@@ -438,7 +424,6 @@ int __qcom_scm_restore_sec_cfg(struct device *dev, u32 device_id, u32 spare)
 
 	return ret ? : res.a1;
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_restore_sec_cfg);
 
 int __qcom_scm_iommu_secure_ptbl_size(struct device *dev, u32 spare,
 				      size_t *size)
@@ -458,7 +443,6 @@ int __qcom_scm_iommu_secure_ptbl_size(struct device *dev, u32 spare,
 
 	return ret ? : res.a2;
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_iommu_secure_ptbl_size);
 
 int __qcom_scm_iommu_secure_ptbl_init(struct device *dev, u64 addr, u32 size,
 				      u32 spare)
@@ -482,7 +466,6 @@ int __qcom_scm_iommu_secure_ptbl_init(struct device *dev, u64 addr, u32 size,
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_iommu_secure_ptbl_init);
 
 int __qcom_scm_set_dload_mode(struct device *dev, bool enable)
 {
@@ -496,7 +479,6 @@ int __qcom_scm_set_dload_mode(struct device *dev, bool enable)
 	return qcom_scm_call(dev, QCOM_SCM_SVC_BOOT, QCOM_SCM_SET_DLOAD_MODE,
 			     &desc, &res);
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_set_dload_mode);
 
 int __qcom_scm_io_readl(struct device *dev, phys_addr_t addr,
 			unsigned int *val)
@@ -515,7 +497,6 @@ int __qcom_scm_io_readl(struct device *dev, phys_addr_t addr,
 
 	return ret < 0 ? ret : 0;
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_io_readl);
 
 int __qcom_scm_io_writel(struct device *dev, phys_addr_t addr, unsigned int val)
 {
@@ -529,4 +510,3 @@ int __qcom_scm_io_writel(struct device *dev, phys_addr_t addr, unsigned int val)
 	return qcom_scm_call(dev, QCOM_SCM_SVC_IO, QCOM_SCM_IO_WRITE,
 			     &desc, &res);
 }
-EXPORT_SYMBOL_GPL(__qcom_scm_io_writel);

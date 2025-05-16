@@ -74,6 +74,11 @@ module_param_named(metacopy, ovl_metacopy_def, bool, 0644);
 MODULE_PARM_DESC(ovl_metacopy_def,
 		 "Default to on or off for the metadata only copy up feature");
 
+#ifdef CONFIG_KDP_NS
+extern void rkp_set_mnt_flags(struct vfsmount *mnt,int flags);
+extern void rkp_reset_mnt_flags(struct vfsmount *mnt,int flags);
+#endif
+
 static void ovl_dentry_release(struct dentry *dentry)
 {
 	struct ovl_entry *oe = dentry->d_fsdata;
@@ -87,7 +92,7 @@ static void ovl_dentry_release(struct dentry *dentry)
 static struct dentry *ovl_d_real(struct dentry *dentry,
 				 const struct inode *inode)
 {
-	struct dentry *real = NULL, *lower;
+	struct dentry *real;
 
 	/* It's an overlay file */
 	if (inode && d_inode(dentry) == inode)
@@ -106,10 +111,9 @@ static struct dentry *ovl_d_real(struct dentry *dentry,
 	if (real && !inode && ovl_has_upperdata(d_inode(dentry)))
 		return real;
 
-	lower = ovl_dentry_lowerdata(dentry);
-	if (!lower)
+	real = ovl_dentry_lowerdata(dentry);
+	if (!real)
 		goto bug;
-	real = lower;
 
 	/* Handle recursion */
 	real = d_real(real, inode);
@@ -117,10 +121,8 @@ static struct dentry *ovl_d_real(struct dentry *dentry,
 	if (!inode || inode == d_inode(real))
 		return real;
 bug:
-	WARN(1, "%s(%pd4, %s:%lu): real dentry (%p/%lu) not found\n",
-	     __func__, dentry, inode ? inode->i_sb->s_id : "NULL",
-	     inode ? inode->i_ino : 0, real,
-	     real && d_inode(real) ? d_inode(real)->i_ino : 0);
+	WARN(1, "ovl_d_real(%pd4, %s:%lu): real dentry not found\n", dentry,
+	     inode ? inode->i_sb->s_id : "NULL", inode ? inode->i_ino : 0);
 	return dentry;
 }
 
@@ -1103,7 +1105,11 @@ static int ovl_get_upper(struct super_block *sb, struct ovl_fs *ofs,
 	}
 
 	/* Don't inherit atime flags */
+#ifdef CONFIG_KDP_NS
+	rkp_reset_mnt_flags(upper_mnt, MNT_NOATIME | MNT_NODIRATIME | MNT_RELATIME); 
+#else
 	upper_mnt->mnt_flags &= ~(MNT_NOATIME | MNT_NODIRATIME | MNT_RELATIME);
+#endif
 	ofs->upper_mnt = upper_mnt;
 
 	if (ovl_inuse_trylock(ofs->upper_mnt->mnt_root)) {
@@ -1352,23 +1358,14 @@ static int ovl_get_lower_layers(struct super_block *sb, struct ovl_fs *ofs,
 		if (err < 0)
 			goto out;
 
-		/*
-		 * Check if lower root conflicts with this overlay layers before
-		 * checking if it is in-use as upperdir/workdir of "another"
-		 * mount, because we do not bother to check in ovl_is_inuse() if
-		 * the upperdir/workdir is in fact in-use by our
-		 * upperdir/workdir.
-		 */
 		err = ovl_setup_trap(sb, stack[i].dentry, &trap, "lowerdir");
 		if (err)
 			goto out;
 
 		if (ovl_is_inuse(stack[i].dentry)) {
 			err = ovl_report_in_use(ofs, "lowerdir");
-			if (err) {
-				iput(trap);
+			if (err)
 				goto out;
-			}
 		}
 
 		mnt = clone_private_mount(&stack[i]);
@@ -1383,8 +1380,11 @@ static int ovl_get_lower_layers(struct super_block *sb, struct ovl_fs *ofs,
 		 * Make lower layers R/O.  That way fchmod/fchown on lower file
 		 * will fail instead of modifying lower fs.
 		 */
+#ifdef CONFIG_KDP_NS
+		rkp_set_mnt_flags(mnt,MNT_READONLY|MNT_NOATIME);
+#else
 		mnt->mnt_flags |= MNT_READONLY | MNT_NOATIME;
-
+#endif
 		ofs->lower_layers[ofs->numlower].trap = trap;
 		ofs->lower_layers[ofs->numlower].mnt = mnt;
 		ofs->lower_layers[ofs->numlower].idx = i + 1;

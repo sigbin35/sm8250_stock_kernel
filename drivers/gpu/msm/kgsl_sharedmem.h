@@ -311,18 +311,6 @@ int kgsl_allocate_global(struct kgsl_device *device,
  */
 void kgsl_free_global(struct kgsl_device *device, struct kgsl_memdesc *memdesc);
 
-/*
- * kgsl_memdesc_is_dmabuf - Return true if the object is an
- * imported dma-buf
- * @memdesc: A handle to GPU memory descriptor
- *
- * Return: True if the memdesc is an imported dma-buf
- */
-static inline bool kgsl_memdesc_is_dmabuf(const struct kgsl_memdesc *memdesc)
-{
-	return memdesc->flags & KGSL_MEMFLAGS_USERMEM_ION;
-}
-
 void kgsl_sharedmem_set_noretry(bool val);
 bool kgsl_sharedmem_get_noretry(void);
 
@@ -380,9 +368,20 @@ static inline void kgsl_free_sgt(struct sg_table *sgt)
  */
 #if !defined(CONFIG_QCOM_KGSL_USE_SHMEM) && \
 	!defined(CONFIG_ALLOC_BUFFERS_IN_4K_CHUNKS)
-static inline int kgsl_get_page_size(size_t size, unsigned int align)
+static inline int kgsl_get_page_size(size_t size, unsigned int align,
+			struct kgsl_memdesc *memdesc)
 {
+	if (memdesc->priv & KGSL_MEMDESC_USE_SHMEM)
+		return PAGE_SIZE;
+
+#ifdef CONFIG_HUGEPAGE_POOL
+	if (align >= ilog2(SZ_2M) && size >= SZ_2M &&
+		kgsl_pool_avaialable(SZ_2M))
+		return SZ_2M;
+	else if (align >= ilog2(SZ_1M) && size >= SZ_1M &&
+#else
 	if (align >= ilog2(SZ_1M) && size >= SZ_1M &&
+#endif
 		kgsl_pool_avaialable(SZ_1M))
 		return SZ_1M;
 	else if (align >= ilog2(SZ_64K) && size >= SZ_64K &&

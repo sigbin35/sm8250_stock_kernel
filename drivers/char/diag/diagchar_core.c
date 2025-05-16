@@ -140,7 +140,7 @@ static struct mutex apps_data_mutex;
 
 #define DIAGPKT_MAX_DELAYED_RSP 0xFFFF
 
-#if IS_ENABLED(CONFIG_IPC_LOGGING)
+#ifdef CONFIG_IPC_LOGGING
 uint16_t diag_debug_mask;
 void *diag_ipc_log;
 #endif
@@ -4315,7 +4315,7 @@ void diag_ws_release(void)
 		pm_relax(driver->diag_dev);
 }
 
-#if IS_ENABLED(CONFIG_IPC_LOGGING)
+#ifdef CONFIG_IPC_LOGGING
 static void diag_debug_init(void)
 {
 	diag_ipc_log = ipc_log_context_create(DIAG_IPC_LOG_PAGES, "diag", 0);

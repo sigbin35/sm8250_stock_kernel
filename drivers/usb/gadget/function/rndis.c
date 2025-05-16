@@ -633,13 +633,17 @@ static int rndis_set_response(struct rndis_params *params,
 	rndis_set_cmplt_type *resp;
 	rndis_resp_t *r;
 
+	BufLength = le32_to_cpu(buf->InformationBufferLength);
+	BufOffset = le32_to_cpu(buf->InformationBufferOffset);
+	if ((BufLength > RNDIS_MAX_TOTAL_SIZE) ||
+	    (BufOffset > RNDIS_MAX_TOTAL_SIZE) ||
+	    (BufOffset + 8 >= RNDIS_MAX_TOTAL_SIZE))
+		    return -EINVAL;
+
 	r = rndis_add_response(params, sizeof(rndis_set_cmplt_type));
 	if (!r)
 		return -ENOMEM;
 	resp = (rndis_set_cmplt_type *)r->buf;
-
-	BufLength = le32_to_cpu(buf->InformationBufferLength);
-	BufOffset = le32_to_cpu(buf->InformationBufferOffset);
 
 #ifdef	VERBOSE_DEBUG
 	pr_debug("%s: Length: %d\n", __func__, BufLength);
@@ -865,8 +869,10 @@ int rndis_msg_parser(struct rndis_params *params, u8 *buf)
 		/* Garbled message can be huge, so limit what we display */
 		if (MsgLength > 16)
 			MsgLength = 16;
+		/*
 		print_hex_dump_bytes(__func__, DUMP_PREFIX_OFFSET,
 				     buf, MsgLength);
+		 */
 		break;
 	}
 
@@ -1012,7 +1018,6 @@ void rndis_set_max_pkt_xfer(struct rndis_params *params, u8 max_pkt_per_xfer)
 
 	params->max_pkt_per_xfer = max_pkt_per_xfer;
 }
-EXPORT_SYMBOL_GPL(rndis_set_max_pkt_xfer);
 
 /**
  * rndis_flow_control: enable/disable flow control with USB RNDIS interface
@@ -1056,7 +1061,6 @@ void rndis_flow_control(struct rndis_params *params, bool enable_flow_control)
 		params->state = RNDIS_DATA_INITIALIZED;
 	}
 }
-EXPORT_SYMBOL_GPL(rndis_flow_control);
 
 void rndis_add_hdr(struct sk_buff *skb)
 {
@@ -1199,7 +1203,6 @@ void rndis_set_pkt_alignment_factor(struct rndis_params *params,
 
 	params->pkt_alignment_factor = pkt_alignment_factor;
 }
-EXPORT_SYMBOL_GPL(rndis_set_pkt_alignment_factor);
 
 #ifdef CONFIG_USB_GADGET_DEBUG_FILES
 
@@ -1295,6 +1298,3 @@ static const struct file_operations rndis_proc_fops = {
 #define	NAME_TEMPLATE "driver/rndis-%03d"
 
 #endif /* CONFIG_USB_GADGET_DEBUG_FILES */
-
-MODULE_DESCRIPTION("Remote NDIS USB Gadget driver");
-MODULE_LICENSE("GPL v2");

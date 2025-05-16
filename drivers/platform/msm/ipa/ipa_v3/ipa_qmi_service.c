@@ -780,10 +780,8 @@ static int ipa3_qmi_filter_request_ex_calc_length(
 {
 	int len = 0;
 
-	/*
-	 * caller should validate and send the req instead of sending max
-	 * length, the approximate length is calculated
-	 */
+	/* caller should validate and send the req */
+	/* instead of sending max length,the approximate length is calculated */
 	len += ((sizeof(struct ipa_install_fltr_rule_req_ex_msg_v01)) -
 		(QMI_IPA_MAX_FILTERS_EX_V01 *
 		sizeof(struct ipa_filter_spec_ex_type_v01) -
@@ -935,7 +933,9 @@ int ipa3_qmi_add_offload_request_send(
 	}
 
 	/* currently set total max to 64 */
-	if (req->filter_spec_ex2_list_len +
+	mutex_lock(&ipa3_qmi_lock);
+	if (req->filter_spec_ex2_list_len > QMI_IPA_MAX_FILTERS_V01 ||
+		req->filter_spec_ex2_list_len +
 		ipa3_qmi_ctx->num_ipa_offload_connection
 		>= QMI_IPA_MAX_FILTERS_V01) {
 		IPAWANDBG(
@@ -943,8 +943,10 @@ int ipa3_qmi_add_offload_request_send(
 			ipa3_qmi_ctx->num_ipa_offload_connection,
 			req->filter_spec_ex2_list_len,
 			QMI_IPA_MAX_FILTERS_V01);
+		mutex_unlock(&ipa3_qmi_lock);
 		return -EINVAL;
 	}
+	mutex_unlock(&ipa3_qmi_lock);
 
 	for (i = 0; i < req->filter_spec_ex2_list_len; i++) {
 		if ((req->filter_spec_ex2_list[i].ip_type !=
@@ -1080,6 +1082,7 @@ int ipa3_qmi_rmv_offload_request_send(
 	req->filter_handle_list_len,
 	ipa3_qmi_ctx->num_ipa_offload_connection);
 
+	mutex_lock(&ipa3_qmi_lock);
 	/*  max as num_ipa_offload_connection */
 	if (req->filter_handle_list_len >
 		ipa3_qmi_ctx->num_ipa_offload_connection) {
@@ -1087,10 +1090,10 @@ int ipa3_qmi_rmv_offload_request_send(
 		"cur(%d), req_rmv(%d)\n",
 			ipa3_qmi_ctx->num_ipa_offload_connection,
 			req->filter_handle_list_len);
+		mutex_unlock(&ipa3_qmi_lock);
 		return -EINVAL;
 	}
 
-	mutex_lock(&ipa3_qmi_lock);
 	for (i = 0; i < req->filter_handle_list_len; i++) {
 		/* check if rule-id match */
 		id =
@@ -1721,6 +1724,14 @@ static struct qmi_msg_handler server_handlers[] = {
 		.ei = ipa3_config_req_msg_data_v01_ei,
 		.decoded_size = sizeof(struct ipa_config_req_msg_v01),
 		.fn = handle_ipa_config_req,
+	},
+	{
+		.type = QMI_REQUEST,
+		.msg_id = QMI_IPA_INIT_MODEM_DRIVER_CMPLT_REQ_V01,
+		.ei = ipa3_init_modem_driver_cmplt_req_msg_data_v01_ei,
+		.decoded_size = sizeof(
+			struct ipa_init_modem_driver_cmplt_req_msg_v01),
+		.fn = ipa3_handle_modem_init_cmplt_req,
 	},
 	{
 		.type = QMI_REQUEST,

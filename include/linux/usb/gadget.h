@@ -26,7 +26,6 @@
 #include <linux/workqueue.h>
 #include <linux/usb/ch9.h>
 #include <linux/pm_runtime.h>
-#include <linux/android_kabi.h>
 
 #define UDC_TRACE_STR_MAX	512
 
@@ -343,10 +342,10 @@ struct usb_ep {
 	u8			address;
 	const struct usb_endpoint_descriptor	*desc;
 	const struct usb_ss_ep_comp_descriptor	*comp_desc;
-	enum ep_type            ep_type;
-	u8                      ep_num;
-	u8                      ep_intr_num;
-	bool                    endless;
+	enum ep_type		ep_type;
+	u8			ep_num;
+	u8			ep_intr_num;
+	bool			endless;
 };
 
 /*-------------------------------------------------------------------------*/
@@ -396,7 +395,7 @@ static inline int usb_ep_fifo_status(struct usb_ep *ep)
 static inline void usb_ep_fifo_flush(struct usb_ep *ep)
 { }
 
-static inline int usb_gsi_ep_op(struct usb_ep *ep,
+static int usb_gsi_ep_op(struct usb_ep *ep,
 		struct usb_gsi_request *req, enum gsi_ep_op op)
 { return 0; }
 #endif /* USB_GADGET */
@@ -543,11 +542,6 @@ struct usb_gadget {
 	unsigned			connected:1;
 	unsigned			lpm_capable:1;
 	unsigned			remote_wakeup:1;
-
-	ANDROID_KABI_RESERVE(1);
-	ANDROID_KABI_RESERVE(2);
-	ANDROID_KABI_RESERVE(3);
-	ANDROID_KABI_RESERVE(4);
 };
 #define work_to_gadget(w)	(container_of((w), struct usb_gadget, work))
 
@@ -696,8 +690,7 @@ static inline int usb_gadget_frame_number(struct usb_gadget *gadget)
 { return 0; }
 static inline int usb_gadget_wakeup(struct usb_gadget *gadget)
 { return 0; }
-static inline int usb_gadget_func_wakeup(struct usb_gadget *gadget,
-					 int interface_id)
+static int usb_gadget_func_wakeup(struct usb_gadget *gadget, int interface_id)
 { return 0; }
 static inline int usb_gadget_set_selfpowered(struct usb_gadget *gadget)
 { return 0; }
@@ -1161,7 +1154,7 @@ extern struct usb_ep *usb_ep_autoconfig_by_name(struct usb_gadget *gadget,
 			struct usb_endpoint_descriptor *desc,
 			const char *ep_name);
 
-#if IS_ENABLED(CONFIG_USB_DWC3_MSM)
+#ifdef CONFIG_USB_DWC3_MSM
 int msm_ep_config(struct usb_ep *ep, struct usb_request *request);
 int msm_ep_unconfig(struct usb_ep *ep);
 void dwc3_tx_fifo_resize_request(struct usb_ep *ep, bool qdss_enable);

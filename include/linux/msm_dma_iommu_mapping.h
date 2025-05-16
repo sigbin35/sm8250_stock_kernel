@@ -11,7 +11,7 @@
 #include <linux/scatterlist.h>
 #include <linux/dma-mapping.h>
 
-#if IS_ENABLED(CONFIG_QCOM_LAZY_MAPPING)
+#ifdef CONFIG_QCOM_LAZY_MAPPING
 /*
  * This function is not taking a reference to the dma_buf here. It is expected
  * that clients hold reference to the dma_buf until they are done with mapping
@@ -21,6 +21,7 @@ int msm_dma_map_sg_attrs(struct device *dev, struct scatterlist *sg, int nents,
 		   enum dma_data_direction dir, struct dma_buf *dma_buf,
 		   unsigned long attrs);
 
+void msm_dma_debug_count_buffers(struct device *dev);
 /*
  * This function takes an extra reference to the dma_buf.
  * What this means is that calling msm_dma_unmap_sg will not result in buffer's

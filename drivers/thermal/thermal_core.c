@@ -22,13 +22,19 @@
 #include <net/netlink.h>
 #include <net/genetlink.h>
 #include <linux/suspend.h>
-#include <linux/kobject.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/thermal.h>
 
 #include "thermal_core.h"
 #include "thermal_hwmon.h"
+
+#if defined(CONFIG_SEC_PM)
+void *thermal_ipc_log;
+
+/* cooling device state */
+static struct delayed_work cdev_print_work;
+#endif
 
 MODULE_AUTHOR("Zhang Rui");
 MODULE_DESCRIPTION("Generic thermal management sysfs support");
@@ -46,8 +52,6 @@ static LIST_HEAD(thermal_governor_list);
 static DEFINE_MUTEX(thermal_list_lock);
 static DEFINE_MUTEX(thermal_governor_lock);
 static DEFINE_MUTEX(poweroff_lock);
-static DEFINE_MUTEX(cdev_softlink_lock);
-static DEFINE_MUTEX(tz_softlink_lock);
 
 static atomic_t in_suspend;
 static bool power_off_triggered;
@@ -55,10 +59,6 @@ static bool power_off_triggered;
 static struct thermal_governor *def_governor;
 
 static struct workqueue_struct *thermal_passive_wq;
-
-static struct kobject *cdev_softlink_kobj;
-
-static struct kobject *tz_softlink_kobj;
 
 /*
  * Governor section: set of functions to handle thermal governors
@@ -480,12 +480,7 @@ static void update_temperature(struct thermal_zone_device *tz)
 static void thermal_zone_device_init(struct thermal_zone_device *tz)
 {
 	struct thermal_instance *pos;
-
-	if (tz->tzp && tz->tzp->tracks_low)
-		tz->temperature = THERMAL_TEMP_INVALID_LOW;
-	else
-		tz->temperature = THERMAL_TEMP_INVALID;
-
+	tz->temperature = THERMAL_TEMP_INVALID;
 	list_for_each_entry(pos, &tz->thermal_instances, tz_node)
 		pos->initialized = false;
 }
@@ -500,9 +495,6 @@ void thermal_zone_device_update_temp(struct thermal_zone_device *tz,
 				enum thermal_notify_event event, int temp)
 {
 	int count;
-
-	if (!tz || !tz->ops)
-		return;
 
 	if (atomic_read(&in_suspend) && (!tz->ops->is_wakeable ||
 		!(tz->ops->is_wakeable(tz))))
@@ -524,9 +516,6 @@ void thermal_zone_device_update(struct thermal_zone_device *tz,
 				enum thermal_notify_event event)
 {
 	int count;
-
-	if (!tz || !tz->ops)
-		return;
 
 	if (atomic_read(&in_suspend) && (!tz->ops->is_wakeable ||
 		!(tz->ops->is_wakeable(tz))))
@@ -813,9 +802,8 @@ int thermal_zone_bind_cooling_device(struct thermal_zone_device *tz,
 	sprintf(dev->attr_name, "cdev%d_trip_point", dev->id);
 	sysfs_attr_init(&dev->attr.attr);
 	dev->attr.attr.name = dev->attr_name;
-	dev->attr.attr.mode = 0644;
+	dev->attr.attr.mode = 0444;
 	dev->attr.show = trip_point_show;
-	dev->attr.store = trip_point_store;
 	result = device_create_file(&tz->device, &dev->attr);
 	if (result)
 		goto remove_symbol_link;
@@ -1047,15 +1035,12 @@ static void bind_cdev(struct thermal_cooling_device *cdev)
  */
 static struct thermal_cooling_device *
 __thermal_cooling_device_register(struct device_node *np,
-				  const char *type, void *devdata,
+				  char *type, void *devdata,
 				  const struct thermal_cooling_device_ops *ops)
 {
 	struct thermal_cooling_device *cdev;
 	struct thermal_zone_device *pos = NULL;
 	int result;
-
-	if (!type || strlen(type) == 0)
-		return ERR_PTR(-EINVAL);
 
 	if (type && strlen(type) >= THERMAL_NAME_LENGTH)
 		return ERR_PTR(-EINVAL);
@@ -1093,18 +1078,7 @@ __thermal_cooling_device_register(struct device_node *np,
 		kfree(cdev);
 		return ERR_PTR(result);
 	}
-
-	mutex_lock(&cdev_softlink_lock);
-	if (cdev_softlink_kobj == NULL) {
-		cdev_softlink_kobj = kobject_create_and_add("cdev-by-name",
-						cdev->device.kobj.parent);
-	}
-	mutex_unlock(&cdev_softlink_lock);
-
-	result = sysfs_create_link(cdev_softlink_kobj,
-				&cdev->device.kobj, cdev->type);
-	if (result)
-		dev_err(&cdev->device, "Fail to create cdev_map soft link\n");
+	pr_info("register cooling_device%d-%s\n", cdev->id, cdev->type);
 
 	/* Add 'this' new cdev to the global cdev list */
 	mutex_lock(&thermal_list_lock);
@@ -1138,7 +1112,7 @@ __thermal_cooling_device_register(struct device_node *np,
  * ERR_PTR. Caller must check return value with IS_ERR*() helpers.
  */
 struct thermal_cooling_device *
-thermal_cooling_device_register(const char *type, void *devdata,
+thermal_cooling_device_register(char *type, void *devdata,
 				const struct thermal_cooling_device_ops *ops)
 {
 	return __thermal_cooling_device_register(NULL, type, devdata, ops);
@@ -1162,7 +1136,7 @@ EXPORT_SYMBOL_GPL(thermal_cooling_device_register);
  */
 struct thermal_cooling_device *
 thermal_of_cooling_device_register(struct device_node *np,
-				   const char *type, void *devdata,
+				   char *type, void *devdata,
 				   const struct thermal_cooling_device_ops *ops)
 {
 	return __thermal_cooling_device_register(np, type, devdata, ops);
@@ -1228,7 +1202,6 @@ void thermal_cooling_device_unregister(struct thermal_cooling_device *cdev)
 
 	mutex_unlock(&thermal_list_lock);
 
-	sysfs_remove_link(cdev_softlink_kobj, tz->type);
 	ida_simple_remove(&thermal_cdev_ida, cdev->id);
 	device_del(&cdev->device);
 	thermal_cooling_device_destroy_sysfs(cdev);
@@ -1317,9 +1290,6 @@ thermal_zone_device_register(const char *type, int trips, int mask,
 		return ERR_PTR(-EINVAL);
 
 	if (type && strlen(type) >= THERMAL_NAME_LENGTH)
-		return ERR_PTR(-EINVAL);
-
-	if (!strcmp(type, ""))
 		return ERR_PTR(-EINVAL);
 
 	if (trips > THERMAL_MAX_TRIPS || trips < 0 || mask >> trips)
@@ -1412,18 +1382,6 @@ thermal_zone_device_register(const char *type, int trips, int mask,
 	if (atomic_cmpxchg(&tz->need_update, 1, 0))
 		thermal_zone_device_update(tz, THERMAL_EVENT_UNSPECIFIED);
 
-	mutex_lock(&tz_softlink_lock);
-	if (tz_softlink_kobj == NULL) {
-		tz_softlink_kobj = kobject_create_and_add("tz-by-name",
-						tz->device.kobj.parent);
-	}
-	mutex_unlock(&tz_softlink_lock);
-
-	result = sysfs_create_link(tz_softlink_kobj,
-				&tz->device.kobj, tz->type);
-	if (result)
-		dev_err(&tz->device, "Fail to create tz_map soft link\n");
-
 	return tz;
 
 unregister:
@@ -1488,8 +1446,6 @@ void thermal_zone_device_unregister(struct thermal_zone_device *tz)
 
 	mutex_unlock(&thermal_list_lock);
 
-	sysfs_remove_link(tz_softlink_kobj, tz->type);
-
 	cancel_delayed_work_sync(&tz->poll_queue);
 
 	thermal_set_governor(tz, NULL);
@@ -1539,43 +1495,6 @@ exit:
 	return ref;
 }
 EXPORT_SYMBOL_GPL(thermal_zone_get_zone_by_name);
-
-/**
- * thermal_zone_get_cdev_by_name() - search for a cooling device and returns
- * its ref.
- * @name: thermal cdev name to fetch the temperature
- *
- * When only one cdev is found with the passed name, returns a reference to it.
- *
- * Return: On success returns a reference to an unique thermal cooling device
- * with matching name equals to @name, an ERR_PTR otherwise (-EINVAL for
- * invalid paramenters, -ENODEV for not found and -EEXIST for multiple matches).
- */
-struct thermal_cooling_device *thermal_zone_get_cdev_by_name(const char *name)
-{
-	struct thermal_cooling_device *pos = NULL, *ref = ERR_PTR(-EINVAL);
-	unsigned int found = 0;
-
-	if (!name)
-		return ref;
-
-	mutex_lock(&thermal_list_lock);
-	list_for_each_entry(pos, &thermal_cdev_list, node)
-		if (!strncasecmp(name, pos->type, THERMAL_NAME_LENGTH)) {
-			found++;
-			ref = pos;
-		}
-	mutex_unlock(&thermal_list_lock);
-
-	/* nothing has been found, thus an error code for it */
-	if (found == 0)
-		return ERR_PTR(-ENODEV);
-	if (found > 1)
-		return ERR_PTR(-EEXIST);
-	return ref;
-
-}
-EXPORT_SYMBOL_GPL(thermal_zone_get_cdev_by_name);
 
 #ifdef CONFIG_NET
 static const struct genl_multicast_group thermal_event_mcgrps[] = {
@@ -1675,16 +1594,49 @@ static inline int thermal_generate_netlink_event(struct thermal_zone_device *tz,
 		enum events event) { return -ENODEV; }
 #endif /* !CONFIG_NET */
 
+#if defined(CONFIG_SEC_PM)
+#define BUF_SIZE	SZ_1K
+static void __ref cdev_print(struct work_struct *work)
+{
+	struct thermal_cooling_device *cdev;
+	unsigned long cur_state = 0;
+	int added = 0, ret = 0;
+	char buffer[BUF_SIZE] = { 0, };
+
+	mutex_lock(&thermal_list_lock);
+	list_for_each_entry(cdev, &thermal_cdev_list, node) {
+		if (cdev->ops->get_cur_state)
+			cdev->ops->get_cur_state(cdev, &cur_state);
+
+		if (cur_state) {
+			ret = snprintf(buffer + added, sizeof(buffer) - added,
+					   "[%s:%ld]", cdev->type, cur_state);
+			added += ret;
+
+			if (added >= BUF_SIZE)
+				break;
+		}
+	}
+	mutex_unlock(&thermal_list_lock);
+
+	pr_info("thermal: cdev%s\n", buffer);
+
+	schedule_delayed_work(&cdev_print_work, HZ * 5);
+}
+#endif
+
 static int thermal_pm_notify(struct notifier_block *nb,
 			     unsigned long mode, void *_unused)
 {
 	struct thermal_zone_device *tz;
-	enum thermal_device_mode tz_mode;
 
 	switch (mode) {
 	case PM_HIBERNATION_PREPARE:
 	case PM_RESTORE_PREPARE:
 	case PM_SUSPEND_PREPARE:
+#if defined(CONFIG_SEC_PM)
+		cancel_delayed_work(&cdev_print_work);
+#endif
 		atomic_set(&in_suspend, 1);
 		break;
 	case PM_POST_HIBERNATION:
@@ -1692,19 +1644,16 @@ static int thermal_pm_notify(struct notifier_block *nb,
 	case PM_POST_SUSPEND:
 		atomic_set(&in_suspend, 0);
 		list_for_each_entry(tz, &thermal_tz_list, node) {
-			tz_mode = THERMAL_DEVICE_ENABLED;
-			if (tz->ops->get_mode)
-				tz->ops->get_mode(tz, &tz_mode);
-
-			if ((tz->ops->is_wakeable &&
-				tz->ops->is_wakeable(tz)) ||
-				tz_mode == THERMAL_DEVICE_DISABLED)
+			if (tz->ops->is_wakeable &&
+				tz->ops->is_wakeable(tz))
 				continue;
-
 			thermal_zone_device_init(tz);
 			thermal_zone_device_update(tz,
 						   THERMAL_EVENT_UNSPECIFIED);
 		}
+#if defined(CONFIG_SEC_PM)
+		schedule_delayed_work(&cdev_print_work, 0);
+#endif
 		break;
 	default:
 		break;
@@ -1747,6 +1696,17 @@ static int __init thermal_init(void)
 		pr_warn("Thermal: Can not register suspend notifier, return %d\n",
 			result);
 
+#if defined(CONFIG_SEC_PM)
+	INIT_DELAYED_WORK(&cdev_print_work, cdev_print);
+	schedule_delayed_work(&cdev_print_work, 0);
+
+	if (!thermal_ipc_log)
+		thermal_ipc_log = ipc_log_context_create(10, "lmh_dcvs", 0);
+
+	if (!thermal_ipc_log)
+		pr_err("%s: Failed to create thermal logging context\n", __func__);
+#endif
+
 	return 0;
 
 exit_zone_parse:
@@ -1766,12 +1726,13 @@ error:
 
 static void thermal_exit(void)
 {
+#if defined(CONFIG_SEC_PM)
+	cancel_delayed_work_sync(&cdev_print_work);
+#endif
 	unregister_pm_notifier(&thermal_pm_nb);
 	of_thermal_destroy_zones();
 	destroy_workqueue(thermal_passive_wq);
 	genetlink_exit();
-	kobject_del(cdev_softlink_kobj);
-	kobject_del(tz_softlink_kobj);
 	class_unregister(&thermal_class);
 	thermal_unregister_governors();
 	ida_destroy(&thermal_tz_ida);
@@ -1796,3 +1757,4 @@ exit_netlink:
 subsys_initcall(thermal_init);
 fs_initcall(thermal_netlink_init);
 module_exit(thermal_exit);
+

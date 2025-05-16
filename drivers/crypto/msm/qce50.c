@@ -2,7 +2,7 @@
 /*
  * QTI Crypto Engine driver.
  *
- * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
  */
 
 #define pr_fmt(fmt) "QCE50: %s: " fmt, __func__
@@ -4865,7 +4865,7 @@ again:
 			pce_dev->intr_cadence = 0;
 			atomic_set(&pce_dev->bunch_cmd_seq, 0);
 			atomic_set(&pce_dev->last_intr_seq, 0);
-			pce_dev->cadence_flag = !pce_dev->cadence_flag;
+			pce_dev->cadence_flag = ~pce_dev->cadence_flag;
 		}
 	}
 

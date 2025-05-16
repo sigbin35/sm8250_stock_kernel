@@ -13,7 +13,7 @@
 #define IPA_PM_MAX_EX_CL 64
 #define IPA_PM_THRESHOLD_MAX 5
 #define IPA_PM_EXCEPTION_MAX 5
-#define IPA_PM_DEFERRED_TIMEOUT 100
+#define IPA_PM_DEFERRED_TIMEOUT 2000
 
 /*
  * ipa_pm group names
@@ -82,7 +82,7 @@ struct ipa_pm_register_params {
 	bool skip_clk_vote;
 };
 
-#if IS_ENABLED(CONFIG_IPA3)
+#ifdef CONFIG_IPA3
 
 int ipa_pm_register(struct ipa_pm_register_params *params, u32 *hdl);
 int ipa_pm_associate_ipa_cons_to_client(u32 hdl, enum ipa_client_type consumer);

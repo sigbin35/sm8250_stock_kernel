@@ -21,7 +21,6 @@
 #include <linux/arm_sdei.h>
 #include <linux/delay.h>
 #include <linux/init.h>
-#include <linux/kernel.h>
 #include <linux/spinlock.h>
 #include <linux/sched/mm.h>
 #include <linux/sched/hotplug.h>
@@ -64,11 +63,12 @@
 #include <asm/system_misc.h>
 #include <soc/qcom/minidump.h>
 
-#include <soc/qcom/scm.h>
 #include <soc/qcom/lpm_levels.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/ipi.h>
+
+#include <linux/sec_debug.h>
 
 DEFINE_PER_CPU_READ_MOSTLY(int, cpu_number);
 EXPORT_PER_CPU_SYMBOL(cpu_number);
@@ -248,7 +248,6 @@ asmlinkage notrace void secondary_start_kernel(void)
 	pr_info("CPU%u: Booted secondary processor 0x%010lx [0x%08x]\n",
 					 cpu, (unsigned long)mpidr,
 					 read_cpuid_id());
-	set_cpu_psci_function_id(cpu, 0);
 	update_cpu_boot_status(CPU_BOOT_SUCCESS);
 	set_cpu_online(cpu, true);
 	complete(&cpu_running);
@@ -413,21 +412,12 @@ static void __init hyp_mode_check(void)
 		pr_info("CPU: All CPU(s) started at EL1\n");
 }
 
-#if defined(CONFIG_QCOM_SCM_MODULE) && \
-	defined(CONFIG_QCOM_QHEE_ENABLE_MEM_PROTECTION)
-int __init __weak scm_enable_mem_protection(void)
-{
-	return 0;
-}
-#endif
-
 void __init smp_cpus_done(unsigned int max_cpus)
 {
 	pr_info("SMP: Total of %d processors activated.\n", num_online_cpus());
 	setup_cpu_features();
 	hyp_mode_check();
 	apply_alternatives_all();
-	scm_enable_mem_protection();
 	mark_linear_text_alias_ro();
 }
 
@@ -614,11 +604,8 @@ static void __init acpi_parse_and_init_cpus(void)
 #define acpi_parse_and_init_cpus(...)	do { } while (0)
 #endif
 void (*__smp_cross_call)(const struct cpumask *, unsigned int);
-/* Dummy vendor field */
 DEFINE_PER_CPU(bool, pending_ipi);
-EXPORT_SYMBOL_GPL(pending_ipi);
 
-static void (*__smp_update_ipi_history_cb)(int cpu);
 /*
  * Enumerate the possible CPU set from the device tree and build the
  * cpu logical map array containing MPIDR values related to logical
@@ -764,12 +751,6 @@ void __init set_smp_cross_call(void (*fn)(const struct cpumask *, unsigned int))
 	__smp_cross_call = fn;
 }
 
-void set_update_ipi_history_callback(void (*fn)(int))
-{
-	__smp_update_ipi_history_cb = fn;
-}
-EXPORT_SYMBOL_GPL(set_update_ipi_history_callback);
-
 static const char *ipi_types[NR_IPI] __tracepoint_string = {
 #define S(x,s)	[x] = s
 	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
@@ -865,8 +846,8 @@ static void ipi_cpu_stop(unsigned int cpu, struct pt_regs *regs)
 		pr_crit("CPU%u: stopping\n", cpu);
 		__show_regs(regs);
 		dump_stack();
-		if (vendor_panic_cb)
-			vendor_panic_cb(regs->sp);
+		dump_stack_minidump(regs->sp);
+		sec_debug_save_context();
 		raw_spin_unlock(&stop_lock);
 	}
 
@@ -981,8 +962,7 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 void smp_send_reschedule(int cpu)
 {
 	BUG_ON(cpu_is_offline(cpu));
-	if (__smp_update_ipi_history_cb)
-		__smp_update_ipi_history_cb(cpu);
+	update_ipi_history(cpu);
 	smp_cross_call_common(cpumask_of(cpu), IPI_RESCHEDULE);
 }
 

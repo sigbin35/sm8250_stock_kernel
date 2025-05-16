@@ -1,4 +1,3 @@
-# SPDX-License-Identifier: GPL-2.0
 #
 # USB device configuration
 #
@@ -175,6 +174,10 @@ source "drivers/usb/typec/Kconfig"
 source "drivers/usb/roles/Kconfig"
 
 source "drivers/usb/pd/Kconfig"
+
+source "drivers/usb/notify/Kconfig"
+
+source "drivers/usb/manager/Kconfig"
 
 config USB_LED_TRIG
 	bool "USB LED Triggers"

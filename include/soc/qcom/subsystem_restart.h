@@ -9,9 +9,6 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 
-#define MAX_SSR_REASON_LEN  256U
-#define MAX_CRASH_TIMESTAMP_LEN  30U
-
 struct subsys_device;
 extern struct bus_type subsys_bus_type;
 
@@ -83,9 +80,6 @@ struct subsys_notif_timeout {
  * @ignore_ssr_failure: SSR failures are usually fatal and results in panic. If
  * set will ignore failure.
  * @edge: GLINK logical name of the subsystem
- * @last_crash_reason: reason of the last crash
- * @last_crash_timestamp: timestamp of the last crash
- * @ssr_sysfs_lock: protects ssr sysfs nodes access
  */
 struct subsys_desc {
 	const char *name;
@@ -126,12 +120,13 @@ struct subsys_desc {
 	bool ignore_ssr_failure;
 	const char *edge;
 	struct qcom_smem_state *state;
-	char last_crash_reason[MAX_SSR_REASON_LEN];
-	char last_crash_timestamp[MAX_CRASH_TIMESTAMP_LEN];
-	spinlock_t ssr_sysfs_lock;
 #ifdef CONFIG_SETUP_SSR_NOTIF_TIMEOUTS
 	struct subsys_notif_timeout timeout_data;
 #endif /* CONFIG_SETUP_SSR_NOTIF_TIMEOUTS */
+	bool run_fssr;
+#ifdef CONFIG_SUPPORT_AK0997X
+	int d_hall_rst_gpio;
+#endif
 };
 
 /**
@@ -151,18 +146,19 @@ struct notif_data {
 	struct platform_device *pdev;
 };
 
-#if IS_ENABLED(CONFIG_MSM_SUBSYSTEM_RESTART)
+#if defined(CONFIG_MSM_SUBSYSTEM_RESTART)
 
 extern int subsys_get_restart_level(struct subsys_device *dev);
 extern int subsystem_restart_dev(struct subsys_device *dev);
 extern int subsystem_restart(const char *name);
 extern int subsystem_crashed(const char *name);
+extern void subsys_set_modem_silent_ssr(bool value);
+extern void subsys_set_modem_crash_id(int value);
+extern void subsys_set_cdsp_silent_ssr(bool value);
 
 extern void *subsystem_get(const char *name);
 extern void *subsystem_get_with_fwname(const char *name, const char *fw_name);
 extern int subsystem_set_fwname(const char *name, const char *fw_name);
-extern int subsystem_set_crash_reason(const char *name,
-				      const char *crash_reason);
 extern void subsystem_put(void *subsystem);
 
 extern struct subsys_device *subsys_register(struct subsys_desc *desc);
@@ -179,6 +175,13 @@ void complete_err_ready(struct subsys_device *subsys);
 void complete_shutdown_ack(struct subsys_device *subsys);
 struct subsys_device *find_subsys_device(const char *str);
 extern int wait_for_shutdown_ack(struct subsys_desc *desc);
+#ifdef CONFIG_SEC_PCIE
+extern bool is_subsystem_crash(const char *name);
+extern int is_subsystem_online(const char *name);
+#endif
+#ifdef CONFIG_SENSORS_SSC
+extern void subsys_set_fssr(struct subsys_device *dev, bool value);
+#endif
 #else
 
 static inline int subsys_get_restart_level(struct subsys_device *dev)
@@ -201,6 +204,9 @@ static inline int subsystem_crashed(const char *name)
 	return 0;
 }
 
+static void subsys_set_modem_silent_ssr(bool value) { }
+static void subsys_set_modem_crash_id(int value) { }
+
 static inline void *subsystem_get(const char *name)
 {
 	return NULL;
@@ -213,12 +219,6 @@ static inline void *subsystem_get_with_fwname(const char *name,
 
 static inline int subsystem_set_fwname(const char *name,
 				const char *fw_name) {
-	return 0;
-}
-
-static inline int subsystem_set_crash_reason(const char *name,
-					     const char *crash_reason)
-{
 	return 0;
 }
 
@@ -247,6 +247,26 @@ static inline int wait_for_shutdown_ack(struct subsys_desc *desc)
 {
 	return -EOPNOTSUPP;
 }
+#ifdef CONFIG_SEC_PCIE
+static bool is_subsystem_crash(const char *name)
+{
+        return false;
+}
+
+static int is_subsystem_online(const char *name)
+{
+        return false;
+}
+#endif
+#ifdef CONFIG_SENSORS_SSC
+static void subsys_set_fssr(struct subsys_device *dev, bool value)
+{
+	return;
+}
+#endif
 #endif /* CONFIG_MSM_SUBSYSTEM_RESTART */
 
+#if defined(CONFIG_SUPPORT_DUAL_6AXIS) && defined(CONFIG_SEC_FACTORY)
+extern bool is_pretest(void);
+#endif
 #endif

@@ -58,6 +58,13 @@
 #include "braille.h"
 #include "internal.h"
 
+#include <linux/sec_debug.h>
+
+#ifdef CONFIG_SEC_LOG_BUF
+#define _ALIGN_DOWN(addr, size)  ((addr)&(~((size)-1)))
+#define _ALIGN_UP(addr, size)    _ALIGN_DOWN(addr + size - 1, size)
+#endif
+
 int console_printk[4] = {
 	CONSOLE_LOGLEVEL_DEFAULT,	/* console_loglevel */
 	MESSAGE_LOGLEVEL_DEFAULT,	/* default_message_loglevel */
@@ -364,15 +371,49 @@ struct printk_log {
 	u8 facility;		/* syslog facility */
 	u8 flags:5;		/* internal record flags */
 	u8 level:3;		/* syslog level */
-	unsigned int cpu;
-	pid_t pid;
+#ifdef CONFIG_SEC_LOG_BUF
+	char process[TASK_COMM_LEN];	/* process Name CONFIG_PRINTK_PROCESS */
+	pid_t pid;			/* process id CONFIG_PRINTK_PROCESS */
+	unsigned int cpu;		/* cpu core number CONFIG_PRINTK_PROCESS */
+	bool in_interrupt;		/* in interrupt CONFIG_PRINTK_PROCESS */
+#endif
 }
 #ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
 __packed __aligned(4)
 #endif
 ;
 
-static struct printk_log *last_msg;
+#ifdef CONFIG_SEC_LOG_BUF
+static void inline save_process(struct printk_log *msg)
+{
+	sec_debug_strcpy_task_comm(msg->process, current->comm);
+	msg->pid = task_pid_nr(current);
+	msg->cpu = smp_processor_id();
+	msg->in_interrupt = in_interrupt() ? true : false;
+}
+
+static size_t inline print_process(const struct printk_log *msg, char *buf)
+{
+	if (!buf)
+		return snprintf(NULL, 0, "%c[%1d:%15s:%5d] ", ' ', 0, " ", 0);
+
+	return sprintf(buf, "%c[%1d:%15s:%5d] ",
+					msg->in_interrupt ? 'I' : ' ',
+					msg->cpu,
+					msg->process,
+					msg->pid);
+}
+
+#else
+static void inline save_process(struct printk_log *msg) { }
+static size_t inline print_process(const struct printk_log *msg, char *buf) { return 0; }
+#endif
+
+#ifdef CONFIG_SEC_LOG_BUF_NO_CONSOLE
+static void __sec_log_buf_add(const struct printk_log *msg);
+#else
+static inline void __sec_log_buf_add(const struct printk_log *msg) {}
+#endif
 
 /*
  * The logbuf_lock protects kmsg buffer, indices, counters.  This can be taken
@@ -433,8 +474,20 @@ static u64 exclusive_console_stop_seq;
 static u64 clear_seq;
 static u32 clear_idx;
 
+// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
+/* the next printk record to read after the last 'clear_knox' command */
+static u64 clear_seq_knox;
+static u32 clear_idx_knox;
+
+#define SYSLOG_ACTION_READ_CLEAR_KNOX 99
+// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
+#ifdef CONFIG_SEC_LOG_BUF
+#define PREFIX_MAX		48
+#define LOG_LINE_MAX		(2048 - PREFIX_MAX)
+#else
 #define PREFIX_MAX		32
 #define LOG_LINE_MAX		(1024 - PREFIX_MAX)
+#endif
 
 #define LOG_LEVEL(v)		((v) & 0x07)
 #define LOG_FACILITY(v)		((v) >> 3 & 0xff)
@@ -447,31 +500,17 @@ static char __log_buf[__LOG_BUF_LEN] __aligned(LOG_ALIGN);
 static char *log_buf = __log_buf;
 static u32 log_buf_len = __LOG_BUF_LEN;
 
-/*
- * We cannot access per-CPU data (e.g. per-CPU flush irq_work) before
- * per_cpu_areas are initialised. This variable is set to true when
- * it's safe to access per-CPU data.
- */
-static bool __printk_percpu_data_ready __read_mostly;
-
-bool printk_percpu_data_ready(void)
-{
-	return __printk_percpu_data_ready;
-}
-
 /* Return log buffer address */
 char *log_buf_addr_get(void)
 {
 	return log_buf;
 }
-EXPORT_SYMBOL_GPL(log_buf_addr_get);
 
 /* Return log buffer size */
 u32 log_buf_len_get(void)
 {
 	return log_buf_len;
 }
-EXPORT_SYMBOL_GPL(log_buf_len_get);
 
 /* human readable text of the record */
 static char *log_text(const struct printk_log *msg)
@@ -556,6 +595,13 @@ static int log_make_free_space(u32 msg_size)
 		clear_idx = log_first_idx;
 	}
 
+	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
+	/* messages are gone, move to first available one */
+	if (clear_seq_knox < log_first_seq) {
+		clear_seq_knox = log_first_seq;
+		clear_idx_knox = log_first_idx;
+	}
+	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
 	/* sequence numbers are equal, so the log buffer is empty */
 	if (logbuf_has_space(msg_size, log_first_seq == log_next_seq))
 		return 0;
@@ -571,7 +617,9 @@ static u32 msg_used_size(u16 text_len, u16 dict_len, u32 *pad_len)
 	size = sizeof(struct printk_log) + text_len + dict_len;
 	*pad_len = (-size) & (LOG_ALIGN - 1);
 	size += *pad_len;
-
+#ifdef CONFIG_SEC_LOG_BUF /* 8 bytes align for 64 bit XBL ramdump */
+	size = _ALIGN_UP(size,8);
+#endif
 	return size;
 }
 
@@ -657,8 +705,8 @@ static int log_store(int facility, int level,
 	log_next_idx += msg->len;
 	log_next_seq++;
 
-	/* record last_msg for extension */
-	last_msg = msg;
+	save_process(msg);
+	__sec_log_buf_add(msg);
 
 	return msg->text_len;
 }
@@ -1122,27 +1170,11 @@ static void __init log_buf_add_cpu(void)
 static inline void log_buf_add_cpu(void) {}
 #endif /* CONFIG_SMP */
 
-static void __init set_percpu_data_ready(void)
-{
-	printk_safe_init();
-	/* Make sure we set this flag only after printk_safe() init is done */
-	barrier();
-	__printk_percpu_data_ready = true;
-}
-
 void __init setup_log_buf(int early)
 {
 	unsigned long flags;
 	char *new_log_buf;
 	unsigned int free;
-
-	/*
-	 * Some archs call setup_log_buf() multiple times - first is very
-	 * early, e.g. from setup_arch(), and second - when percpu_areas
-	 * are initialised.
-	 */
-	if (!early)
-		set_percpu_data_ready();
 
 	if (log_buf != __log_buf)
 		return;
@@ -1153,6 +1185,7 @@ void __init setup_log_buf(int early)
 	if (!new_log_buf_len)
 		return;
 
+	set_memsize_kernel_type(MEMSIZE_KERNEL_LOGBUF);
 	if (early) {
 		new_log_buf =
 			memblock_virt_alloc(new_log_buf_len, LOG_ALIGN);
@@ -1160,6 +1193,7 @@ void __init setup_log_buf(int early)
 		new_log_buf = memblock_virt_alloc_nopanic(new_log_buf_len,
 							  LOG_ALIGN);
 	}
+	set_memsize_kernel_type(MEMSIZE_KERNEL_OTHERS);
 
 	if (unlikely(!new_log_buf)) {
 		pr_err("log_buf_len: %lu bytes not available\n",
@@ -1274,43 +1308,6 @@ static size_t print_time(u64 ts, char *buf)
 		       (unsigned long)ts, rem_nsec / 1000);
 }
 
-static bool printk_cpu = IS_ENABLED(CONFIG_PRINTK_CPU_ID);
-module_param_named(cpu, printk_cpu, bool, 0644);
-
-static bool printk_pid = IS_ENABLED(CONFIG_PRINTK_PID);
-module_param_named(pid, printk_pid, bool, 0644);
-
-static size_t print_cpu(unsigned int cpu, char *buf)
-{
-	if (!printk_cpu)
-		return 0;
-
-	if (!buf)
-		return snprintf(NULL, 0, "c%u ", cpu);
-
-	return sprintf(buf, "c%u ", cpu);
-}
-
-static size_t print_pid(pid_t pid, char *buf)
-{
-	if (!printk_pid)
-		return 0;
-
-	if (!buf)
-		return snprintf(NULL, 0, "%6u ", pid);
-
-	return sprintf(buf, "%6u ", pid);
-}
-
-static void update_msg_ext(unsigned int cpu, pid_t pid)
-{
-	if (!last_msg)
-		return;
-
-	last_msg->cpu = cpu;
-	last_msg->pid = pid;
-}
-
 static size_t print_prefix(const struct printk_log *msg, bool syslog, char *buf)
 {
 	size_t len = 0;
@@ -1331,8 +1328,8 @@ static size_t print_prefix(const struct printk_log *msg, bool syslog, char *buf)
 	}
 
 	len += print_time(msg->ts_nsec, buf ? buf + len : NULL);
-	len += print_cpu(msg->cpu, buf ? buf + len : NULL);
-	len += print_pid(msg->pid, buf ? buf + len : NULL);
+	len += print_process(msg, buf ? buf + len : NULL);
+
 	return len;
 }
 
@@ -1437,7 +1434,14 @@ static int syslog_print(char __user *buf, int size)
 	return len;
 }
 
+// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
+/*
+// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
 static int syslog_print_all(char __user *buf, int size, bool clear)
+// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
+*/
+static int syslog_print_all(char __user *buf, int size, bool clear, bool knox)
+// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
 {
 	char *text;
 	int len = 0;
@@ -1454,8 +1458,21 @@ static int syslog_print_all(char __user *buf, int size, bool clear)
 	 * Find first record that fits, including all following records,
 	 * into the user-provided buffer for this dump.
 	 */
+	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
+	/*
+	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
 	seq = clear_seq;
 	idx = clear_idx;
+	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
+	*/
+	if (!knox) {
+		seq = clear_seq;
+		idx = clear_idx;
+	} else { //MDM edmaudit
+		seq = clear_seq_knox;
+		idx = clear_idx_knox;
+	}
+	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
 	while (seq < log_next_seq) {
 		struct printk_log *msg = log_from_idx(idx);
 
@@ -1465,8 +1482,21 @@ static int syslog_print_all(char __user *buf, int size, bool clear)
 	}
 
 	/* move first record forward until length fits into the buffer */
+	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
+	/*
+	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
 	seq = clear_seq;
 	idx = clear_idx;
+	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
+	*/
+	if (!knox) {
+		seq = clear_seq;
+		idx = clear_idx;
+	} else { // MDM edmaudit
+		seq = clear_seq_knox;
+		idx = clear_idx_knox;
+	}
+	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
 	while (len > size && seq < log_next_seq) {
 		struct printk_log *msg = log_from_idx(idx);
 
@@ -1507,8 +1537,21 @@ static int syslog_print_all(char __user *buf, int size, bool clear)
 	}
 
 	if (clear) {
+	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
+	/*
+	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
 		clear_seq = log_next_seq;
 		clear_idx = log_next_idx;
+	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
+	*/
+		if (!knox) {
+			clear_seq = log_next_seq;
+			clear_idx = log_next_idx;
+		} else { //MDM edmaudit
+			clear_seq_knox = log_next_seq;
+			clear_idx_knox = log_next_idx;
+		}
+	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
 	}
 	logbuf_unlock_irq();
 
@@ -1564,7 +1607,14 @@ int do_syslog(int type, char __user *buf, int len, int source)
 			return 0;
 		if (!access_ok(VERIFY_WRITE, buf, len))
 			return -EFAULT;
+		// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
+		/*
+		// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
 		error = syslog_print_all(buf, len, clear);
+		// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
+		*/
+		error = syslog_print_all(buf, len, clear, false);
+		// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
 		break;
 	/* Clear ring buffer */
 	case SYSLOG_ACTION_CLEAR:
@@ -1628,10 +1678,29 @@ int do_syslog(int type, char __user *buf, int len, int source)
 	case SYSLOG_ACTION_SIZE_BUFFER:
 		error = log_buf_len;
 		break;
+	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
+	/* edmaudit Read last kernel messages */
+	case SYSLOG_ACTION_READ_CLEAR_KNOX:
+		error = -EINVAL;
+		if (!buf || len < 0)
+			goto out;
+		error = 0;
+		if (!len)
+			goto out;
+		if (!access_ok(VERIFY_WRITE, buf, len)) {
+			error = -EFAULT;
+			goto out;
+		}
+		error = syslog_print_all(buf, len, /* clear */ true, /* knox */true);
+		break;
+	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
 	default:
 		error = -EINVAL;
 		break;
 	}
+// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
+out:
+// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
 
 	return error;
 }
@@ -1841,8 +1910,6 @@ static struct cont {
 	u8 level;			/* log level of first message */
 	u8 facility;			/* log facility of first message */
 	enum log_flags flags;		/* prefix, newline flags */
-	unsigned int cpu;
-	pid_t pid;
 } cont;
 
 static void cont_flush(void)
@@ -1852,7 +1919,6 @@ static void cont_flush(void)
 
 	log_store(cont.facility, cont.level, cont.flags, cont.ts_nsec,
 		  NULL, 0, cont.buf, cont.len);
-	update_msg_ext(cont.cpu, cont.pid);
 	cont.len = 0;
 }
 
@@ -1874,8 +1940,6 @@ static bool cont_add(int facility, int level, enum log_flags flags, const char *
 		cont.owner = current;
 		cont.ts_nsec = local_clock();
 		cont.flags = flags;
-		cont.cpu = smp_processor_id();
-		cont.pid = current->pid;
 	}
 
 	memcpy(cont.buf + cont.len, text, len);
@@ -1932,7 +1996,6 @@ int vprintk_store(int facility, int level,
 	char *text = textbuf;
 	size_t text_len;
 	enum log_flags lflags = 0;
-	size_t printed_len;
 
 	/*
 	 * The printf needs to come first; we need the syslog
@@ -1974,11 +2037,8 @@ int vprintk_store(int facility, int level,
 	if (dict)
 		lflags |= LOG_PREFIX|LOG_NEWLINE;
 
-	printed_len = log_output(facility, level, lflags,
+	return log_output(facility, level, lflags,
 			  dict, dictlen, text, text_len);
-	update_msg_ext(smp_processor_id(), current->pid);
-
-	return printed_len;
 }
 
 asmlinkage int vprintk_emit(int facility, int level,
@@ -2205,9 +2265,6 @@ static int __init console_setup(char *str)
 	char *s, *options, *brl_options = NULL;
 	int idx;
 
-	if (str[0] == 0)
-		return 1;
-
 	if (_braille_console_setup(&str, &brl_options))
 		return 1;
 
@@ -2273,11 +2330,6 @@ module_param_named(console_suspend, console_suspend_enabled,
 		bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(console_suspend, "suspend console during suspend"
 	" and hibernate operations");
-
-int is_console_suspended(void)
-{
-	return console_suspended;
-}
 
 /**
  * suspend_console - suspend the console subsystem
@@ -3012,9 +3064,6 @@ static DEFINE_PER_CPU(struct irq_work, wake_up_klogd_work) = {
 
 void wake_up_klogd(void)
 {
-	if (!printk_percpu_data_ready())
-		return;
-
 	preempt_disable();
 	if (waitqueue_active(&log_wait)) {
 		this_cpu_or(printk_pending, PRINTK_PENDING_WAKEUP);
@@ -3025,9 +3074,6 @@ void wake_up_klogd(void)
 
 void defer_console_output(void)
 {
-	if (!printk_percpu_data_ready())
-		return;
-
 	preempt_disable();
 	__this_cpu_or(printk_pending, PRINTK_PENDING_OUTPUT);
 	irq_work_queue(this_cpu_ptr(&wake_up_klogd_work));
@@ -3403,4 +3449,47 @@ void kmsg_dump_rewind(struct kmsg_dumper *dumper)
 }
 EXPORT_SYMBOL_GPL(kmsg_dump_rewind);
 
+#endif
+
+#ifdef CONFIG_SEC_LOG_BUF_NO_CONSOLE
+static void __sec_log_buf_add(const struct printk_log *msg)
+{
+	static char tmp[PAGE_SIZE];
+	unsigned int size;
+
+	size = msg_print_text(msg, true, tmp, PAGE_SIZE);
+	sec_log_buf_write(tmp, size);
+
+	if (unlikely(msg->pid == 1))
+		sec_init_log_buf_write(tmp, size);
+}
+
+void __init sec_log_buf_pull_early_buffer(bool *init_done)
+{
+	u32 current_idx = log_first_idx;
+	struct printk_log *msg;
+	unsigned long flags;
+
+	logbuf_lock_irqsave(flags);
+
+	*init_done = true;
+
+	while (current_idx < log_next_idx) {
+		msg = log_from_idx(current_idx);
+		__sec_log_buf_add(msg);
+		current_idx = log_next(current_idx);
+	}
+
+	logbuf_unlock_irqrestore(flags);
+}
+#endif
+
+#ifdef CONFIG_SEC_DEBUG_SUMMARY
+void sec_debug_summary_set_klog_info(struct sec_debug_summary_data_apss *apss)
+{
+	apss->log.first_idx_paddr = (unsigned int)__pa(&log_first_idx);
+	apss->log.next_idx_paddr = (unsigned int)__pa(&log_next_idx);
+	apss->log.log_paddr = (unsigned long)__pa(log_buf);
+	apss->log.size_paddr = (unsigned long)__pa(&log_buf_len);
+}
 #endif

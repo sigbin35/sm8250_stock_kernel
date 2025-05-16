@@ -113,7 +113,11 @@ restart:
 			if (mnt != parent) {
 				dentry = READ_ONCE(mnt->mnt_mountpoint);
 				mnt = parent;
+#ifdef CONFIG_KDP_NS
+				vfsmnt = mnt->mnt;
+#else
 				vfsmnt = &mnt->mnt;
+#endif
 				continue;
 			}
 			if (!error)
@@ -391,7 +395,6 @@ char *dentry_path(struct dentry *dentry, char *buf, int buflen)
 Elong:
 	return ERR_PTR(-ENAMETOOLONG);
 }
-EXPORT_SYMBOL_GPL(dentry_path);
 
 static void get_fs_root_and_pwd_rcu(struct fs_struct *fs, struct path *root,
 				    struct path *pwd)

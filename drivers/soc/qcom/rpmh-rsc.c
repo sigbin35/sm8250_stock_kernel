@@ -12,7 +12,6 @@
 #include <linux/ipc_logging.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
-#include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_irq.h>
 #include <linux/of_platform.h>

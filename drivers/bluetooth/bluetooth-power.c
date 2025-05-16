@@ -27,7 +27,7 @@
 #include <net/cnss.h>
 #endif
 
-#if IS_ENABLED(CONFIG_BT_SLIM_QCA6390) || IS_ENABLED(CONFIG_BTFM_SLIM_WCN3990)
+#if defined CONFIG_BT_SLIM_QCA6390 || defined CONFIG_BT_SLIM_QCA6490|| defined CONFIG_BTFM_SLIM_WCN3990
 #include "btfm_slim.h"
 #include "btfm_slim_slave.h"
 #endif
@@ -46,6 +46,7 @@ static const struct of_device_id bt_power_match_table[] = {
 	{	.compatible = "qca,qca6174" },
 	{	.compatible = "qca,wcn3990" },
 	{	.compatible = "qca,qca6390" },
+	{	.compatible = "qca,qca6490" },
 	{	.compatible = "qca,wcn6750" },
 	{}
 };
@@ -83,7 +84,7 @@ enum power_src_pos {
 };
 
 static int bt_power_src_status[BT_POWER_SRC_SIZE];
-static struct bluetooth_power_platform_data *bt_power_pdata;
+static struct bluetooth_power_platform_data *bt_power_pdata = NULL;
 static struct platform_device *btpdev;
 static bool previous;
 static int pwr_state;
@@ -288,6 +289,67 @@ static int bt_clk_disable(struct bt_power_clk_data *clk)
 	return rc;
 }
 
+static int bt_enable_bt_reset_gpios_safely(void)
+{
+	int rc = 0;
+	int bt_reset_gpio = bt_power_pdata->bt_gpio_sys_rst;
+	int wl_reset_gpio = bt_power_pdata->wl_gpio_sys_rst;
+
+	if (wl_reset_gpio >= 0) {
+		BT_PWR_INFO("%s: BTON:Turn Bt On", __func__);
+		BT_PWR_INFO("%s: wl-reset-gpio(%d) value(%d)",
+			__func__, wl_reset_gpio,
+				gpio_get_value(wl_reset_gpio));
+	}
+
+	if ((wl_reset_gpio < 0) ||
+		((wl_reset_gpio >= 0) &&
+			gpio_get_value(wl_reset_gpio))) {
+		BT_PWR_INFO("%s: BTON: Asserting BT_EN",
+			__func__);
+		rc = gpio_direction_output(bt_reset_gpio, 1);
+		if (rc) {
+			BT_PWR_ERR("%s: Unable to set direction",
+				__func__);
+			return rc;
+		}
+		bt_power_src_status[BT_RESET_GPIO] =
+			gpio_get_value(bt_reset_gpio);
+	}
+
+	if ((wl_reset_gpio >= 0) &&
+		(gpio_get_value(wl_reset_gpio) == 0)) {
+		if (gpio_get_value(bt_reset_gpio)) {
+			BT_PWR_INFO("%s: Wlan Off and BT On too close",
+				__func__);
+			BT_PWR_INFO("%s: Reset BT_EN", __func__);
+			BT_PWR_INFO("%s: Enable it after delay",
+				__func__);
+			rc = gpio_direction_output(bt_reset_gpio, 0);
+			if (rc) {
+				BT_PWR_ERR("%s:Unable to set direction",
+					__func__);
+				return rc;
+			}
+			bt_power_src_status[BT_RESET_GPIO] =
+				gpio_get_value(bt_reset_gpio);
+		}
+		BT_PWR_INFO("%s: 100ms delay added", __func__);
+		BT_PWR_INFO("%s: for AON output to fully discharge",
+			__func__);
+		msleep(100);
+		rc = gpio_direction_output(bt_reset_gpio, 1);
+		if (rc) {
+			BT_PWR_ERR("%s: Unable to set direction",
+				__func__);
+			return rc;
+		}
+		bt_power_src_status[BT_RESET_GPIO] =
+			gpio_get_value(bt_reset_gpio);
+	}
+	return rc;
+}
+
 static int bt_configure_gpios(int on)
 {
 	int rc = 0;
@@ -312,7 +374,7 @@ static int bt_configure_gpios(int on)
 		bt_power_src_status[BT_RESET_GPIO] =
 			gpio_get_value(bt_reset_gpio);
 		msleep(50);
-		BT_PWR_INFO("BTON:Turn Bt Off bt-reset-gpio(%d) value(%d)\n",
+		BT_PWR_INFO("BTON:Turn Bt Off bt-reset-gpio(%d) value(%d)",
 				bt_reset_gpio, gpio_get_value(bt_reset_gpio));
 		if (bt_sw_ctrl_gpio >= 0) {
 			BT_PWR_INFO("BTON:Turn Bt Off");
@@ -323,14 +385,12 @@ static int bt_configure_gpios(int on)
 					bt_power_src_status[BT_SW_CTRL_GPIO]);
 		}
 
-		rc = gpio_direction_output(bt_reset_gpio, 1);
-
+		rc = bt_enable_bt_reset_gpios_safely();
 		if (rc) {
-			BT_PWR_ERR("Unable to set direction\n");
-			return rc;
+			BT_PWR_ERR("%s:bt_enable_bt_reset_gpios_safely failed",
+				__func__);
 		}
-		bt_power_src_status[BT_RESET_GPIO] =
-			gpio_get_value(bt_reset_gpio);
+
 		msleep(50);
 		/*  Check  if  SW_CTRL  is  asserted  */
 		if  (bt_sw_ctrl_gpio  >=  0)  {
@@ -382,6 +442,18 @@ static int bt_configure_gpios(int on)
 
 	BT_PWR_INFO("bt_gpio= %d on: %d is successful", bt_reset_gpio, on);
 	return rc;
+}
+
+static void bt_free_gpios(void)
+{
+	if (bt_power_pdata->bt_gpio_sys_rst > 0)
+		gpio_free(bt_power_pdata->bt_gpio_sys_rst);
+	if (bt_power_pdata->wl_gpio_sys_rst > 0)
+		gpio_free(bt_power_pdata->wl_gpio_sys_rst);
+	if  (bt_power_pdata->bt_gpio_sw_ctrl  >  0)
+		gpio_free(bt_power_pdata->bt_gpio_sw_ctrl);
+	if  (bt_power_pdata->bt_gpio_debug  >  0)
+		gpio_free(bt_power_pdata->bt_gpio_debug);
 }
 
 static int bluetooth_power(int on)
@@ -547,12 +619,9 @@ static int bluetooth_power(int on)
 		if (bt_power_pdata->bt_gpio_sys_rst > 0)
 			bt_configure_gpios(on);
 gpio_fail:
-		if (bt_power_pdata->bt_gpio_sys_rst > 0)
-			gpio_free(bt_power_pdata->bt_gpio_sys_rst);
-		if  (bt_power_pdata->bt_gpio_sw_ctrl  >  0)
-			gpio_free(bt_power_pdata->bt_gpio_sw_ctrl);
-		if  (bt_power_pdata->bt_gpio_debug  >  0)
-			gpio_free(bt_power_pdata->bt_gpio_debug);
+		//Free Gpios
+		bt_free_gpios();
+
 		if (bt_power_pdata->bt_chip_clk)
 			bt_clk_disable(bt_power_pdata->bt_chip_clk);
 clk_fail:
@@ -821,6 +890,12 @@ static int bt_power_populate_dt_pinfo(struct platform_device *pdev)
 		if (bt_power_pdata->bt_gpio_sys_rst < 0)
 			BT_PWR_INFO("bt-reset-gpio not provided in devicetree");
 
+		bt_power_pdata->wl_gpio_sys_rst =
+			of_get_named_gpio(pdev->dev.of_node,
+						"qca,wl-reset-gpio", 0);
+		if (bt_power_pdata->wl_gpio_sys_rst < 0)
+			BT_PWR_INFO("wl-reset-gpio not provided in devicetree");
+
 		bt_power_pdata->bt_gpio_sw_ctrl  =
 			of_get_named_gpio(pdev->dev.of_node,
 						"qca,bt-sw-ctrl-gpio",  0);
@@ -1046,9 +1121,15 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	int ret = 0, pwr_cntrl = 0;
 	int chipset_version = 0;
 
+	if(bt_power_pdata == NULL){
+		BT_PWR_ERR("Bt_power not probed");
+		ret = -EINVAL;
+		return ret;
+	}
+
 	switch (cmd) {
 	case BT_CMD_SLIM_TEST:
-#if IS_ENABLED(CONFIG_BT_SLIM_QCA6390) || IS_ENABLED(CONFIG_BTFM_SLIM_WCN3990)
+#if defined CONFIG_BT_SLIM_QCA6390 || defined CONFIG_BT_SLIM_QCA6490|| defined CONFIG_BTFM_SLIM_WCN3990
 		if (!bt_power_pdata->slim_dev) {
 			BT_PWR_ERR("slim_dev is null\n");
 			return -EINVAL;
@@ -1061,6 +1142,7 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case BT_CMD_PWR_CTRL:
 		pwr_cntrl = (int)arg;
 		BT_PWR_ERR("BT_CMD_PWR_CTRL pwr_cntrl:%d", pwr_cntrl);
+
 		if (pwr_state != pwr_cntrl) {
 			ret = bluetooth_power(pwr_cntrl);
 			if (!ret)
@@ -1169,8 +1251,6 @@ static int __init bluetooth_power_init(void)
 	int ret;
 
 	ret = platform_driver_register(&bt_power_driver);
-	if (ret)
-		return ret;
 
 	bt_major = register_chrdev(0, "bt", &bt_dev_fops);
 	if (bt_major < 0) {
@@ -1190,30 +1270,16 @@ static int __init bluetooth_power_init(void)
 		BT_PWR_ERR("failed to allocate char dev\n");
 		goto chrdev_unreg;
 	}
-
-#if IS_ENABLED(CONFIG_BT_SLIM_QCA6390) || IS_ENABLED(CONFIG_BTFM_SLIM_WCN3990)
-#if defined(CONFIG_MSM_BT_POWER_MODULE)
-	ret = btfm_slim_init();
-	if (ret)
-		goto chrdev_unreg;
-#endif
-#endif
 	return 0;
 
 chrdev_unreg:
 	unregister_chrdev(bt_major, "bt");
 	class_destroy(bt_class);
-	platform_driver_unregister(&bt_power_driver);
 	return ret;
 }
 
 static void __exit bluetooth_power_exit(void)
 {
-#if IS_ENABLED(CONFIG_BT_SLIM_QCA6390) || IS_ENABLED(CONFIG_BTFM_SLIM_WCN3990)
-#if defined(CONFIG_MSM_BT_POWER_MODULE)
-	btfm_slim_exit();
-#endif
-#endif
 	platform_driver_unregister(&bt_power_driver);
 }
 

@@ -1409,7 +1409,6 @@ int ipa_get_flt_rt_stats(struct ipa_ioc_flt_rt_query *query)
 
 	return __ipa_get_flt_rt_stats(query);
 }
-EXPORT_SYMBOL_GPL(ipa_get_flt_rt_stats);
 
 
 static int __ipa_set_flt_rt_stats(int index, struct ipa_flt_rt_stats stats)
@@ -1521,7 +1520,6 @@ int ipa_set_flt_rt_stats(int index, struct ipa_flt_rt_stats stats)
 
 	return __ipa_set_flt_rt_stats(index, stats);
 }
-EXPORT_SYMBOL_GPL(ipa_set_flt_rt_stats);
 
 int ipa_init_drop_stats(u32 pipe_bitmask)
 {
@@ -1845,6 +1843,9 @@ int ipa_reset_all_drop_stats(void)
 }
 
 
+#ifndef CONFIG_DEBUG_FS
+int ipa_debugfs_init_stats(struct dentry *parent) { return 0; }
+#else
 #define IPA_MAX_MSG_LEN 4096
 static char dbg_buff[IPA_MAX_MSG_LEN];
 
@@ -2389,3 +2390,4 @@ fail:
 	debugfs_remove_recursive(dent);
 	return -EFAULT;
 }
+#endif

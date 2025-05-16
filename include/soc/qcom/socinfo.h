@@ -40,54 +40,6 @@
 
 #define machine_is_msm8974()	of_machine_is_compatible("qcom,msm8974")
 
-#ifdef MODULE
-#define early_machine_is_msm8916()	\
-	of_machine_is_compatible("qcom,msm8916")
-#define early_machine_is_apq8084()	\
-	of_machine_is_compatible("qcom,apq8084")
-#define early_machine_is_msm8996()	\
-	of_machine_is_compatible("qcom,msm8996")
-#define early_machine_is_msm8996_auto()	\
-	of_machine_is_compatible("qcom,msm8996-cdp")
-#define early_machine_is_sm8150()	\
-	of_machine_is_compatible("qcom,sm8150")
-#define early_machine_is_sa8150()	\
-	of_machine_is_compatible("qcom,sa8150")
-#define early_machine_is_kona()	\
-	of_machine_is_compatible("qcom,kona")
-#define early_machine_is_lito()	\
-	of_machine_is_compatible("qcom,lito")
-#define early_machine_is_orchid()	\
-	of_machine_is_compatible("qcom,orchid")
-#define early_machine_is_bengal()	\
-	of_machine_is_compatible("qcom,bengal")
-#define early_machine_is_bengalp()	\
-	of_machine_is_compatible("qcom,bengalp")
-#define early_machine_is_lagoon()	\
-	of_machine_is_compatible("qcom,lagoon")
-#define early_machine_is_scuba()	\
-	of_machine_is_compatible("qcom,scuba")
-#define early_machine_is_scubaiot()	\
-	of_machine_is_compatible("qcom,scuba-iot")
-#define early_machine_is_scubapiot()	\
-	of_machine_is_compatible("qcom,scubap-iot")
-#define early_machine_is_sdmshrike()	\
-	of_machine_is_compatible("qcom,sdmshrike")
-#define early_machine_is_sm6150()	\
-	of_machine_is_compatible("qcom,sm6150")
-#define early_machine_is_qcs405()	\
-	of_machine_is_compatible("qcom,qcs405")
-#define early_machine_is_sdxprairie()	\
-	of_machine_is_compatible("qcom,sdxprairie")
-#define early_machine_is_sdmmagpie()	\
-	of_machine_is_compatible("qcom,sdmmagpie")
-#define early_machine_is_sdm660()	\
-	of_machine_is_compatible("qcom,sdm660")
-#define early_machine_is_bengal_iot()	\
-	of_machine_is_compatible("qcom,bengal-iot")
-#define early_machine_is_bengalp_iot()	\
-	of_machine_is_compatible("qcom,bengalp-iot")
-#else
 #define early_machine_is_msm8916()	\
 	of_flat_dt_is_compatible(of_get_flat_dt_root(), "qcom,msm8916")
 #define early_machine_is_apq8084()	\
@@ -134,8 +86,6 @@
 	of_flat_dt_is_compatible(of_get_flat_dt_root(), "qcom,bengal-iot")
 #define early_machine_is_bengalp_iot()	\
 	of_flat_dt_is_compatible(of_get_flat_dt_root(), "qcom,bengalp-iot")
-#endif
-
 #else
 #define of_board_is_sim()		0
 #define of_board_is_rumi()		0
@@ -245,9 +195,6 @@ char *socinfo_get_id_string(void);
 uint32_t socinfo_get_platform_type(void);
 uint32_t socinfo_get_platform_subtype(void);
 uint32_t socinfo_get_platform_version(void);
-uint32_t socinfo_get_g_platform_type(void);
-uint32_t socinfo_get_g_platform_subtype(void);
-uint32_t socinfo_get_g_platform_version(void);
 uint32_t socinfo_get_serial_number(void);
 enum pmic_model socinfo_get_pmic_model(void);
 uint32_t socinfo_get_pmic_die_revision(void);

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2010-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2010-2020, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -14,7 +14,6 @@
 
 #include <asm/cacheflush.h>
 #include <asm/compiler.h>
-#include <asm/traps.h>
 
 #include <soc/qcom/scm.h>
 #include <soc/qcom/qtee_shmbridge.h>
@@ -130,8 +129,13 @@ static int __scm_call_armv8_64(u64 x0, u64 x1, u64 x2, u64 x3, u64 x4, u64 x5,
 			  "=r" (r4), "=r" (r5), "=r" (r6)
 			: "r" (r0), "r" (r1), "r" (r2), "r" (r3), "r" (r4),
 			  "r" (r5), "r" (r6)
+#ifdef CONFIG_CFP_ROPP
+			: "x7", "x8", "x9", "x10", "x11", "x12", "x13",
+			  "x14", "x15", "x19", "x20");
+#else
 			: "x7", "x8", "x9", "x10", "x11", "x12", "x13",
 			  "x14", "x15", "x16", "x17");
+#endif
 	} while (r0 == SCM_INTERRUPTED);
 
 	if (ret1)
@@ -179,8 +183,13 @@ static int __scm_call_armv8_32(u32 w0, u32 w1, u32 w2, u32 w3, u32 w4, u32 w5,
 			  "=r" (r4), "=r" (r5), "=r" (r6)
 			: "r" (r0), "r" (r1), "r" (r2), "r" (r3), "r" (r4),
 			  "r" (r5), "r" (r6)
+#ifdef CONFIG_CFP_ROPP
+			: "x7", "x8", "x9", "x10", "x11", "x12", "x13",
+			  "x14", "x15", "x19", "x20");
+#else
 			: "x7", "x8", "x9", "x10", "x11", "x12", "x13",
 			"x14", "x15", "x16", "x17");
+#endif
 
 	} while (r0 == SCM_INTERRUPTED);
 
@@ -307,7 +316,6 @@ bool is_scm_armv8(void)
 	return (scm_version == SCM_ARMV8_32) ||
 			(scm_version == SCM_ARMV8_64);
 }
-EXPORT_SYMBOL_GPL(is_scm_armv8);
 
 /*
  * If there are more than N_REGISTER_ARGS, allocate a buffer and place
@@ -499,22 +507,6 @@ int scm_call2_atomic(u32 fn_id, struct scm_desc *desc)
 }
 EXPORT_SYMBOL(scm_call2_atomic);
 
-int do_tlb_conf_fault(unsigned long addr,
-		      unsigned int esr,
-		      struct pt_regs *regs)
-{
-#define SCM_TLB_CONFLICT_CMD	0x1F
-	struct scm_desc desc = {
-		.args[0] = addr,
-		.arginfo = SCM_ARGS(1),
-	};
-
-	if (scm_call2_atomic(SCM_SIP_FNID(SCM_SVC_MP, SCM_TLB_CONFLICT_CMD),
-						&desc))
-		return 1;
-	return 0;
-}
-
 u32 scm_get_version(void)
 {
 	int context_id;
@@ -678,6 +670,8 @@ bool scm_is_secure_device(void)
 }
 EXPORT_SYMBOL(scm_is_secure_device);
 
+#ifdef CONFIG_ARM64
+
 /*
  * SCM call command ID to protect kernel memory
  * in Hyp Stage 2 page tables.
@@ -686,7 +680,7 @@ EXPORT_SYMBOL(scm_is_secure_device);
  */
 #define TZ_RTIC_ENABLE_MEM_PROTECTION	0x4
 #if IS_ENABLED(CONFIG_QCOM_QHEE_ENABLE_MEM_PROTECTION)
-int scm_enable_mem_protection(void)
+static int __init scm_mem_protection_init(void)
 {
 	struct scm_desc desc = {0};
 	int ret = 0, resp;
@@ -711,13 +705,8 @@ int scm_enable_mem_protection(void)
 
 	return resp;
 }
-#else
-inline int scm_enable_mem_protection(void)
-{
-	return 0;
-}
-#endif
-EXPORT_SYMBOL(scm_enable_mem_protection);
 
-MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("Scm");
+early_initcall(scm_mem_protection_init);
+#endif
+
+#endif

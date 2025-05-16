@@ -34,7 +34,6 @@ const char * const mhi_ee_str[MHI_EE_MAX] = {
 	[MHI_EE_DISABLE_TRANSITION] = "DISABLE",
 	[MHI_EE_NOT_SUPPORTED] = "NOT SUPPORTED",
 };
-EXPORT_SYMBOL_GPL(mhi_ee_str);
 
 const char * const mhi_state_tran_str[MHI_ST_TRANSITION_MAX] = {
 	[MHI_ST_TRANSITION_PBL] = "PBL",
@@ -268,12 +267,15 @@ static ssize_t bus_vote_store(struct device *dev,
 			      size_t count)
 {
 	struct mhi_device *mhi_dev = to_mhi_device(dev);
+	struct mhi_controller *mhi_cntrl = mhi_dev->mhi_cntrl;
 	int ret = -EINVAL;
 
 	if (sysfs_streq(buf, "get")) {
 		ret = mhi_device_get_sync(mhi_dev, MHI_VOTE_BUS);
+		MHI_ERR("MHI bus vote from sysfs\n");
 	} else if (sysfs_streq(buf, "put")) {
 		mhi_device_put(mhi_dev, MHI_VOTE_BUS);
+		MHI_ERR("MHI bus unvote from sysfs\n");
 		ret = 0;
 	}
 
@@ -297,12 +299,15 @@ static ssize_t device_vote_store(struct device *dev,
 				 size_t count)
 {
 	struct mhi_device *mhi_dev = to_mhi_device(dev);
+	struct mhi_controller *mhi_cntrl = mhi_dev->mhi_cntrl;
 	int ret = -EINVAL;
 
 	if (sysfs_streq(buf, "get")) {
 		ret = mhi_device_get_sync(mhi_dev, MHI_VOTE_DEVICE);
+		MHI_ERR("MHI device vote from sysfs\n");
 	} else if (sysfs_streq(buf, "put")) {
 		mhi_device_put(mhi_dev, MHI_VOTE_DEVICE);
+		MHI_ERR("MHI device unvote from sysfs\n");
 		ret = 0;
 	}
 
@@ -1154,7 +1159,6 @@ int mhi_device_configure(struct mhi_device *mhi_dev,
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(mhi_device_configure);
 
 static int of_parse_ev_cfg(struct mhi_controller *mhi_cntrl,
 			   struct device_node *of_node)
@@ -1563,7 +1567,7 @@ int of_register_mhi_controller(struct mhi_controller *mhi_cntrl)
 	init_waitqueue_head(&mhi_cntrl->state_event);
 
 	mhi_cntrl->wq = alloc_ordered_workqueue("mhi_w",
-						WQ_MEM_RECLAIM | WQ_HIGHPRI);
+						WQ_HIGHPRI);
 	if (!mhi_cntrl->wq)
 		goto error_alloc_cmd;
 
@@ -1722,7 +1726,6 @@ void mhi_unregister_mhi_controller(struct mhi_controller *mhi_cntrl)
 	list_del(&mhi_cntrl->node);
 	mutex_unlock(&mhi_bus.lock);
 }
-EXPORT_SYMBOL_GPL(mhi_unregister_mhi_controller);
 
 /* set ptr to control private data */
 static inline void mhi_controller_set_devdata(struct mhi_controller *mhi_cntrl,
@@ -1779,13 +1782,6 @@ int mhi_prepare_for_power_up(struct mhi_controller *mhi_cntrl)
 				goto bhie_error;
 			}
 
-			if (bhie_off >= mhi_cntrl->len) {
-				MHI_ERR("Invalid BHIE=0x%x  len=0x%x\n",
-					bhie_off, mhi_cntrl->len);
-				ret = -EINVAL;
-				goto bhie_error;
-			}
-
 			mhi_cntrl->bhie = mhi_cntrl->regs + bhie_off;
 		}
 
@@ -1824,7 +1820,6 @@ void mhi_unprepare_after_power_down(struct mhi_controller *mhi_cntrl)
 	mhi_deinit_dev_ctxt(mhi_cntrl);
 	mhi_cntrl->pre_init = false;
 }
-EXPORT_SYMBOL_GPL(mhi_unprepare_after_power_down);
 
 /* match dev to drv */
 static int mhi_match(struct device *dev, struct device_driver *drv)

@@ -172,4 +172,3 @@ module_exit(qcom_hwspinlock_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Hardware spinlock driver for Qualcomm SoCs");
-MODULE_SOFTDEP("pre: qcom-cpufreq-hw");

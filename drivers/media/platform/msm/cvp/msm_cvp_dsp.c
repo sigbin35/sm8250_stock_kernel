@@ -120,6 +120,7 @@ void msm_cvp_cdsp_ssr_handler(struct work_struct *work)
 	struct cvp_iface_q_info *iface_q;
 
 	dprintk(CVP_WARN, "%s: Entering CDSP-SSR handler\n", __func__);
+
 	me = container_of(work, struct cvp_dsp_apps, ssr_work);
 	if (!me) {
 		dprintk(CVP_ERR, "%s: Invalid params\n", __func__);
@@ -163,6 +164,7 @@ void msm_cvp_cdsp_ssr_handler(struct work_struct *work)
 	msg_ptr_len =  cmd_msg.msg_ptr_len;
 
 	dprintk(CVP_WARN, "%s: HFI queue cmd after CDSP-SSR\n", __func__);
+
 	err = cvp_dsp_send_cmd_hfi_queue((phys_addr_t *)msg_ptr,
 					msg_ptr_len,
 					(struct iris_hfi_device *)(me->device));
@@ -577,7 +579,7 @@ static struct rpmsg_driver cvp_dsp_rpmsg_client = {
 	},
 };
 
-int __init cvp_dsp_device_init(void)
+static int __init cvp_dsp_device_init(void)
 {
 	struct cvp_dsp_apps *me = &gfa_cv;
 	int err;
@@ -605,18 +607,13 @@ int __init cvp_dsp_device_init(void)
 register_bail:
 	me->cvp_shutdown = STATUS_DEINIT;
 	me->cdsp_state = STATUS_DEINIT;
-	mutex_destroy(&me->smd_mutex);
-	mutex_destroy(&me->reg_buffer_mutex);
-	mutex_destroy(&me->dereg_buffer_mutex);
 	return err;
 }
 
-void __exit cvp_dsp_device_exit(void)
+static void __exit cvp_dsp_device_exit(void)
 {
 	struct cvp_dsp_apps *me = &gfa_cv;
 
-	if (me->cvp_shutdown == STATUS_DEINIT)
-		return;
 	me->cvp_shutdown = STATUS_DEINIT;
 	me->cdsp_state = STATUS_DEINIT;
 	mutex_destroy(&me->smd_mutex);
@@ -626,10 +623,7 @@ void __exit cvp_dsp_device_exit(void)
 		unregister_rpmsg_driver(&cvp_dsp_rpmsg_client);
 }
 
-#ifndef CONFIG_MSM_CVP_V4L2_MODULE
 late_initcall(cvp_dsp_device_init);
 module_exit(cvp_dsp_device_exit);
-#endif
 
 MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("MSM CVP DSP");

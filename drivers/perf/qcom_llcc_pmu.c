@@ -310,4 +310,3 @@ static struct platform_driver qcom_llcc_pmu_driver = {
 };
 
 module_platform_driver(qcom_llcc_pmu_driver);
-MODULE_LICENSE("GPL v2");

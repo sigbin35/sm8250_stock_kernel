@@ -38,6 +38,7 @@ typedef unsigned long mm_segment_t;
  */
 struct thread_info {
 	unsigned long		flags;		/* low level flags */
+	unsigned long		padding[7];
 	mm_segment_t		addr_limit;	/* address limit */
 #ifdef CONFIG_ARM64_SW_TTBR0_PAN
 	u64			ttbr0;		/* saved TTBR0_EL1 */
@@ -46,7 +47,17 @@ struct thread_info {
 #ifdef CONFIG_SHADOW_CALL_STACK
 	void			*shadow_call_stack;
 #endif
+#ifdef CONFIG_CFP_ROPP
+	u64			rrk;
+#endif
 };
+
+#ifdef CONFIG_CFP_ROPP
+#define INIT_THREAD_INFO_CFP(tsk)					\
+	.rrk = 0,
+#else
+#define INIT_THREAD_INFO_CFP(tsk)
+#endif
 
 #define thread_saved_pc(tsk)	\
 	((unsigned long)(tsk->thread.cpu_context.pc))
@@ -105,7 +116,6 @@ void arch_release_task_struct(struct task_struct *tsk);
 #define _TIF_SECCOMP		(1 << TIF_SECCOMP)
 #define _TIF_UPROBE		(1 << TIF_UPROBE)
 #define _TIF_FSCHECK		(1 << TIF_FSCHECK)
-#define _TIF_SINGLESTEP		(1 << TIF_SINGLESTEP)
 #define _TIF_32BIT		(1 << TIF_32BIT)
 #define _TIF_SVE		(1 << TIF_SVE)
 
@@ -122,6 +132,7 @@ void arch_release_task_struct(struct task_struct *tsk);
 	.flags		= _TIF_FOREIGN_FPSTATE,				\
 	.preempt_count	= INIT_PREEMPT_COUNT,				\
 	.addr_limit	= KERNEL_DS,					\
+	INIT_THREAD_INFO_CFP(tsk)					\
 }
 
 #endif /* __KERNEL__ */

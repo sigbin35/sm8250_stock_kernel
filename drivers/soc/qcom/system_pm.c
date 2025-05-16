@@ -5,7 +5,6 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <soc/qcom/rpmh.h>
@@ -95,4 +94,3 @@ static struct platform_driver sys_pm_driver = {
 	},
 };
 builtin_platform_driver(sys_pm_driver);
-MODULE_LICENSE("GPL v2");

@@ -16,6 +16,10 @@
 #include <linux/mod_devicetable.h>
 #include <linux/notifier.h>
 
+#define MAX_CNT_U64     0xFFFFFFFFFF
+#define MAX_CNT_U32     0x7FFFFFFF
+#define STATUS_MASK     (R1_ERROR | R1_CC_ERROR | R1_CARD_ECC_FAILED | R1_WP_VIOLATION | R1_OUT_OF_RANGE)
+
 struct mmc_cid {
 	unsigned int		manfid;
 	char			prod_name[8];
@@ -243,7 +247,7 @@ struct mmc_queue_req;
  * MMC Physical partitions
  */
 struct mmc_part {
-	u64		size;	/* partition size (in bytes) */
+	unsigned int	size;	/* partition size (in bytes) */
 	unsigned int	part_cfg;	/* partition type */
 	char	name[MAX_MMC_PART_NAME_LEN];
 	bool	force_ro;	/* to make boot parts RO by default */
@@ -310,6 +314,24 @@ enum mmc_pon_type {
 
 #define mmc_card_strobe(c) (((c)->ext_csd).strobe_support & MMC_STROBE_SUPPORT)
 
+struct mmc_card_error_log {
+	char	type[5];	// sbc, cmd, data, stop, busy
+	int	err_type;
+	u32	status;
+	u64	first_issue_time;
+	u64	last_issue_time;
+	u32	count;
+	u32	ge_cnt;		// status[19] : general error or unknown error
+	u32	cc_cnt;		// status[20] : internal card controller error
+	u32	ecc_cnt;	// status[21] : ecc error
+	u32	wp_cnt;		// status[26] : write protection error
+	u32	oor_cnt;	// status[31] : out of range error
+	u32     halt_cnt;       // cq halt / unhalt fail
+	u32     cq_cnt;         // cq enable / disable fail
+	u32     rpmb_cnt;       // RPMB switch fail
+	u32	noti_cnt;	// uevent notification count
+};
+
 /*
  * MMC device
  */
@@ -358,7 +380,6 @@ struct mmc_card {
 
 /* Make sure CMDQ is empty before queuing DCMD */
 #define MMC_QUIRK_CMDQ_EMPTY_BEFORE_DCMD (1 << 18)
-#define MMC_QUIRK_QCA9379_SETTINGS (1 << 19)    /* QCA9379 card settings*/
 
 	bool			reenable_cmdq;	/* Re-enable Command Queue */
 
@@ -402,6 +423,9 @@ struct mmc_card {
 	struct notifier_block   reboot_notify;
 	enum mmc_pon_type	pon_type;
 	struct mmc_bkops_info bkops;
+
+	struct device_attribute error_count;
+	struct mmc_card_error_log err_log[10];
 };
 
 static inline bool mmc_large_sector(struct mmc_card *card)
@@ -451,11 +475,6 @@ static inline bool mmc_enable_qca6574_settings(const struct mmc_card *c)
 static inline bool mmc_enable_qca9377_settings(const struct mmc_card *c)
 {
 	return c->quirks & MMC_QUIRK_QCA9377_SETTINGS;
-}
-
-static inline bool mmc_enable_qca9379_settings(const struct mmc_card *c)
-{
-	return c->quirks & MMC_QUIRK_QCA9379_SETTINGS;
 }
 
 #define mmc_dev_to_card(d)	container_of(d, struct mmc_card, dev)

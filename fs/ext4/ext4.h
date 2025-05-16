@@ -40,6 +40,10 @@
 #include <linux/compat.h>
 #endif
 
+#ifdef CONFIG_FS_HPB
+#include <linux/fs_hpb.h>
+#endif
+
 #include <linux/fscrypt.h>
 #include <linux/fsverity.h>
 
@@ -1347,9 +1351,11 @@ struct ext4_super_block {
  */
 #define EXT4_MF_MNTDIR_SAMPLED		0x0001
 #define EXT4_MF_FS_ABORTED		0x0002	/* Fatal error detected */
+#define EXT4_MF_TEST_DUMMY_ENCRYPTION	0x0004
 
 #ifdef CONFIG_FS_ENCRYPTION
-#define DUMMY_ENCRYPTION_ENABLED(sbi) ((sbi)->s_dummy_enc_ctx.ctx != NULL)
+#define DUMMY_ENCRYPTION_ENABLED(sbi) (unlikely((sbi)->s_mount_flags & \
+						EXT4_MF_TEST_DUMMY_ENCRYPTION))
 #else
 #define DUMMY_ENCRYPTION_ENABLED(sbi) (0)
 #endif
@@ -1435,6 +1441,9 @@ struct ext4_sb_info {
 	unsigned long s_ext_blocks;
 	unsigned long s_ext_extents;
 #endif
+
+	/* Reserved inodes count */
+	s64 s_r_inodes_count;
 
 	/* for buddy allocator */
 	struct ext4_group_info ** __rcu *s_group_info;
@@ -1527,9 +1536,6 @@ struct ext4_sb_info {
 	struct ratelimit_state s_warning_ratelimit_state;
 	struct ratelimit_state s_msg_ratelimit_state;
 
-	/* Encryption context for '-o test_dummy_encryption' */
-	struct fscrypt_dummy_context s_dummy_enc_ctx;
-
 	/*
 	 * Barrier between writepages ops and changing any inode's JOURNAL_DATA
 	 * or EXTENTS flag.
@@ -1587,6 +1593,10 @@ enum {
 	EXT4_STATE_EXT_PRECACHED,	/* extents have been precached */
 	EXT4_STATE_LUSTRE_EA_INODE,	/* Lustre-style ea_inode */
 	EXT4_STATE_VERITY_IN_PROGRESS,	/* building fs-verity Merkle tree */
+
+#ifdef CONFIG_FS_HPB
+	EXT4_STATE_HPB,			/* HPB I/O */
+#endif
 };
 
 #define EXT4_INODE_BIT_FNS(name, field, offset)				\
@@ -1934,6 +1944,11 @@ static inline int ext4_forced_shutdown(struct ext4_sb_info *sbi)
  */
 #define EXT4_DEF_MIN_BATCH_TIME	0
 #define EXT4_DEF_MAX_BATCH_TIME	15000 /* 15ms */
+
+/*
+ * Default reserved inode count
+ */
+#define EXT4_DEF_RESERVE_INODE 8192
 
 /*
  * Minimum number of groups in a flexgroup before we separate out
@@ -2477,8 +2492,7 @@ void ext4_insert_dentry(struct inode *inode,
 			struct ext4_filename *fname);
 static inline void ext4_update_dx_flag(struct inode *inode)
 {
-	if (!ext4_has_feature_dir_index(inode->i_sb) &&
-	    ext4_test_inode_flag(inode, EXT4_INODE_INDEX)) {
+	if (!ext4_has_feature_dir_index(inode->i_sb)) {
 		/* ext4_iget() should have caught this... */
 		WARN_ON_ONCE(ext4_has_feature_metadata_csum(inode->i_sb));
 		ext4_clear_inode_flag(inode, EXT4_INODE_INDEX);
@@ -2554,6 +2568,7 @@ extern int ext4_group_add_blocks(handle_t *handle, struct super_block *sb,
 				ext4_fsblk_t block, unsigned long count);
 extern int ext4_trim_fs(struct super_block *, struct fstrim_range *);
 extern void ext4_process_freed_data(struct super_block *sb, tid_t commit_tid);
+extern ssize_t ext4_mb_freefrag_show(struct ext4_sb_info *sbi, char *buf);
 
 /* inode.c */
 int ext4_inode_is_fast_symlink(struct inode *inode);
@@ -2850,6 +2865,12 @@ static inline int ext4_has_metadata_csum(struct super_block *sb)
 	       (EXT4_SB(sb)->s_chksum_driver != NULL);
 }
 
+extern void print_iloc_info(struct super_block *sb, struct ext4_iloc iloc);
+extern void print_bh(struct super_block *sb,
+		struct buffer_head *bh, int start, int len);
+extern void print_block_data(struct super_block *sb, sector_t blocknr,
+		unsigned char *data_to_dump, int start, int len);
+
 static inline int ext4_has_group_desc_csum(struct super_block *sb)
 {
 	return ext4_has_feature_gdt_csum(sb) || ext4_has_metadata_csum(sb);
@@ -3099,6 +3120,10 @@ static inline void ext4_unlock_group(struct super_block *sb,
 /* dir.c */
 extern const struct file_operations ext4_dir_operations;
 
+#ifdef CONFIG_UNICODE
+extern const struct dentry_operations ext4_dentry_ops;
+#endif
+
 /* file.c */
 extern const struct inode_operations ext4_file_inode_operations;
 extern const struct file_operations ext4_file_operations;
@@ -3319,6 +3344,17 @@ extern void ext4_io_submit_init(struct ext4_io_submit *io,
 				struct writeback_control *wbc);
 extern void ext4_end_io_rsv_work(struct work_struct *work);
 extern void ext4_io_submit(struct ext4_io_submit *io);
+#ifdef CONFIG_DDAR
+#define	EXT4_IOC_GET_DD_POLICY		FS_IOC_GET_DD_POLICY
+#define	EXT4_IOC_SET_DD_POLICY		FS_IOC_SET_DD_POLICY
+#endif
+
+#ifdef CONFIG_DDAR
+int ext4_io_submit_to_dd(struct inode *inode, struct ext4_io_submit *io);
+#else
+static inline int ext4_io_submit_to_dd(struct inode *inode, struct ext4_io_submit *io) { return -EOPNOTSUPP; }
+#endif
+
 extern int ext4_bio_write_page(struct ext4_io_submit *io,
 			       struct page *page,
 			       int len,

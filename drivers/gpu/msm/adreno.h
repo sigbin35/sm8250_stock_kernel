@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2008-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef __ADRENO_H
 #define __ADRENO_H
@@ -109,6 +110,20 @@
 #define ADRENO_DEPRECATED BIT(20)
 /* The target supports ringbuffer level APRIV */
 #define ADRENO_APRIV BIT(21)
+/*
+ * Use SHMEM for page allocation. There will be no support
+ * for pools and higher order pages.
+ */
+#define ADRENO_USE_SHMEM BIT(22)
+/*
+ * Make pages available for reclaim. Process foreground/background
+ * activity is known through sysfs exposed per process. Based on
+ * this, pages are unpinned and made available to Per Process
+ * Reclaim (PPR). SHMEM is used for allocation of pages and
+ * support for pools is removed.
+ */
+#define ADRENO_PROCESS_RECLAIM BIT(23)
+
 /*
  * Adreno GPU quirks - control bits for various workarounds
  */
@@ -239,6 +254,9 @@ struct adreno_gpudev;
 /* Time to allow preemption to complete (in ms) */
 #define ADRENO_PREEMPT_TIMEOUT 10000
 
+#define PREEMPT_SCRATCH_ADDR(dev, id) \
+	((dev)->preempt.scratch.gpuaddr + (id * sizeof(u64)))
+
 #define ADRENO_INT_BIT(a, _bit) (((a)->gpucore->gpudev->int_bits) ? \
 		(adreno_get_int(a, _bit) < 0 ? 0 : \
 		BIT(adreno_get_int(a, _bit))) : 0)
@@ -273,6 +291,7 @@ enum adreno_preempt_states {
  * skipsaverestore: To skip saverestore during L1 preemption (for 6XX)
  * usesgmem: enable GMEM save/restore across preemption (for 6XX)
  * count: Track the number of preemptions triggered
+ * @postamble_len: Number of dwords in KMD postamble pm4 packet
  */
 struct adreno_preemption {
 	atomic_t state;
@@ -283,6 +302,7 @@ struct adreno_preemption {
 	bool skipsaverestore;
 	bool usesgmem;
 	unsigned int count;
+	u32 postamble_len;
 };
 
 
@@ -541,6 +561,11 @@ struct adreno_device {
 	bool gpuhtw_llc_slice_enable;
 	unsigned int zap_loaded;
 	unsigned int soc_hw_rev;
+	/*
+	 * @perfcounter: Flag to clear perfcounters across contexts and
+	 * controls perfcounter ioctl read
+	 */
+	bool perfcounter;	
 };
 
 /**
@@ -780,7 +805,6 @@ struct adreno_coresight_attr {
 	struct adreno_coresight_register *reg;
 };
 
-#if IS_ENABLED(CONFIG_CORESIGHT_ARDENO)
 ssize_t adreno_coresight_show_register(struct device *device,
 		struct device_attribute *attr, char *buf);
 
@@ -793,12 +817,6 @@ ssize_t adreno_coresight_store_register(struct device *dev,
 		adreno_coresight_show_register, \
 		adreno_coresight_store_register), \
 		(_reg), }
-#else
-#define ADRENO_CORESIGHT_ATTR(_attrname, _reg) \
-	struct adreno_coresight_attr coresight_attr_##_attrname  = { \
-		__ATTR_NULL, \
-		(_reg), }
-#endif /* CONFIG_CORESIGHT_ADRENO */
 
 /**
  * struct adreno_coresight - GPU specific coresight definition
@@ -880,6 +898,7 @@ struct adreno_gpudev {
 	unsigned int *const int_bits;
 	const struct adreno_ft_perf_counters *ft_perf_counters;
 	unsigned int ft_perf_counters_count;
+	unsigned int rbbm_status;
 
 	struct adreno_perfcounters *perfcounters;
 	const struct adreno_invalid_countables *invalid_countables;
@@ -1070,22 +1089,12 @@ void adreno_fault_skipcmd_detached(struct adreno_device *adreno_dev,
 					 struct adreno_context *drawctxt,
 					 struct kgsl_drawobj *drawobj);
 
-#if IS_ENABLED(CONFIG_CORESIGHT_ARDENO)
 int adreno_coresight_init(struct adreno_device *adreno_dev);
 
 void adreno_coresight_start(struct adreno_device *adreno_dev);
 void adreno_coresight_stop(struct adreno_device *adreno_dev);
 
 void adreno_coresight_remove(struct adreno_device *adreno_dev);
-#else
-static inline int adreno_coresight_init(struct adreno_device *adreno_dev)
-{
-	return -ENODEV;
-}
-static inline void adreno_coresight_start(struct adreno_device *adreno_dev) { }
-static inline void adreno_coresight_stop(struct adreno_device *adreno_dev) { }
-static inline void adreno_coresight_remove(struct adreno_device *adreno_dev) { }
-#endif /* CONFIG_CORESIGHT_ADRENO */
 
 bool adreno_hw_isidle(struct adreno_device *adreno_dev);
 

@@ -80,13 +80,13 @@ static dev_t qcedev_device_no;
 static struct class *driver_class;
 static struct device *class_dev;
 
+MODULE_DEVICE_TABLE(of, qcedev_match);
+
 static const struct of_device_id qcedev_match[] = {
 	{	.compatible = "qcom,qcedev"},
 	{	.compatible = "qcom,qcedev,context-bank"},
 	{}
 };
-
-MODULE_DEVICE_TABLE(of, qcedev_match);
 
 static uint32_t qcedev_get_block_size(enum qcedev_sha_alg_enum alg)
 {
@@ -252,6 +252,8 @@ static struct qcedev_control qce_dev[] = {
 };
 
 #define MAX_QCE_DEVICE ARRAY_SIZE(qce_dev)
+#define DEBUG_MAX_FNAME  16
+#define DEBUG_MAX_RW_BUF 1024
 
 struct qcedev_stat {
 	u32 qcedev_dec_success;
@@ -263,13 +265,9 @@ struct qcedev_stat {
 };
 
 static struct qcedev_stat _qcedev_stat;
-#ifdef CONFIG_DEBUG_FS
-#define DEBUG_MAX_FNAME  16
-#define DEBUG_MAX_RW_BUF 1024
 static struct dentry *_debug_dent;
 static char _debug_read_buf[DEBUG_MAX_RW_BUF];
 static int _debug_qcedev;
-#endif /* CONFIG_DEBUG_FS */
 
 static struct qcedev_control *qcedev_minor_to_control(unsigned int n)
 {
@@ -2349,7 +2347,6 @@ static struct platform_driver qcedev_plat_driver = {
 	},
 };
 
-#ifdef CONFIG_DEBUG_FS
 static int _disp_stats(int id)
 {
 	struct qcedev_stat *pstat;
@@ -2433,25 +2430,17 @@ err:
 	debugfs_remove_recursive(_debug_dent);
 	return rc;
 }
-#endif
 
 static int qcedev_init(void)
 {
-#ifdef CONFIG_DEBUG_FS
-	int rc;
+	_qcedev_debug_init();
 
-	rc = _qcedev_debug_init();
-	if (rc)
-		return rc;
-#endif
 	return platform_driver_register(&qcedev_plat_driver);
 }
 
 static void qcedev_exit(void)
 {
-#ifdef CONFIG_DEBUG_FS
 	debugfs_remove_recursive(_debug_dent);
-#endif
 	platform_driver_unregister(&qcedev_plat_driver);
 }
 

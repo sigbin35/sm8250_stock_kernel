@@ -645,8 +645,13 @@ static int a6xx_zap_load(struct adreno_device *adreno_dev)
 		if (IS_ERR_OR_NULL(zap)) {
 			ret = (zap == NULL) ? -ENODEV : PTR_ERR(zap);
 			zap = NULL;
-		} else
+			dev_err(adreno_dev->dev.dev,
+				"subsystem_get() for zap failed. zap = NULL\n");
+		} else {
 			adreno_dev->zap_loaded = 1;
+			dev_err(adreno_dev->dev.dev,
+				"subsystem_get() for zap succeed.\n");
+		}
 	}
 
 	return ret;
@@ -1136,14 +1141,10 @@ static int a6xx_reset(struct kgsl_device *device, int fault)
 {
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	int ret;
-	unsigned long flags = device->pwrctrl.ctrl_flags;
 
 	/* Use the regular reset sequence for No GMU */
 	if (!gmu_core_isenabled(device))
 		return adreno_reset(device, fault);
-
-	/* Clear ctrl_flags to ensure clocks and regulators are turned off */
-	device->pwrctrl.ctrl_flags = 0;
 
 	/* Transition from ACTIVE to RESET state */
 	kgsl_pwrctrl_change_state(device, KGSL_STATE_RESET);
@@ -1156,8 +1157,6 @@ static int a6xx_reset(struct kgsl_device *device, int fault)
 		return ret;
 
 	kgsl_pwrctrl_change_state(device, KGSL_STATE_ACTIVE);
-
-	device->pwrctrl.ctrl_flags = flags;
 
 	/*
 	 * If active_cnt is zero, there is no need to keep the GPU active. So,

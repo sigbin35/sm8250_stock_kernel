@@ -7,7 +7,7 @@
 
 #include <linux/ipc_logging.h>
 
-#define DIAG_IPC_LOG_PAGES	50
+#define DIAG_IPC_LOG_PAGES	100
 
 #define DIAG_DEBUG_USERSPACE	0x0001
 #define DIAG_DEBUG_MUX		0x0002
@@ -19,7 +19,7 @@
 #define DIAG_DEBUG_CMD_INFO	0x0080
 #define DIAG_DEBUG_MHI		0x0100
 
-#if IS_ENABLED(CONFIG_IPC_LOGGING)
+#ifdef CONFIG_IPC_LOGGING
 extern uint16_t diag_debug_mask;
 extern void *diag_ipc_log;
 

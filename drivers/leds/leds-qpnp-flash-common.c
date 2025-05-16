@@ -4,7 +4,6 @@
  */
 
 #include "leds.h"
-#include <linux/module.h>
 
 struct flash_data {
 	struct list_head link;
@@ -31,7 +30,6 @@ int qpnp_flash_register_led_prepare(struct device *dev, void *data)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(qpnp_flash_register_led_prepare);
 
 int qpnp_flash_led_prepare(struct led_trigger *trig, int options,
 					int *max_current)
@@ -51,8 +49,3 @@ int qpnp_flash_led_prepare(struct led_trigger *trig, int options,
 
 	return rc;
 }
-EXPORT_SYMBOL_GPL(qpnp_flash_led_prepare);
-
-MODULE_DESCRIPTION("QPNP Flash LED common driver");
-MODULE_LICENSE("GPL v2");
-MODULE_ALIAS("leds:leds-qpnp-flash-common");

@@ -88,7 +88,7 @@ config RING_BUFFER_ALLOW_SWAP
 	 Adds a very slight overhead to tracing when enabled.
 
 config IPC_LOGGING
-	tristate "Debug Logging for IPC Drivers"
+	bool "Debug Logging for IPC Drivers"
 	select GENERIC_TRACER
 	help
 	  IPC Logging driver provides a logging option for IPC Drivers.
@@ -99,8 +99,7 @@ config IPC_LOGGING
 	  If in doubt, say no.
 
 config QCOM_RTB
-	tristate "Register tracing"
-	depends on TRACING
+	bool "Register tracing"
 	help
 	  Enable the kernel to trace every kernel function. This is done
 	  Add support for logging different events to a small uncached
@@ -505,7 +504,7 @@ config KPROBE_EVENTS
 config KPROBE_EVENTS_ON_NOTRACE
 	bool "Do NOT protect notrace function from kprobe events"
 	depends on KPROBE_EVENTS
-	depends on DYNAMIC_FTRACE
+	depends on KPROBES_ON_FTRACE
 	default n
 	help
 	  This is only for the developers who want to debug ftrace itself

@@ -253,8 +253,6 @@ int keycombo_remove(struct platform_device *pdev)
 	wakeup_source_unregister(state->combo_up_wake_source);
 	wakeup_source_unregister(state->combo_held_wake_source);
 	destroy_workqueue(state->wq);
-	wakeup_source_unregister(state->combo_held_wake_source);
-	wakeup_source_unregister(state->combo_up_wake_source);
 	kfree(state);
 	return 0;
 }

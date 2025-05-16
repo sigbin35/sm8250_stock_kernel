@@ -20,7 +20,7 @@
 #include <linux/cdev.h>
 #include <linux/ipa_odu_bridge.h>
 #include "../ipa_common_i.h"
-#if IS_ENABLED(CONFIG_IPA3)
+#ifdef CONFIG_IPA3
 #include "../ipa_v3/ipa_pm.h"
 #endif
 
@@ -58,9 +58,11 @@
 
 #define IPA_GSB_MAX_MSG_LEN 512
 
+#ifdef CONFIG_DEBUG_FS
 static struct dentry *dent;
 static struct dentry *dfile_stats;
 static char dbg_buff[IPA_GSB_MAX_MSG_LEN];
+#endif
 
 #define IPA_GSB_SKB_HEADROOM 256
 #define IPA_GSB_SKB_DUMMY_HEADER 42
@@ -160,6 +162,7 @@ struct ipa_gsb_context {
 
 static struct ipa_gsb_context *ipa_gsb_ctx;
 
+#ifdef CONFIG_DEBUG_FS
 static ssize_t ipa_gsb_debugfs_stats(struct file *file,
 				  char __user *ubuf,
 				  size_t count,
@@ -206,7 +209,7 @@ static void ipa_gsb_debugfs_init(void)
 	const mode_t read_only_mode = 00444;
 
 	dent = debugfs_create_dir("ipa_gsb", NULL);
-	if (IS_ERR_OR_NULL(dent)) {
+	if (IS_ERR(dent)) {
 		IPA_GSB_ERR("fail to create folder ipa_gsb\n");
 		return;
 	}
@@ -229,6 +232,15 @@ static void ipa_gsb_debugfs_destroy(void)
 {
 	debugfs_remove_recursive(dent);
 }
+#else
+static void ipa_gsb_debugfs_init(void)
+{
+}
+
+static void ipa_gsb_debugfs_destroy(void)
+{
+}
+#endif
 
 static int ipa_gsb_driver_init(struct odu_bridge_params *params)
 {

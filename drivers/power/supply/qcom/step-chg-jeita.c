@@ -231,7 +231,6 @@ static int get_step_chg_jeita_setting_from_profile(struct step_chg_info *chip)
 	const __be32 *handle;
 	int batt_id_ohms, rc, hysteresis[2] = {0};
 	union power_supply_propval prop = {0, };
-	union power_supply_propval batt_type = {0, };
 
 	handle = of_get_property(chip->dev->of_node,
 			"qcom,battery-data", NULL);
@@ -257,16 +256,8 @@ static int get_step_chg_jeita_setting_from_profile(struct step_chg_info *chip)
 	if (batt_id_ohms < 0)
 		return -EBUSY;
 
-	rc = power_supply_get_property(chip->bms_psy,
-			POWER_SUPPLY_PROP_BATTERY_TYPE, &batt_type);
-	if (rc < 0) {
-		pr_err("Failed to get batt-type rc=%d\n", rc);
-		return -EBUSY;
-	}
-	pr_info("battery type=%s\n", batt_type.strval);
-
 	profile_node = of_batterydata_get_best_profile(batt_node,
-					batt_id_ohms / 1000, batt_type.strval);
+					batt_id_ohms / 1000, NULL);
 	if (IS_ERR(profile_node))
 		return PTR_ERR(profile_node);
 

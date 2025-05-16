@@ -6,7 +6,7 @@
 #ifndef __IMP_H_
 #define __IMP_H_
 
-#if IS_ENABLED(CONFIG_IPA3_MHI_PROXY)
+#ifdef CONFIG_IPA3_MHI_PROXY
 
 #include "ipa_qmi_service.h"
 

@@ -40,7 +40,6 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/io-64-nonatomic-hi-lo.h>
-#include <linux/io-pgtable.h>
 #include <linux/iommu.h>
 #include <linux/io-pgtable.h>
 #include <linux/iopoll.h>
@@ -81,6 +80,7 @@
  * using r31 (i.e. XZR/WZR) as the source register.
  */
 #define QCOM_DUMMY_VAL -1
+#include <linux/sec_debug.h>
 
 #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
 
@@ -457,7 +457,7 @@ static struct arm_smmu_option_prop arm_smmu_options[] = {
 static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
 					dma_addr_t iova);
 static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
-					      dma_addr_t iova);
+				    dma_addr_t iova, unsigned long trans_flags);
 static void arm_smmu_destroy_domain_context(struct iommu_domain *domain);
 
 static int arm_smmu_prepare_pgtable(void *addr, void *cookie);
@@ -997,7 +997,7 @@ struct arm_smmu_arch_ops {
 	int (*init)(struct arm_smmu_device *smmu);
 	void (*device_reset)(struct arm_smmu_device *smmu);
 	phys_addr_t (*iova_to_phys_hard)(struct iommu_domain *domain,
-					 dma_addr_t iova);
+			dma_addr_t iova, unsigned long trans_flags);
 	void (*init_context_bank)(struct arm_smmu_domain *smmu_domain,
 					struct device *dev);
 	int (*device_group)(struct device *dev, struct iommu_group *group);
@@ -1888,18 +1888,18 @@ static void print_ctx_regs(struct arm_smmu_device *smmu, struct arm_smmu_cfg
 	dev_err(smmu->dev,
 		"FSR    = 0x%08x [%s%s%s%s%s%s%s%s%s%s]\n",
 		fsr,
-		(fsr & 0x02) ?  (fsynr0 & 0x10 ?
+		(fsr & FSR_TF) ?  (fsynr0 & FSYNR0_WNR ?
 				 "TF W " : "TF R ") : "",
-		(fsr & 0x04) ? "AFF " : "",
-		(fsr & 0x08) ? (fsynr0 & 0x10 ?
+		(fsr & FSR_AFF) ? "AFF " : "",
+		(fsr & FSR_PF) ? (fsynr0 & FSYNR0_WNR ?
 				"PF W " : "PF R ") : "",
-		(fsr & 0x10) ? "EF " : "",
-		(fsr & 0x20) ? "TLBMCF " : "",
-		(fsr & 0x40) ? "TLBLKF " : "",
-		(fsr & 0x80) ? "MHF " : "",
-		(fsr & 0x100) ? "UUT " : "",
-		(fsr & 0x40000000) ? "SS " : "",
-		(fsr & 0x80000000) ? "MULTI " : "");
+		(fsr & FSR_EF) ? "EF " : "",
+		(fsr & FSR_TLBMCF) ? "TLBMCF " : "",
+		(fsr & FSR_TLBLKF) ? "TLBLKF " : "",
+		(fsr & FSR_ASF) ? "ASF " : "",
+		(fsr & FSR_UUT) ? "UUT " : "",
+		(fsr & FSR_SS) ? "SS " : "",
+		(fsr & FSR_MULTI) ? "MULTI " : "");
 
 	if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
 		dev_err(smmu->dev, "TTBR0  = 0x%pK\n",
@@ -1930,24 +1930,56 @@ static void print_ctx_regs(struct arm_smmu_device *smmu, struct arm_smmu_cfg
 }
 
 static phys_addr_t arm_smmu_verify_fault(struct iommu_domain *domain,
-					 dma_addr_t iova, u32 fsr)
+					 dma_addr_t iova, u32 fsr, u32 fsynr0)
 {
 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
 	struct arm_smmu_device *smmu = smmu_domain->smmu;
-	phys_addr_t phys;
-	phys_addr_t phys_post_tlbiall;
+	phys_addr_t phys_hard_priv = 0;
+	phys_addr_t phys_stimu, phys_stimu_post_tlbiall;
+	unsigned long flags = 0;
 
-	phys = arm_smmu_iova_to_phys_hard(domain, iova);
+	/* Get the transaction type */
+	if (fsynr0 & FSYNR0_WNR)
+		flags |= IOMMU_TRANS_WRITE;
+	if (fsynr0 & FSYNR0_PNU)
+		flags |= IOMMU_TRANS_PRIV;
+	if (fsynr0 & FSYNR0_IND)
+		flags |= IOMMU_TRANS_INST;
+
+	/* Now replicate the faulty transaction */
+	phys_stimu = arm_smmu_iova_to_phys_hard(domain, iova, flags);
+
+	/*
+	 * If the replicated transaction fails, it could be due to legitimate
+	 * unmapped access (translation fault) or stale TLB with insufficient
+	 * privileges (permission fault). Try ATOS operation with full access
+	 * privileges to rule out stale entry with insufficient privileges case.
+	 */
+	if (!phys_stimu)
+		phys_hard_priv = arm_smmu_iova_to_phys_hard(domain, iova,
+						       IOMMU_TRANS_DEFAULT |
+						       IOMMU_TRANS_PRIV);
+
+	/* Now replicate the faulty transaction post tlbiall */
 	smmu_domain->pgtbl_cfg.tlb->tlb_flush_all(smmu_domain);
-	phys_post_tlbiall = arm_smmu_iova_to_phys_hard(domain, iova);
+	phys_stimu_post_tlbiall = arm_smmu_iova_to_phys_hard(domain, iova,
+							     flags);
 
-	if (phys != phys_post_tlbiall) {
+	if (!phys_stimu && phys_hard_priv) {
 		dev_err(smmu->dev,
-			"ATOS results differed across TLBIALL...\n"
-			"Before: %pa After: %pa\n", &phys, &phys_post_tlbiall);
+			"ATOS results differed across access privileges...\n"
+			"Before: %pa After: %pa\n",
+			&phys_stimu, &phys_hard_priv);
 	}
 
-	return (phys == 0 ? phys_post_tlbiall : phys);
+	if (phys_stimu != phys_stimu_post_tlbiall) {
+		dev_err(smmu->dev,
+			"ATOS results differed across TLBIALL...\n"
+			"Before: %pa After: %pa\n", &phys_stimu,
+						&phys_stimu_post_tlbiall);
+	}
+
+	return (phys_stimu == 0 ? phys_stimu_post_tlbiall : phys_stimu);
 }
 
 int iommu_get_fault_ids(struct iommu_domain *domain,
@@ -1990,6 +2022,56 @@ int iommu_get_fault_ids(struct iommu_domain *domain,
 }
 EXPORT_SYMBOL(iommu_get_fault_ids);
 
+static const char *__arm_smmu_get_devname(struct device *dev)
+{
+	const char *token;
+	const char *delim = ":,.";
+	const char *devname;
+
+	token = dev_name(dev);
+	if (!token)
+		return "No Name";
+
+	pr_info("smmu client name - %s\n", token);
+
+	/* FIXME: the name of pci client only has delimeters and numbers */
+	if (dev_is_pci(dev))
+		return token;
+
+	while (true) {
+		devname = token;
+		token = strpbrk(token, delim);
+		if (!token)
+			break;
+		token++;	/* skip delimiter */
+	}
+
+	return devname;
+}
+
+static const char *arm_smmu_get_devname(const struct arm_smmu_domain *smmu_domain,
+		u32 sid)
+{
+	struct iommu_fwspec *fwspec = NULL;
+	struct device* dev = NULL;
+	unsigned int i;
+
+	if (smmu_domain->dev)
+		fwspec = smmu_domain->dev->iommu_fwspec;
+
+	for (i = 0; fwspec && i < fwspec->num_ids; i++) {
+		if ((fwspec->ids[i] & smmu_domain->smmu->streamid_mask) == sid) {
+			dev = smmu_domain->dev;
+			break;
+		}
+	}
+
+	if (!fwspec || !dev)
+		return "No Device";
+
+	return __arm_smmu_get_devname(dev);
+}
+
 static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
 {
 	int flags, ret, tmp;
@@ -2027,6 +2109,9 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
 	if (fatal_asf && (fsr & FSR_ASF)) {
 		dev_err(smmu->dev,
 			"Took an address size fault.  Refusing to recover.\n");
+
+		sec_debug_save_smmu_info_asf_fatal();
+
 		BUG();
 	}
 
@@ -2065,7 +2150,8 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
 			phys_addr_t phys_atos;
 
 			print_ctx_regs(smmu, cfg, fsr);
-			phys_atos = arm_smmu_verify_fault(domain, iova, fsr);
+			phys_atos = arm_smmu_verify_fault(domain, iova, fsr,
+							  fsynr0);
 			dev_err(smmu->dev,
 				"Unhandled context fault: iova=0x%08lx, cb=%d, fsr=0x%x, fsynr0=0x%x, fsynr1=0x%x\n",
 				iova, cfg->cbndx, fsr, fsynr0, fsynr1);
@@ -2097,7 +2183,13 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
 		if (!non_fatal_fault) {
 			dev_err(smmu->dev,
 				"Unhandled arm-smmu context fault!\n");
-			BUG();
+
+			sec_debug_save_smmu_info_fatal();
+			if (IS_ENABLED(CONFIG_SEC_DEBUG))
+				panic("%s SMMU Fault - SID=0x%x",
+						arm_smmu_get_devname(smmu_domain, frsynra), frsynra);
+			else
+				BUG();
 		}
 	}
 
@@ -2579,7 +2671,6 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 	}
 
 	if (arm_smmu_is_slave_side_secure(smmu_domain)) {
-#ifdef CONFIG_MSM_TZ_SMMU
 		smmu_domain->pgtbl_cfg = (struct io_pgtable_cfg) {
 			.quirks         = quirks,
 			.pgsize_bitmap  = smmu->pgsize_bitmap,
@@ -2593,9 +2684,6 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 			.iova_end	= domain->geometry.aperture_end,
 		};
 		fmt = ARM_MSM_SECURE;
-#else
-		WARN(1, "CONFIG_MSM_TZ_SMMU is disabled. Will not work!\n");
-#endif
 	} else  {
 		smmu_domain->pgtbl_cfg = (struct io_pgtable_cfg) {
 			.quirks		= quirks,
@@ -3774,7 +3862,7 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
  * original iova_to_phys() op.
  */
 static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
-					dma_addr_t iova)
+				    dma_addr_t iova, unsigned long trans_flags)
 {
 	phys_addr_t ret = 0;
 	unsigned long flags;
@@ -3791,7 +3879,7 @@ static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
 	if (smmu_domain->smmu->arch_ops &&
 	    smmu_domain->smmu->arch_ops->iova_to_phys_hard) {
 		ret = smmu_domain->smmu->arch_ops->iova_to_phys_hard(
-						domain, iova);
+						domain, iova, trans_flags);
 		goto out;
 	}
 
@@ -3838,7 +3926,7 @@ struct arm_smmu_device *arm_smmu_get_by_fwnode(struct fwnode_handle *fwnode)
 	return dev ? dev_get_drvdata(dev) : NULL;
 }
 
-#if IS_ENABLED(CONFIG_MSM_TZ_SMMU)
+#ifdef CONFIG_MSM_TZ_SMMU
 static int msm_secure_smmu_map(struct iommu_domain *domain, unsigned long iova,
 			       phys_addr_t paddr, size_t size, int prot)
 {
@@ -4694,7 +4782,7 @@ static void qsmmuv2_device_reset(struct arm_smmu_device *smmu)
 }
 
 static phys_addr_t qsmmuv2_iova_to_phys_hard(struct iommu_domain *domain,
-				dma_addr_t iova)
+				dma_addr_t iova, unsigned long trans_flags)
 {
 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
 	struct arm_smmu_device *smmu = smmu_domain->smmu;
@@ -5438,7 +5526,7 @@ static const struct of_device_id arm_smmu_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
 
-#if IS_ENABLED(CONFIG_MSM_TZ_SMMU)
+#ifdef CONFIG_MSM_TZ_SMMU
 int register_iommu_sec_ptbl(void)
 {
 	struct device_node *np;
@@ -5723,9 +5811,7 @@ static int arm_smmu_legacy_bus_init(void)
 		arm_smmu_bus_init();
 	return 0;
 }
-#ifndef MODULE
 device_initcall_sync(arm_smmu_legacy_bus_init);
-#endif
 
 static int arm_smmu_device_remove(struct platform_device *pdev)
 {
@@ -5796,34 +5882,18 @@ static int __init arm_smmu_init(void)
 		return ret;
 
 	ret = platform_driver_register(&arm_smmu_driver);
-	if (ret)
-		goto exit;
-#if IS_ENABLED(CONFIG_MSM_TZ_SMMU)
+#ifdef CONFIG_MSM_TZ_SMMU
 	ret = register_iommu_sec_ptbl();
-	if (ret)
-		goto exit_sec_ptbl;
 #endif
 	registered = !ret;
 	trace_smmu_init(ktime_us_delta(ktime_get(), cur));
 
-#ifdef MODULE
-	arm_smmu_legacy_bus_init();
-#endif
-	return ret;
-
-#if IS_ENABLED(CONFIG_MSM_TZ_SMMU)
-exit_sec_ptbl:
-	platform_driver_unregister(&arm_smmu_driver);
-#endif
-exit:
-	platform_driver_unregister(&qsmmuv500_tbu_driver);
 	return ret;
 }
 
 static void __exit arm_smmu_exit(void)
 {
-	platform_driver_unregister(&arm_smmu_driver);
-	platform_driver_unregister(&qsmmuv500_tbu_driver);
+	return platform_driver_unregister(&arm_smmu_driver);
 }
 
 subsys_initcall(arm_smmu_init);
@@ -5839,8 +5909,14 @@ module_exit(arm_smmu_exit);
 
 #define DEBUG_TXN_TRIGG_REG		0x18
 #define DEBUG_TXN_AXPROT_SHIFT		6
+#define DEBUG_TXN_AXPROT_PRIV	(0x1 << DEBUG_TXN_AXPROT_SHIFT)
+#define DEBUG_TXN_AXPROT_UNPRIV	(0x0 << DEBUG_TXN_AXPROT_SHIFT)
+#define DEBUG_TXN_AXPROT_NSEC	(0x2 << DEBUG_TXN_AXPROT_SHIFT)
+#define DEBUG_TXN_AXPROT_SEC	(0x0 << DEBUG_TXN_AXPROT_SHIFT)
+#define DEBUG_TXN_AXPROT_INST	(0x4 << DEBUG_TXN_AXPROT_SHIFT)
+#define DEBUG_TXN_AXPROT_DATA	(0x0 << DEBUG_TXN_AXPROT_SHIFT)
 #define DEBUG_TXN_AXCACHE_SHIFT		2
-#define DEBUG_TRX_WRITE			(0x1 << 1)
+#define DEBUG_TXN_WRITE			(0x1 << 1)
 #define DEBUG_TXN_READ			(0x0 << 1)
 #define DEBUG_TXN_TRIGGER		0x1
 
@@ -6023,7 +6099,8 @@ static void qsmmuv500_ecats_unlock(struct arm_smmu_domain *smmu_domain,
  * Zero means failure.
  */
 static phys_addr_t qsmmuv500_iova_to_phys(
-		struct iommu_domain *domain, dma_addr_t iova, u32 sid)
+		struct iommu_domain *domain, dma_addr_t iova,
+		u32 sid, unsigned long trans_flags)
 {
 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
 	struct arm_smmu_device *smmu = smmu_domain->smmu;
@@ -6101,13 +6178,24 @@ redo:
 		DEBUG_AXUSER_CDMID_SHIFT;
 	writeq_relaxed(val, tbu->base + DEBUG_AXUSER_REG);
 
-	/*
-	 * Write-back Read and Write-Allocate
-	 * Priviledged, nonsecure, data transaction
-	 * Read operation.
-	 */
+	/* Write-back Read and Write-Allocate */
 	val = 0xF << DEBUG_TXN_AXCACHE_SHIFT;
-	val |= 0x3 << DEBUG_TXN_AXPROT_SHIFT;
+
+	/* Non-secure Access */
+	val |= DEBUG_TXN_AXPROT_NSEC;
+
+	/* Write or Read Access */
+	if (trans_flags & IOMMU_TRANS_WRITE)
+		val |= DEBUG_TXN_WRITE;
+
+	/* Priviledged or Unpriviledged Access */
+	if (trans_flags & IOMMU_TRANS_PRIV)
+		val |= DEBUG_TXN_AXPROT_PRIV;
+
+	/* Data or Instruction Access */
+	if (trans_flags & IOMMU_TRANS_INST)
+		val |= DEBUG_TXN_AXPROT_INST;
+
 	val |= DEBUG_TXN_TRIGGER;
 	writeq_relaxed(val, tbu->base + DEBUG_TXN_TRIGG_REG);
 
@@ -6187,7 +6275,8 @@ out_power_off:
 }
 
 static phys_addr_t qsmmuv500_iova_to_phys_hard(
-		struct iommu_domain *domain, dma_addr_t iova)
+		struct iommu_domain *domain, dma_addr_t iova,
+		unsigned long trans_flags)
 {
 	u16 sid;
 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
@@ -6196,7 +6285,6 @@ static phys_addr_t qsmmuv500_iova_to_phys_hard(
 	struct iommu_fwspec *fwspec;
 	void __iomem *gr1_base;
 	u32 frsynra;
-
 
 	/* Check to see if the domain is associated with the test
 	 * device. If the domain belongs to the test device, then
@@ -6216,7 +6304,7 @@ static phys_addr_t qsmmuv500_iova_to_phys_hard(
 		frsynra &= CBFRSYNRA_SID_MASK;
 		sid      = frsynra;
 	}
-	return qsmmuv500_iova_to_phys(domain, iova, sid);
+	return qsmmuv500_iova_to_phys(domain, iova, sid, trans_flags);
 }
 
 static void qsmmuv500_release_group_iommudata(void *data)

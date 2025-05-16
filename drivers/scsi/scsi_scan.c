@@ -303,6 +303,11 @@ static struct scsi_device *scsi_alloc_sdev(struct scsi_target *starget,
 		}
 	}
 
+#ifdef CONFIG_BLK_TURBO_WRITE
+	if (shost->by_ufs)
+		scsi_alloc_tw(sdev);
+#endif
+
 	return sdev;
 
 out_device_destroy:
@@ -965,7 +970,8 @@ static int scsi_add_lun(struct scsi_device *sdev, unsigned char *inq_result,
 	transport_configure_device(&sdev->sdev_gendev);
 
 	/* The LLD can override auto suspend tunables in ->slave_configure() */
-	sdev->rpm_autosuspend = 0;
+	sdev->use_rpm_auto = 0;
+	sdev->autosuspend_delay = SCSI_DEFAULT_AUTOSUSPEND_DELAY;
 
 	if (sdev->host->hostt->slave_configure) {
 		ret = sdev->host->hostt->slave_configure(sdev);
@@ -1720,16 +1726,15 @@ static void scsi_sysfs_add_devices(struct Scsi_Host *shost)
  */
 static struct async_scan_data *scsi_prep_async_scan(struct Scsi_Host *shost)
 {
-	struct async_scan_data *data = NULL;
+	struct async_scan_data *data;
 	unsigned long flags;
 
 	if (strncmp(scsi_scan_type, "sync", 4) == 0)
 		return NULL;
 
-	mutex_lock(&shost->scan_mutex);
 	if (shost->async_scan) {
 		shost_printk(KERN_DEBUG, shost, "%s called twice\n", __func__);
-		goto err;
+		return NULL;
 	}
 
 	data = kmalloc(sizeof(*data), GFP_KERNEL);
@@ -1740,6 +1745,7 @@ static struct async_scan_data *scsi_prep_async_scan(struct Scsi_Host *shost)
 		goto err;
 	init_completion(&data->prev_finished);
 
+	mutex_lock(&shost->scan_mutex);
 	spin_lock_irqsave(shost->host_lock, flags);
 	shost->async_scan = 1;
 	spin_unlock_irqrestore(shost->host_lock, flags);
@@ -1754,7 +1760,6 @@ static struct async_scan_data *scsi_prep_async_scan(struct Scsi_Host *shost)
 	return data;
 
  err:
-	mutex_unlock(&shost->scan_mutex);
 	kfree(data);
 	return NULL;
 }

@@ -44,7 +44,6 @@
 #include <linux/sched/debug.h>
 #include <linux/slab.h>
 #include <linux/compat.h>
-#include <linux/random.h>
 
 #include <linux/uaccess.h>
 #include <asm/unistd.h>
@@ -56,6 +55,8 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/timer.h>
+
+#include <linux/sec_debug.h>
 
 __visible u64 jiffies_64 __cacheline_aligned_in_smp = INITIAL_JIFFIES;
 
@@ -531,8 +532,8 @@ static int calc_wheel_index(unsigned long expires, unsigned long clk)
 		 * Force expire obscene large timeouts to expire at the
 		 * capacity limit of the wheel.
 		 */
-		if (delta >= WHEEL_TIMEOUT_CUTOFF)
-			expires = clk + WHEEL_TIMEOUT_MAX;
+		if (expires >= WHEEL_TIMEOUT_CUTOFF)
+			expires = WHEEL_TIMEOUT_MAX;
 
 		idx = calc_index(expires, LVL_DEPTH - 1);
 	}
@@ -592,15 +593,7 @@ trigger_dyntick_cpu(struct timer_base *base, struct timer_list *timer)
 	 * Set the next expiry time and kick the CPU so it can reevaluate the
 	 * wheel:
 	 */
-	if (time_before(timer->expires, base->clk)) {
-		/*
-		 * Prevent from forward_timer_base() moving the base->clk
-		 * backward
-		 */
-		base->next_expiry = base->clk;
-	} else {
-		base->next_expiry = timer->expires;
-	}
+	base->next_expiry = timer->expires;
 	wake_up_nohz_cpu(base->cpu);
 }
 
@@ -925,13 +918,10 @@ static inline void forward_timer_base(struct timer_base *base)
 	 * If the next expiry value is > jiffies, then we fast forward to
 	 * jiffies otherwise we forward to the next expiry value.
 	 */
-	if (time_after(base->next_expiry, jnow)) {
+	if (time_after(base->next_expiry, jnow))
 		base->clk = jnow;
-	} else {
-		if (WARN_ON_ONCE(time_before(base->next_expiry, base->clk)))
-			return;
+	else
 		base->clk = base->next_expiry;
-	}
 #endif
 }
 
@@ -1354,7 +1344,9 @@ static void call_timer_fn(struct timer_list *timer, void (*fn)(struct timer_list
 	lock_map_acquire(&lockdep_map);
 
 	trace_timer_expire_entry(timer);
+	sec_debug_msg_log("timer %pS entry", fn);
 	fn(timer);
+	sec_debug_msg_log("timer %pS exit", fn);
 	trace_timer_expire_exit(timer);
 
 	lock_map_release(&lockdep_map);
@@ -2088,3 +2080,37 @@ void __sched usleep_range(unsigned long min, unsigned long max)
 	}
 }
 EXPORT_SYMBOL(usleep_range);
+
+/**
+ * get_cpu_where_timer_on - iterate timer vec to find cpu num where the timer is on 
+ * @timer : target timer_list to find
+ * CAUTION : it must be called from oops/watchdog bark context for debugging purpose.
+ * 
+ * Returns -1 when there is no target in vector otherwise cpu num where it is on will be returned.
+ */
+int get_cpu_where_timer_on(struct timer_list *timer)
+{
+	int i;
+	int cpu;
+	struct timer_list *t;
+	struct timer_base *base;
+	struct hlist_node *n;
+	struct hlist_head *vec;
+
+	for_each_possible_cpu(cpu) {
+		base = per_cpu_ptr(&timer_bases[BASE_STD], cpu);
+		raw_spin_lock(&base->lock);
+		for (i = 0; i < WHEEL_SIZE; i++) {
+			vec = &base->vectors[i];
+			hlist_for_each_entry_safe(t, n, vec, entry) {
+				if(timer == t) {
+					raw_spin_unlock(&base->lock);
+					return cpu;		
+				}
+			}
+		}
+		raw_spin_unlock(&base->lock);
+	}
+
+	return -1;
+}

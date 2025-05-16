@@ -5,6 +5,8 @@
 #ifndef __LINUX_BIO_CRYPT_CTX_H
 #define __LINUX_BIO_CRYPT_CTX_H
 
+#include <linux/string.h>
+
 enum blk_crypto_mode_num {
 	BLK_ENCRYPTION_MODE_INVALID,
 	BLK_ENCRYPTION_MODE_AES_256_XTS,
@@ -104,6 +106,7 @@ struct bio_crypt_ctx {
 	 * with keyslot.
 	 */
 	struct keyslot_manager		*bc_ksm;
+	bool is_ext4;
 };
 
 int bio_crypt_ctx_init(void);

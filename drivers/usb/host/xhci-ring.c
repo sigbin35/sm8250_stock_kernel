@@ -306,6 +306,7 @@ static void xhci_handle_stopped_cmd_ring(struct xhci_hcd *xhci,
 {
 	struct xhci_command *i_cmd;
 
+	xhci_info(xhci, "%s \n", __func__);
 	/* Turn all aborted commands in list to no-ops, then restart */
 	list_for_each_entry(i_cmd, &xhci->cmd_list, cmd_list) {
 
@@ -314,7 +315,7 @@ static void xhci_handle_stopped_cmd_ring(struct xhci_hcd *xhci,
 
 		i_cmd->status = COMP_COMMAND_RING_STOPPED;
 
-		xhci_dbg(xhci, "Turn aborted command %p to no-op\n",
+		xhci_info(xhci, "Turn aborted command %pK to no-op\n",
 			 i_cmd->command_trb);
 
 		trb_to_noop(i_cmd->command_trb, TRB_CMD_NOOP);
@@ -330,6 +331,7 @@ static void xhci_handle_stopped_cmd_ring(struct xhci_hcd *xhci,
 	/* ring command ring doorbell to restart the command ring */
 	if ((xhci->cmd_ring->dequeue != xhci->cmd_ring->enqueue) &&
 	    !(xhci->xhc_state & XHCI_STATE_DYING)) {
+		xhci_info(xhci, "%s \n", __func__);
 		xhci->current_cmd = cur_cmd;
 		xhci_mod_cmd_timer(xhci, XHCI_CMD_DEFAULT_TIMEOUT);
 		xhci_ring_cmd_db(xhci);
@@ -342,7 +344,7 @@ static int xhci_abort_cmd_ring(struct xhci_hcd *xhci, unsigned long flags)
 	u64 temp_64;
 	int ret;
 
-	xhci_dbg(xhci, "Abort command ring\n");
+	xhci_info(xhci, "Abort command ring\n");
 
 	reinit_completion(&xhci->cmd_ring_stop_completion);
 
@@ -357,7 +359,7 @@ static int xhci_abort_cmd_ring(struct xhci_hcd *xhci, unsigned long flags)
 	 * and try to recover a -ETIMEDOUT with a host controller reset.
 	 */
 	ret = xhci_handshake_check_state(xhci, &xhci->op_regs->cmd_ring,
-			CMD_RING_RUNNING, 0, 1000 * 1000);
+			CMD_RING_RUNNING, 0, 5 * 100 * 1000);
 	if (ret < 0) {
 		xhci_err(xhci, "Abort failed to stop command ring: %d\n", ret);
 		xhci_halt(xhci);
@@ -375,8 +377,15 @@ static int xhci_abort_cmd_ring(struct xhci_hcd *xhci, unsigned long flags)
 					  msecs_to_jiffies(2000));
 	spin_lock_irqsave(&xhci->lock, flags);
 	if (!ret) {
-		xhci_dbg(xhci, "No stop event for abort, ring start fail?\n");
+		xhci_info(xhci, "No stop event for abort, ring start fail?\n");
+#if defined(CONFIG_USB_HOST_SAMSUNG_FEATURE)
+		cancel_delayed_work(&xhci->cmd_timer);
+#endif
 		xhci_cleanup_command_queue(xhci);
+#if defined(CONFIG_USB_HOST_SAMSUNG_FEATURE)
+		xhci->current_cmd = NULL;
+#endif
+		xhci_info(xhci, "xhci->xhc_state 0x%x\n", xhci->xhc_state);
 	} else {
 		xhci_handle_stopped_cmd_ring(xhci, xhci_next_queued_cmd(xhci));
 	}
@@ -670,16 +679,11 @@ static void xhci_unmap_td_bounce_buffer(struct xhci_hcd *xhci,
 	dma_unmap_single(dev, seg->bounce_dma, ring->bounce_buf_len,
 			 DMA_FROM_DEVICE);
 	/* for in tranfers we need to copy the data from bounce to sg */
-	if (urb->num_sgs) {
-		len = sg_pcopy_from_buffer(urb->sg, urb->num_sgs, seg->bounce_buf,
-					   seg->bounce_len, seg->bounce_offs);
-		if (len != seg->bounce_len)
-			xhci_warn(xhci, "WARN Wrong bounce buffer read length: %zu != %d\n",
-				  len, seg->bounce_len);
-	} else {
-		memcpy(urb->transfer_buffer + seg->bounce_offs, seg->bounce_buf,
-		       seg->bounce_len);
-	}
+	len = sg_pcopy_from_buffer(urb->sg, urb->num_sgs, seg->bounce_buf,
+			     seg->bounce_len, seg->bounce_offs);
+	if (len != seg->bounce_len)
+		xhci_warn(xhci, "WARN Wrong bounce buffer read length: %zu != %d\n",
+				len, seg->bounce_len);
 	seg->bounce_len = 0;
 	seg->bounce_offs = 0;
 }
@@ -2840,8 +2844,6 @@ static void queue_trb(struct xhci_hcd *xhci, struct xhci_ring *ring,
 	trb->field[0] = cpu_to_le32(field1);
 	trb->field[1] = cpu_to_le32(field2);
 	trb->field[2] = cpu_to_le32(field3);
-	/* make sure TRB is fully written before giving it to the controller */
-	wmb();
 	trb->field[3] = cpu_to_le32(field4);
 
 	trace_xhci_queue_trb(ring, trb);
@@ -3185,16 +3187,12 @@ static int xhci_align_td(struct xhci_hcd *xhci, struct urb *urb, u32 enqd_len,
 
 	/* create a max max_pkt sized bounce buffer pointed to by last trb */
 	if (usb_urb_dir_out(urb)) {
-		if (urb->num_sgs) {
-			len = sg_pcopy_to_buffer(urb->sg, urb->num_sgs,
-						 seg->bounce_buf, new_buff_len, enqd_len);
-			if (len != new_buff_len)
-				xhci_warn(xhci, "WARN Wrong bounce buffer write length: %zu != %d\n",
-					  len, new_buff_len);
-		} else {
-			memcpy(seg->bounce_buf, urb->transfer_buffer + enqd_len, new_buff_len);
-		}
-
+		len = sg_pcopy_to_buffer(urb->sg, urb->num_sgs,
+				   seg->bounce_buf, new_buff_len, enqd_len);
+		if (len != new_buff_len)
+			xhci_warn(xhci,
+				"WARN Wrong bounce buffer write length: %zu != %d\n",
+				len, new_buff_len);
 		seg->bounce_dma = dma_map_single(dev, seg->bounce_buf,
 						 max_pkt, DMA_TO_DEVICE);
 	} else {

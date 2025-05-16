@@ -347,6 +347,7 @@ out:
 		if (!fatal)
 			fatal = err;
 	} else {
+		print_bh(sb, bitmap_bh, 0, EXT4_BLOCK_SIZE(sb));
 		ext4_error(sb, "bit already cleared for inode %lu", ino);
 		ext4_mark_group_bitmap_corrupted(sb, block_group,
 					EXT4_GROUP_INFO_IBITMAP_CORRUPT);
@@ -665,7 +666,7 @@ static int find_group_other(struct super_block *sb, struct inode *parent,
  * block has been written back to disk.  (Yes, these values are
  * somewhat arbitrary...)
  */
-#define RECENTCY_MIN	60
+#define RECENTCY_MIN	5
 #define RECENTCY_DIRTY	300
 
 static int recently_deleted(struct super_block *sb, ext4_group_t group, int ino)
@@ -730,6 +731,28 @@ next:
 	}
 
 	return 1;
+}
+
+/*
+ * ext4_has_free_inodes()
+ * @sbi: in-core super block structure.
+ *
+ * Check if filesystem has inodes available for allocation.
+ * On success return 1, return 0 on failure.
+ */
+static inline int ext4_has_free_inodes(struct ext4_sb_info *sbi)
+{
+	if (likely(percpu_counter_read_positive(&sbi->s_freeinodes_counter) >
+				sbi->s_r_inodes_count))
+		return 1;
+
+	/* Hm, nope.  Are (enough) root reserved inodes available? */
+	if (uid_eq(sbi->s_resuid, current_fsuid()) ||
+			(!gid_eq(sbi->s_resgid, GLOBAL_ROOT_GID) &&
+			 in_group_p(sbi->s_resgid)) ||
+			capable(CAP_SYS_RESOURCE))
+		return 1;
+	return 0;
 }
 
 /*
@@ -859,6 +882,11 @@ struct inode *__ext4_new_inode(handle_t *handle, struct inode *dir,
 	err = dquot_initialize(inode);
 	if (err)
 		goto out;
+
+	if (!ext4_has_free_inodes(sbi)) {
+		err = -ENOSPC;
+		goto out;
+	}
 
 	if (!goal)
 		goal = sbi->s_inode_goal;
@@ -1197,6 +1225,11 @@ fail_drop:
 	clear_nlink(inode);
 	unlock_new_inode(inode);
 out:
+	if (err == -ENOSPC) {
+		printk_ratelimited(KERN_INFO "Return ENOSPC: ifree=%d, inodes=%u\n",
+			(int) percpu_counter_read_positive(&sbi->s_freeinodes_counter),
+			le32_to_cpu(sbi->s_es->s_inodes_count));
+	}
 	dquot_drop(inode);
 	inode->i_flags |= S_NOQUOTA;
 	iput(inode);

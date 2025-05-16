@@ -44,10 +44,6 @@ struct cpu_cooling_ops {
 struct thermal_cooling_device *
 cpufreq_cooling_register(struct cpufreq_policy *policy);
 
-struct thermal_cooling_device *
-cpufreq_platform_cooling_register(struct cpufreq_policy *policy,
-					struct cpu_cooling_ops *ops);
-
 /**
  * cpufreq_platform_cooling_register - create cpufreq cooling device with
  * additional platform specific mitigation function.
@@ -71,13 +67,6 @@ static inline struct thermal_cooling_device *
 cpufreq_cooling_register(struct cpufreq_policy *policy)
 {
 	return ERR_PTR(-ENOSYS);
-}
-
-static inline struct thermal_cooling_device *
-cpufreq_platform_cooling_register(struct cpufreq_policy *policy,
-					struct cpu_cooling_ops *ops)
-{
-	return NULL;
 }
 
 static inline
@@ -109,7 +98,7 @@ cpufreq_platform_cooling_register(struct cpufreq_policy *policy,
 }
 #endif /* defined(CONFIG_THERMAL_OF) && defined(CONFIG_CPU_THERMAL) */
 
-#if IS_ENABLED(CONFIG_QTI_CPU_ISOLATE_COOLING_DEVICE)
+#ifdef CONFIG_QTI_CPU_ISOLATE_COOLING_DEVICE
 extern void cpu_cooling_max_level_notifier_register(struct notifier_block *n);
 extern void cpu_cooling_max_level_notifier_unregister(struct notifier_block *n);
 extern const struct cpumask *cpu_cooling_get_max_level_cpumask(void);

@@ -10,8 +10,6 @@
 #include <linux/slab.h>
 #include <linux/genalloc.h>
 
-#include <asm/traps.h>
-
 #include <soc/qcom/scm.h>
 #include <soc/qcom/qseecomi.h>
 #include <soc/qcom/qtee_shmbridge.h>
@@ -53,6 +51,9 @@
 	TZ_SYSCALL_CREATE_PARAM_ID_1( \
 	TZ_SYSCALL_PARAM_TYPE_VAL)
 
+/* TIMA MEM Reserve */
+#define TIMA_MEM_ADDRESS 0xB0100000
+#define TIMA_MEM_SIZE 1<<20
 #define MAXSHMVMS 4
 #define PERM_BITS 3
 #define VM_BITS 16
@@ -110,6 +111,7 @@ struct bridge_list_entry {
 };
 
 static struct bridge_info default_bridge;
+static struct bridge_info tima_bridge;
 static struct bridge_list bridge_list_head;
 static bool qtee_shmbridge_enabled;
 
@@ -380,7 +382,7 @@ static int __init qtee_shmbridge_init(void)
 	INIT_LIST_HEAD(&bridge_list_head.head);
 
 	/* enable shm bridge mechanism */
-	ret = qtee_shmbridge_enable(true);
+	ret = qtee_shmbridge_enable(false);
 	if (ret) {
 		/* keep the mem pool and return if failed to enable bridge */
 		ret = 0;
@@ -397,13 +399,24 @@ static int __init qtee_shmbridge_init(void)
 			default_bridge.size);
 		goto exit;
 	}
-
+	tima_bridge.paddr = TIMA_MEM_ADDRESS;
+	tima_bridge.size = TIMA_MEM_SIZE;
+	/*register TIMA bridge*/
+	ret = qtee_shmbridge_register(tima_bridge.paddr,
+			tima_bridge.size, ns_vm_ids,
+			ns_vm_perms, 1, VM_PERM_R|VM_PERM_W,
+			&tima_bridge.handle);
+	if (ret) {
+		pr_err("Failed to register tima bridge, size %zu\n",
+			tima_bridge.size);
+		goto exit;
+	}
+	else{
+		pr_err("Tima bridge registration is successful \n");
+	}
+	
 	pr_debug("qtee shmbridge registered default bridge with size %d bytes\n",
 			DEFAULT_BRIDGE_SIZE);
-#ifdef MODULE
-	do_tlb_conf_fault_cb = do_tlb_conf_fault;
-	scm_enable_mem_protection();
-#endif
 
 	return 0;
 
@@ -416,6 +429,3 @@ exit:
 }
 
 early_initcall(qtee_shmbridge_init);
-
-MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("Qtee Shmbridge");

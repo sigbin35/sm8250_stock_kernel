@@ -220,23 +220,6 @@ static int qpnp_ibb_pd_control(struct qpnp_amoled *chip, bool en)
 					val);
 }
 
-static int qpnp_amoled_pd_control(struct qpnp_amoled *chip, bool en)
-{
-	if (chip->ibb.pd_control) {
-		const int rc = qpnp_ibb_pd_control(chip, en);
-		if (rc < 0)
-			return rc;
-	}
-
-	if (chip->ab.pd_control) {
-		const int rc = qpnp_ab_pd_control(chip, en);
-		if (rc < 0)
-			return rc;
-	}
-
-	return 0;
-}
-
 static int qpnp_ab_ibb_regulator_set_mode(struct regulator_dev *rdev,
 						unsigned int mode)
 {
@@ -255,16 +238,35 @@ static int qpnp_ab_ibb_regulator_set_mode(struct regulator_dev *rdev,
 	pr_debug("mode: %d\n", mode);
 
 	if (mode == REGULATOR_MODE_NORMAL || mode == REGULATOR_MODE_STANDBY) {
-		rc = qpnp_amoled_pd_control(chip, true);
+		if (chip->ibb.pd_control) {
+			rc = qpnp_ibb_pd_control(chip, true);
+			if (rc < 0)
+				goto error;
+		}
+
+		if (chip->ab.pd_control) {
+			rc = qpnp_ab_pd_control(chip, true);
+			if (rc < 0)
+				goto error;
+		}
 	} else if (mode == REGULATOR_MODE_IDLE) {
-		rc = qpnp_amoled_pd_control(chip, false);
+		if (chip->ibb.pd_control) {
+			rc = qpnp_ibb_pd_control(chip, false);
+			if (rc < 0)
+				goto error;
+		}
+
+		if (chip->ab.pd_control) {
+			rc = qpnp_ab_pd_control(chip, false);
+			if (rc < 0)
+				goto error;
+		}
 	}
 
-	if (!rc)
-		chip->ab.vreg.mode = chip->ibb.vreg.mode = mode;
-	else
+	chip->ab.vreg.mode = chip->ibb.vreg.mode = mode;
+error:
+	if (rc < 0)
 		pr_err("Failed to configure for mode %d\n", mode);
-
 	return rc;
 }
 

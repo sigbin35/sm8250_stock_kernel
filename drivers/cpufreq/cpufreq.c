@@ -32,10 +32,12 @@
 #include <linux/tick.h>
 #include <linux/sched/topology.h>
 #include <linux/sched/sysctl.h>
-
+#include <linux/ologk.h>
 #include <trace/events/power.h>
 
 static LIST_HEAD(cpufreq_policy_list);
+
+struct cpufreq_user_policy core_min_max_policy[NR_CPUS];
 
 static inline bool policy_is_inactive(struct cpufreq_policy *policy)
 {
@@ -667,14 +669,9 @@ unsigned int cpuinfo_max_freq_cached;
 
 static bool should_use_cached_freq(int cpu)
 {
-	/* This is a safe check. may not be needed */
 	if (!cpuinfo_max_freq_cached)
 		return false;
 
-	/*
-	 * perfd already configure sched_lib_mask_force to
-	 * 0xf0 from user space. so re-using it.
-	 */
 	if (!(BIT(cpu) & sched_lib_mask_force))
 		return false;
 
@@ -2290,6 +2287,15 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 	policy->min = new_policy->min;
 	policy->max = new_policy->max;
 	trace_cpu_frequency_limits(policy);
+	if(policy->cpu < NR_CPUS) {
+		if(/*core_min_max_policy[policy->cpu].min != policy->min ||*/ core_min_max_policy[policy->cpu].max != policy->max) {
+			if(policy->max < OLOG_CPU_FREQ_FILTER || core_min_max_policy[policy->cpu].max < OLOG_CPU_FREQ_FILTER) {
+				perflog(PERFLOG_CPUFREQ, "[%d] %lu, %lu", policy->cpu, policy->min / 1000, policy->max / 1000);
+			}
+			core_min_max_policy[policy->cpu].min = policy->min;
+			core_min_max_policy[policy->cpu].max = policy->max;
+		}
+	}
 
 	arch_set_max_freq_scale(policy->cpus, policy->max);
 

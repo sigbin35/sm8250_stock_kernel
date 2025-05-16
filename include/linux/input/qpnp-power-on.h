@@ -46,6 +46,9 @@ enum pon_power_off_type {
 	PON_POWER_OFF_MAX_TYPE		= 0x10,
 };
 
+#if IS_ENABLED(CONFIG_SEC_DEBUG)
+#include <linux/sec_debug.h>
+#else
 enum pon_restart_reason {
 	PON_RESTART_REASON_UNKNOWN		= 0x00,
 	PON_RESTART_REASON_RECOVERY		= 0x01,
@@ -54,16 +57,19 @@ enum pon_restart_reason {
 	PON_RESTART_REASON_DMVERITY_CORRUPTED	= 0x04,
 	PON_RESTART_REASON_DMVERITY_ENFORCE	= 0x05,
 	PON_RESTART_REASON_KEYS_CLEAR		= 0x06,
-	PON_RESTART_REASON_PANIC		= 0x07,
-	PON_RESTART_REASON_WDT			= 0x08,
-	PON_RESTART_REASON_REBOOT_LONGKEY	= 0x09,
-	PON_RESTART_REASON_USERSPACE_FASTBOOT	= 0x0A,
-	PON_RESTART_REASON_REBOOT_PMICOFF	= 0x0B,
-	PON_RESTART_REASON_RESCUE		= 0x0C,
-	PON_RESTART_REASON_SHUTDOWN_THERMAL	= 0x0D,
+	PON_RESTART_REASON_RECOVERY_UPDATE	= 0x07,
 };
+#endif
 
-#if IS_ENABLED(CONFIG_INPUT_QPNP_POWER_ON)
+#ifdef CONFIG_SEC_PM
+int qpnp_pon_check_chg_det(void);
+ssize_t sec_get_pwrsrc(char *buf);
+int qpnp_control_s2_reset_onoff(int on);
+int qpnp_get_s2_reset_onoff(void);
+char* qpnp_pon_get_off_reason(void);
+#endif
+
+#ifdef CONFIG_INPUT_QPNP_POWER_ON
 int qpnp_pon_system_pwr_off(enum pon_power_off_type type);
 int qpnp_pon_is_warm_reset(void);
 int qpnp_pon_trigger_config(enum pon_trigger_source pon_src, bool enable);
@@ -71,6 +77,10 @@ int qpnp_pon_wd_config(bool enable);
 int qpnp_pon_set_restart_reason(enum pon_restart_reason reason);
 bool qpnp_pon_check_hard_reset_stored(void);
 int qpnp_pon_modem_pwr_off(enum pon_power_off_type type);
+
+#ifdef CONFIG_SEC_PM
+int qpnp_set_resin_wk_int(int en);
+#endif /* CONFIG_SEC_PM */
 
 #else
 

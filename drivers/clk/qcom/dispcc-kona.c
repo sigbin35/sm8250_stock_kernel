@@ -29,6 +29,8 @@
 #include "reset.h"
 #include "vdd-level.h"
 
+#include <linux/sde_rsc.h>
+
 #define F(f, s, h, m, n) { (f), (s), (2 * (h) - 1), (m), (n) }
 
 static DEFINE_VDD_REGULATORS(vdd_mm, VDD_NUM_MM, 1, vdd_corner);
@@ -375,6 +377,9 @@ static struct clk_rcg2 disp_cc_mdss_ahb_clk_src = {
 };
 
 static const struct freq_tbl ftbl_disp_cc_mdss_byte0_clk_src[] = {
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+	F(12800000, P_BI_TCXO, 1.5, 0, 0),
+#endif
 	F(19200000, P_BI_TCXO, 1, 0, 0),
 	{ }
 };
@@ -1526,6 +1531,7 @@ static int disp_cc_kona_probe(struct platform_device *pdev)
 	struct clk *clk;
 	int ret, i;
 
+	reg_log_dump(__func__, __LINE__);
 	regmap = qcom_cc_map(pdev, &disp_cc_kona_desc);
 	if (IS_ERR(regmap)) {
 		pr_err("Failed to map the disp_cc registers\n");
@@ -1547,8 +1553,6 @@ static int disp_cc_kona_probe(struct platform_device *pdev)
 				"Unable to get vdd_mm regulator\n");
 		return PTR_ERR(vdd_mm.regulator[0]);
 	}
-	vdd_mm.skip_handoff = true;
-	clk_vote_vdd_level(&vdd_mm, vdd_mm.num_levels - 1);
 
 	dispcc_bus_id = msm_bus_scale_register_client(&clk_debugfs_scale_table);
 	if (!dispcc_bus_id) {
@@ -1572,15 +1576,9 @@ static int disp_cc_kona_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Failed to register Display CC clocks\n");
 		return ret;
 	}
-
+	reg_log_dump(__func__, __LINE__);
 	dev_info(&pdev->dev, "Registered Display CC clocks\n");
 	return ret;
-}
-
-static void dispcc_kona_sync_state(struct device *dev)
-{
-	clk_sync_state(dev);
-	clk_unvote_vdd_level(&vdd_mm, vdd_mm.num_levels - 1);
 }
 
 static struct platform_driver disp_cc_kona_driver = {
@@ -1588,7 +1586,6 @@ static struct platform_driver disp_cc_kona_driver = {
 	.driver = {
 		.name = "disp_cc-kona",
 		.of_match_table = disp_cc_kona_match_table,
-		.sync_state = dispcc_kona_sync_state,
 	},
 };
 

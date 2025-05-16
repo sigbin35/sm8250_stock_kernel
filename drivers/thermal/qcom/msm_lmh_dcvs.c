@@ -185,9 +185,6 @@ static unsigned long limits_mitigation_notify(struct limits_dcvs_hw *hw)
 	pr_debug("CPU:%d max limit:%lu\n", cpumask_first(&hw->core_map),
 			max_limit);
 	trace_lmh_dcvs_freq(cpumask_first(&hw->core_map), max_limit);
-	trace_clock_set_rate(hw->sensor_name,
-			max_limit,
-			cpumask_first(&hw->core_map));
 
 notify_exit:
 	hw->hw_freq_limit = max_limit;
@@ -557,7 +554,6 @@ static int limits_dcvs_probe(struct platform_device *pdev)
 	cpumask_t mask = { CPU_BITS_NONE };
 	const __be32 *addr;
 	bool no_cdev_register = false;
-	unsigned long max_limit = 0;
 
 	for_each_possible_cpu(cpu) {
 		cpu_node = of_cpu_device_node_get(cpu);
@@ -597,13 +593,12 @@ static int limits_dcvs_probe(struct platform_device *pdev)
 	cpumask_copy(&hw->core_map, &mask);
 	cpumask_clear(&hw->online_mask);
 	hw->cdev_registered = 0;
-	limits_dcvs_get_freq_limits(hw);
 	for_each_cpu(cpu, &hw->core_map) {
 		hw->cdev_data[idx].cdev = NULL;
 		hw->cdev_data[idx].max_freq = U32_MAX;
 		hw->cdev_data[idx].min_freq = 0;
-		if (max_limit < hw->max_freq[idx])
-			max_limit = hw->max_freq[idx];
+		hw->max_freq[idx] = U32_MAX;
+		hw->min_freq[idx] = 0;
 		idx++;
 	}
 	ret = of_property_read_u32(dn, "qcom,affinity", &affinity);
@@ -685,7 +680,7 @@ static int limits_dcvs_probe(struct platform_device *pdev)
 	 */
 	hw->temp_limits[LIMITS_TRIP_HI] = INT_MAX;
 	hw->temp_limits[LIMITS_TRIP_ARM] = 0;
-	hw->hw_freq_limit = max_limit;
+	hw->hw_freq_limit = U32_MAX;
 	snprintf(hw->sensor_name, sizeof(hw->sensor_name), "limits_sensor-%02d",
 			affinity);
 	tzdev = thermal_zone_of_sensor_register(&pdev->dev, 0, hw,
@@ -740,7 +735,6 @@ static int limits_dcvs_probe(struct platform_device *pdev)
 	hw->lmh_freq_attr.attr.name = "lmh_freq_limit";
 	hw->lmh_freq_attr.show = lmh_freq_limit_show;
 	hw->lmh_freq_attr.attr.mode = 0444;
-	sysfs_attr_init(&hw->lmh_freq_attr.attr);
 	device_create_file(&pdev->dev, &hw->lmh_freq_attr);
 
 probe_exit:
@@ -780,4 +774,3 @@ static struct platform_driver limits_dcvs_driver = {
 	},
 };
 builtin_platform_driver(limits_dcvs_driver);
-MODULE_LICENSE("GPL v2");

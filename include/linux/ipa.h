@@ -1304,7 +1304,7 @@ struct ipa_smmu_out_params {
 	bool shared_cb;
 };
 
-#if IS_ENABLED(CONFIG_IPA) || IS_ENABLED(CONFIG_IPA3)
+#if defined CONFIG_IPA || defined CONFIG_IPA3
 
 /*
  * Resume / Suspend

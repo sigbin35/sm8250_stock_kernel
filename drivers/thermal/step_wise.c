@@ -54,9 +54,10 @@ static unsigned long get_target_state(struct thermal_instance *instance,
 	unsigned long next_target;
 
 	/*
-	 * If the throttle condition is not reached, clear the throttling.
+	 * If the throttle condition is not reached and there is no
+	 * previous mitigaiton request, then there is nothing to compute.
 	 */
-	if (!throttle)
+	if (!throttle && instance->target == THERMAL_NO_TARGET)
 		return THERMAL_NO_TARGET;
 	/*
 	 * We keep this instance the way it is by default.
@@ -208,14 +209,6 @@ static void thermal_zone_trip_update(struct thermal_zone_device *tz, int trip)
 							false);
 				update_passive_instance(tz, trip_type, -1);
 			}
-		}
-
-		if (old_target != instance->target) {
-			dev_info_ratelimited(
-				&tz->device,
-				"tz:%s, temp:%d, cdev:%s, target:%d\n",
-				tz->type, tz->temperature, instance->cdev->type,
-				instance->target);
 		}
 
 		instance->initialized = true;

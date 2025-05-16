@@ -28,7 +28,7 @@ struct wcnss_prealloc {
 	int occupied;
 	size_t size;
 	void *ptr;
-#if defined(CONFIG_SLUB_DEBUG) && defined(CONFIG_STACKTRACE)
+#ifdef CONFIG_SLUB_DEBUG
 	unsigned long stack_trace[WCNSS_MAX_STACK_TRACE];
 	struct stack_trace trace;
 #endif
@@ -101,7 +101,7 @@ void wcnss_prealloc_deinit(void)
 	}
 }
 
-#if defined(CONFIG_SLUB_DEBUG) && defined(CONFIG_STACKTRACE)
+#ifdef CONFIG_SLUB_DEBUG
 static void wcnss_prealloc_save_stack_trace(struct wcnss_prealloc *entry)
 {
 	struct stack_trace *trace = &entry->trace;
@@ -162,7 +162,7 @@ int wcnss_prealloc_put(void *ptr)
 }
 EXPORT_SYMBOL(wcnss_prealloc_put);
 
-#if defined(CONFIG_SLUB_DEBUG) && defined(CONFIG_STACKTRACE)
+#ifdef CONFIG_SLUB_DEBUG
 void wcnss_prealloc_check_memory_leak(void)
 {
 	int i, j = 0;
@@ -290,4 +290,4 @@ module_init(wcnss_pre_alloc_init);
 module_exit(wcnss_pre_alloc_exit);
 
 MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("WCNSS Prealloc Driver");
+MODULE_DESCRIPTION(DEVICE "WCNSS Prealloc Driver");

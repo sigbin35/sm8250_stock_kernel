@@ -9,7 +9,6 @@
 #include <linux/types.h>
 #include <linux/bvec.h>
 #include <linux/ktime.h>
-#include <linux/android_kabi.h>
 
 struct bio_set;
 struct bio;
@@ -212,11 +211,6 @@ struct bio {
 
 	struct bio_set		*bi_pool;
 
-	ktime_t bi_alloc_ts;			/* for mm_event */
-
-	ANDROID_KABI_RESERVE(1);
-	ANDROID_KABI_RESERVE(2);
-
 	/*
 	 * We can inline a number of vecs at the end of the bio, to avoid
 	 * double allocations for a small number of bio_vecs. This member
@@ -346,6 +340,9 @@ enum req_flag_bits {
 	/* for driver use */
 	__REQ_DRV,
 	__REQ_SWAP,		/* swapping request. */
+	
+	/* HPB Flag */
+	__REQ_HPB_PREFER,
 	__REQ_NR_BITS,		/* stops here */
 };
 
@@ -369,6 +366,8 @@ enum req_flag_bits {
 
 #define REQ_DRV			(1ULL << __REQ_DRV)
 #define REQ_SWAP		(1ULL << __REQ_SWAP)
+
+#define REQ_HPB_PREFER		(1ULL << __REQ_HPB_PREFER)
 
 #define REQ_FAILFAST_MASK \
 	(REQ_FAILFAST_DEV | REQ_FAILFAST_TRANSPORT | REQ_FAILFAST_DRIVER)

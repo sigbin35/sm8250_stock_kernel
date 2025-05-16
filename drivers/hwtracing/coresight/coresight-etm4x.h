@@ -136,7 +136,7 @@
 #define ETM_MAX_RES_SEL			16
 #define ETM_MAX_SS_CMP			8
 
-#define ETM_ARCH_V4			0x40
+#define ETM_ARCH_MAJOR_V4		0x4
 #define ETMv4_SYNC_MASK			0x1F
 #define ETM_CYC_THRESHOLD_MASK		0xFFF
 #define ETM_CYC_THRESHOLD_DEFAULT       0x100
@@ -325,7 +325,7 @@ struct etmv4_save_state {
 	u64	trcacvr[ETM_MAX_SINGLE_ADDR_CMP];
 	u64	trcacatr[ETM_MAX_SINGLE_ADDR_CMP];
 	u64	trccidcvr[ETMv4_MAX_CTXID_CMP];
-	u64	trcvmidcvr[ETM_MAX_VMID_CMP];
+	u32	trcvmidcvr[ETM_MAX_VMID_CMP];
 	u32	trccidcctlr0;
 	u32	trccidcctlr1;
 	u32	trcvmidcctlr0;

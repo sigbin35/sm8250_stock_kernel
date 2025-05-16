@@ -24,6 +24,13 @@
 #include <asm/pgtable-hwdef.h>
 #include <asm/pgtable-prot.h>
 
+#ifdef CONFIG_UH
+#include <linux/uh.h>
+#ifdef CONFIG_UH_RKP
+#include <linux/rkp.h>
+#endif
+#endif
+
 /*
  * VMALLOC range.
  *
@@ -51,6 +58,9 @@ extern void __pmd_error(const char *file, int line, unsigned long val);
 extern void __pud_error(const char *file, int line, unsigned long val);
 extern void __pgd_error(const char *file, int line, unsigned long val);
 
+#ifdef CONFIG_KDP_DMAP
+extern int rkp_cred_enable;
+#endif
 /*
  * ZERO_PAGE is a global shared page that is always zero: used
  * for zero-mapped memory areas etc..
@@ -146,6 +156,13 @@ static inline pte_t set_pte_bit(pte_t pte, pgprot_t prot)
 	return pte;
 }
 
+static inline pte_t pte_wrprotect(pte_t pte)
+{
+	pte = clear_pte_bit(pte, __pgprot(PTE_WRITE));
+	pte = set_pte_bit(pte, __pgprot(PTE_RDONLY));
+	return pte;
+}
+
 static inline pte_t pte_mkwrite(pte_t pte)
 {
 	pte = set_pte_bit(pte, __pgprot(PTE_WRITE));
@@ -168,20 +185,6 @@ static inline pte_t pte_mkdirty(pte_t pte)
 	if (pte_write(pte))
 		pte = clear_pte_bit(pte, __pgprot(PTE_RDONLY));
 
-	return pte;
-}
-
-static inline pte_t pte_wrprotect(pte_t pte)
-{
-	/*
-	 * If hardware-dirty (PTE_WRITE/DBM bit set and PTE_RDONLY
-	 * clear), set the PTE_DIRTY bit.
-	 */
-	if (pte_hw_dirty(pte))
-		pte = pte_mkdirty(pte);
-
-	pte = clear_pte_bit(pte, __pgprot(PTE_WRITE));
-	pte = set_pte_bit(pte, __pgprot(PTE_RDONLY));
 	return pte;
 }
 
@@ -251,6 +254,16 @@ pte_bad:
 pte_ok:
 #endif
 
+#ifdef CONFIG_KDP_DMAP
+	/* bug on double mapping */
+	if(rkp_cred_enable)
+		BUG_ON(__pte_to_phys(pte) && rkp_is_pg_dbl_mapped(__pte_to_phys(pte)));
+#endif
+#ifdef CONFIG_UH_RKP 
+	if (rkp_is_pg_protected((u64)ptep)) {
+		uh_call(UH_APP_RKP, RKP_WRITE_PGT3, (u64)ptep, pte_val(pte), 0, 0);
+	} else
+#endif
 	WRITE_ONCE(*ptep, pte);
 
 	/*
@@ -448,6 +461,11 @@ static inline bool pud_table(pud_t pud) { return true; }
 
 static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
+#ifdef CONFIG_UH_RKP
+	if (rkp_is_pg_protected((u64)pmdp)) {
+		uh_call(UH_APP_RKP, RKP_WRITE_PGT2, (u64)pmdp, pmd_val(pmd), 0, 0);
+	} else
+#endif
 	WRITE_ONCE(*pmdp, pmd);
 	dsb(ishst);
 	isb();
@@ -505,6 +523,11 @@ static inline void pte_unmap(pte_t *pte) { }
 
 static inline void set_pud(pud_t *pudp, pud_t pud)
 {
+#ifdef CONFIG_UH_RKP
+	if (rkp_is_pg_protected((u64)pudp)) {
+		uh_call(UH_APP_RKP, RKP_WRITE_PGT1, (u64)pudp, pud_val(pud), 0, 0);
+	} else
+#endif
 	WRITE_ONCE(*pudp, pud);
 	dsb(ishst);
 	isb();
@@ -720,6 +743,12 @@ static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addres
 	pte = READ_ONCE(*ptep);
 	do {
 		old_pte = pte;
+		/*
+		 * If hardware-dirty (PTE_WRITE/DBM bit set and PTE_RDONLY
+		 * clear), set the PTE_DIRTY bit.
+		 */
+		if (pte_hw_dirty(pte))
+			pte = pte_mkdirty(pte);
 		pte = pte_wrprotect(pte);
 		pte_val(pte) = cmpxchg_relaxed(&pte_val(*ptep),
 					       pte_val(old_pte), pte_val(pte));

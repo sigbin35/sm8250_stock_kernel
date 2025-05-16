@@ -27,12 +27,13 @@ struct md_region {
 	u64	size;
 };
 
-/* Register an entry in Minidump table
+#ifdef CONFIG_QCOM_MINIDUMP
+/*
+ * Register an entry in Minidump table
  * Returns:
  *	region number: entry position in minidump table.
- *	Negetive error number on failures
+ *	Negetive error number on failures.
  */
-#if IS_ENABLED(CONFIG_QCOM_MINIDUMP)
 extern int msm_minidump_add_region(const struct md_region *entry);
 extern int msm_minidump_remove_region(const struct md_region *entry);
 /*

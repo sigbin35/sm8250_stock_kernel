@@ -221,7 +221,7 @@ int cqhci_host_init_crypto_qti_spec(struct cqhci_host *host,
 		err = -ENOMEM;
 		goto out;
 	}
-	keyslot_manager_set_max_dun_bytes(host->ksm, 4);
+	keyslot_manager_set_max_dun_bytes(host->ksm, sizeof(u32));
 
 	/*
 	 * In case host controller supports cryptographic operations

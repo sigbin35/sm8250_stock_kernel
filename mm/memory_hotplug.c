@@ -635,6 +635,7 @@ static void  __free_pages_memory(unsigned long start,
 			> bootloader_memory_limit)
 			order--;
 
+		kernel_map_pages(page, 1 << order, 1);
 		__free_pages_hotplug(page, order);
 		onlined_pages += (1UL << order);
 	}
@@ -776,7 +777,7 @@ void __ref move_pfn_range_to_zone(struct zone *zone, unsigned long start_pfn,
 	 * are reserved so nobody should be touching them so we should be safe
 	 */
 	memmap_init_zone(nr_pages, nid, zone_idx(zone), start_pfn,
-			 MEMINIT_HOTPLUG, altmap);
+			MEMMAP_HOTPLUG, altmap);
 
 	set_zone_contiguous(zone);
 }
@@ -913,8 +914,7 @@ int __ref online_pages(unsigned long pfn, unsigned long nr_pages, int online_typ
 		node_states_set_node(nid, &arg);
 		if (need_zonelists_rebuild)
 			build_all_zonelists(NULL);
-		else
-			zone_pcp_update(zone);
+		zone_pcp_update(zone);
 	}
 
 	init_per_zone_wmark_min();
@@ -1083,10 +1083,8 @@ bool try_online_one_block(int nid)
 {
 	struct zone *zone = &NODE_DATA(nid)->node_zones[ZONE_MOVABLE];
 	bool onlined_block = false;
-	int ret = lock_device_hotplug_sysfs();
 
-	if (ret)
-		return false;
+	lock_device_hotplug();
 
 	walk_memory_range(zone->zone_start_pfn, zone_end_pfn(zone),
 			  &onlined_block, online_memory_one_block);
@@ -1176,8 +1174,7 @@ int __ref add_memory_resource(int nid, struct resource *res, bool online)
 	}
 
 	/* link memory sections under this node.*/
-	ret = link_mem_sections(nid, PFN_DOWN(start), PFN_UP(start + size - 1),
-				MEMINIT_HOTPLUG);
+	ret = link_mem_sections(nid, PFN_DOWN(start), PFN_UP(start + size - 1));
 	BUG_ON(ret);
 
 	/* create new memmap entry */
@@ -1445,7 +1442,9 @@ do_migrate_range(unsigned long start_pfn, unsigned long end_pfn)
 			if (WARN_ON(PageLRU(page)))
 				isolate_lru_page(page);
 			if (page_mapped(page))
-				try_to_unmap(page, TTU_IGNORE_MLOCK | TTU_IGNORE_ACCESS);
+				try_to_unmap(page,
+					TTU_IGNORE_MLOCK | TTU_IGNORE_ACCESS,
+					NULL);
 			continue;
 		}
 

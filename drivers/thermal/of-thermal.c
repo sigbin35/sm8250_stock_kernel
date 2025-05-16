@@ -143,13 +143,6 @@ static int virt_sensor_read_temp(void *data, int *val)
 			return ret;
 		}
 		switch (sens->logic) {
-		case VIRT_COUNT_THRESHOLD:
-			if ((sens->coefficients[idx] < 0 &&
-			     sens_temp < -sens->coefficients[idx]) ||
-			    (sens->coefficients[idx] > 0 &&
-			     sens_temp >= sens->coefficients[idx]))
-				temp += 1;
-			break;
 		case VIRT_WEIGHTED_AVG:
 			temp += sens_temp * sens->coefficients[idx];
 			if (idx == (sens->num_sensors - 1))
@@ -184,7 +177,6 @@ static int of_thermal_get_temp(struct thermal_zone_device *tz,
 			       int *temp)
 {
 	struct __thermal_zone *data = tz->devdata;
-	int ret;
 
 	if (!data->senps || !data->senps->ops->get_temp)
 		return -EINVAL;
@@ -195,10 +187,7 @@ static int of_thermal_get_temp(struct thermal_zone_device *tz,
 		return 0;
 	}
 
-	ret = data->senps->ops->get_temp(data->senps->sensor_data, temp);
-	*temp = *temp + tz->tzp->offset;
-
-	return ret;
+	return data->senps->ops->get_temp(data->senps->sensor_data, temp);
 }
 
 static int of_thermal_set_trips(struct thermal_zone_device *tz,
@@ -430,8 +419,7 @@ static int of_thermal_get_trip_temp(struct thermal_zone_device *tz, int trip,
 	if (trip >= data->ntrips || trip < 0)
 		return -EDOM;
 
-	if (data->senps && data->senps->ops &&
-	    data->senps->ops->get_trip_temp) {
+	if (data->senps && data->senps->ops->get_trip_temp) {
 		int ret;
 
 		ret = data->senps->ops->get_trip_temp(data->senps->sensor_data,
@@ -543,15 +531,13 @@ static int of_thermal_aggregate_trip_types(struct thermal_zone_device *tz,
 	int min = INT_MIN;
 	int max = INT_MAX;
 	int tt, th, trip;
-	int temp;
+	int temp = tz->temperature;
 	struct thermal_zone_device *zone = NULL;
 	struct __thermal_zone *data = tz->devdata;
 	struct list_head *head;
 	enum thermal_trip_type type = 0;
 
 	head = &data->senps->first_tz;
-	temp = tz->temperature - tz->tzp->offset;
-
 	list_for_each_entry(data, head, list) {
 		zone = data->tzd;
 		if (data->mode == THERMAL_DEVICE_DISABLED)
@@ -591,9 +577,6 @@ static bool of_thermal_is_trips_triggered(struct thermal_zone_device *tz,
 	int tt, th, trip, last_temp;
 	struct __thermal_zone *data = tz->devdata;
 	bool triggered = false;
-
-	if (!tz->tzp)
-		return triggered;
 
 	mutex_lock(&tz->lock);
 	last_temp = tz->temperature;
@@ -652,20 +635,10 @@ static void handle_thermal_trip(struct thermal_zone_device *tz,
 		bool temp_valid, int trip_temp)
 {
 	struct thermal_zone_device *zone;
-	struct __thermal_zone *data;
+	struct __thermal_zone *data = tz->devdata;
 	struct list_head *head;
-	bool notify = false;
-
-	if (!tz || !tz->devdata)
-		return;
-
-	data = tz->devdata;
-
-	if (!data->senps)
-		return;
 
 	head = &data->senps->first_tz;
-
 	list_for_each_entry(data, head, list) {
 		zone = data->tzd;
 		if (data->mode == THERMAL_DEVICE_DISABLED)
@@ -676,20 +649,10 @@ static void handle_thermal_trip(struct thermal_zone_device *tz,
 		} else {
 			if (!of_thermal_is_trips_triggered(zone, trip_temp))
 				continue;
-			notify = true;
-			thermal_zone_device_update_temp(
-				zone, THERMAL_EVENT_UNSPECIFIED,
-				trip_temp + zone->tzp->offset);
+			thermal_zone_device_update_temp(zone,
+				THERMAL_EVENT_UNSPECIFIED, trip_temp);
 		}
 	}
-
-	/*
-	 * It is better to notify at least one thermal zone if trip is violated
-	 * for none.
-	 */
-	if (temp_valid && !notify)
-		thermal_zone_device_update_temp(tz, THERMAL_EVENT_UNSPECIFIED,
-				trip_temp);
 }
 
 /*
@@ -703,7 +666,7 @@ void of_thermal_handle_trip_temp(struct thermal_zone_device *tz,
 {
 	return handle_thermal_trip(tz, true, trip_temp);
 }
-EXPORT_SYMBOL_GPL(of_thermal_handle_trip_temp);
+EXPORT_SYMBOL(of_thermal_handle_trip_temp);
 
 /*
  * of_thermal_handle_trip - Handle thermal trip from sensors
@@ -714,7 +677,7 @@ void of_thermal_handle_trip(struct thermal_zone_device *tz)
 {
 	return handle_thermal_trip(tz, false, 0);
 }
-EXPORT_SYMBOL_GPL(of_thermal_handle_trip);
+EXPORT_SYMBOL(of_thermal_handle_trip);
 
 static struct thermal_zone_device_ops of_thermal_ops = {
 	.get_mode = of_thermal_get_mode,
@@ -1022,8 +985,7 @@ struct thermal_zone_device *devm_thermal_of_virtual_sensor_register(
 	sens->virt_tz = tzd;
 	sens->logic = sensor_data->logic;
 	sens->num_sensors = sensor_data->num_sensors;
-	if ((sens->logic == VIRT_WEIGHTED_AVG) ||
-	    (sens->logic == VIRT_COUNT_THRESHOLD)) {
+	if (sens->logic == VIRT_WEIGHTED_AVG) {
 		int coeff_ct = sensor_data->coefficient_ct;
 
 		/*
@@ -1031,7 +993,7 @@ struct thermal_zone_device *devm_thermal_of_virtual_sensor_register(
 		 * n+2 coefficients.
 		 */
 		if (coeff_ct != sens->num_sensors) {
-			dev_err(dev, "sens:%s invalid coefficient\n",
+			dev_err(dev, "sens:%s Invalid coefficient\n",
 					sensor_data->virt_zone_name);
 			return ERR_PTR(-EINVAL);
 		}

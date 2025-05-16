@@ -740,7 +740,7 @@ struct sps_timer_result {
  */
 struct sps_pipe;	/* Forward declaration */
 
-#if IS_ENABLED(CONFIG_SPS)
+#ifdef CONFIG_SPS
 /**
  * Register a BAM device
  *

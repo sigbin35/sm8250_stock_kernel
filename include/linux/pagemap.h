@@ -29,6 +29,9 @@ enum mapping_flags {
 	AS_EXITING	= 4, 	/* final truncate in progress */
 	/* writeback related tags are not used */
 	AS_NO_WRITEBACK_TAGS = 5,
+#if defined(CONFIG_SDP)
+	AS_SENSITIVE = __GFP_BITS_SHIFT + 5, /* Group of sensitive pages to be cleaned up */
+#endif
 };
 
 /**
@@ -117,6 +120,25 @@ static inline void mapping_set_gfp_mask(struct address_space *m, gfp_t mask)
 {
 	m->gfp_mask = mask;
 }
+
+#if defined(CONFIG_SDP)
+static inline void mapping_set_sensitive(struct address_space *mapping)
+{
+	set_bit(AS_SENSITIVE, &mapping->flags);
+}
+
+static inline void mapping_clear_sensitive(struct address_space *mapping)
+{
+	clear_bit(AS_SENSITIVE, &mapping->flags);
+}
+
+static inline int mapping_sensitive(struct address_space *mapping)
+{
+	if (mapping)
+		return test_bit(AS_SENSITIVE, &mapping->flags);
+	return !!mapping;
+}
+#endif
 
 void release_pages(struct page **pages, int nr);
 
@@ -456,14 +478,14 @@ static inline pgoff_t linear_page_index(struct vm_area_struct *vma,
 	pgoff_t pgoff;
 	if (unlikely(is_vm_hugetlb_page(vma)))
 		return linear_hugepage_index(vma, address);
-	pgoff = (address - vma->vm_start) >> PAGE_SHIFT;
-	pgoff += vma->vm_pgoff;
+	pgoff = (address - READ_ONCE(vma->vm_start)) >> PAGE_SHIFT;
+	pgoff += READ_ONCE(vma->vm_pgoff);
 	return pgoff;
 }
 
-extern void __sched __lock_page(struct page *page);
-extern int __sched __lock_page_killable(struct page *page);
-extern int __sched __lock_page_or_retry(struct page *page, struct mm_struct *mm,
+extern void __lock_page(struct page *page);
+extern int __lock_page_killable(struct page *page);
+extern int __lock_page_or_retry(struct page *page, struct mm_struct *mm,
 				unsigned int flags);
 extern void unlock_page(struct page *page);
 
@@ -476,7 +498,7 @@ static inline int trylock_page(struct page *page)
 /*
  * lock_page may only be called if we have the page's inode pinned.
  */
-static inline __sched void lock_page(struct page *page)
+static inline void lock_page(struct page *page)
 {
 	might_sleep();
 	if (!trylock_page(page))
@@ -488,7 +510,7 @@ static inline __sched void lock_page(struct page *page)
  * signals.  It returns 0 if it locked the page and -EINTR if it was
  * killed while waiting.
  */
-static inline __sched int lock_page_killable(struct page *page)
+static inline int lock_page_killable(struct page *page)
 {
 	might_sleep();
 	if (!trylock_page(page))
@@ -503,9 +525,8 @@ static inline __sched int lock_page_killable(struct page *page)
  * Return value and mmap_sem implications depend on flags; see
  * __lock_page_or_retry().
  */
-static inline __sched int lock_page_or_retry(struct page *page,
-					     struct mm_struct *mm,
-					     unsigned int flags)
+static inline int lock_page_or_retry(struct page *page, struct mm_struct *mm,
+				     unsigned int flags)
 {
 	might_sleep();
 	return trylock_page(page) || __lock_page_or_retry(page, mm, flags);
@@ -515,8 +536,8 @@ static inline __sched int lock_page_or_retry(struct page *page,
  * This is exported only for wait_on_page_locked/wait_on_page_writeback, etc.,
  * and should not be used directly.
  */
-extern void __sched wait_on_page_bit(struct page *page, int bit_nr);
-extern int __sched wait_on_page_bit_killable(struct page *page, int bit_nr);
+extern void wait_on_page_bit(struct page *page, int bit_nr);
+extern int wait_on_page_bit_killable(struct page *page, int bit_nr);
 
 /* 
  * Wait for a page to be unlocked.
@@ -525,13 +546,13 @@ extern int __sched wait_on_page_bit_killable(struct page *page, int bit_nr);
  * ie with increased "page->count" so that the page won't
  * go away during the wait..
  */
-static inline __sched void wait_on_page_locked(struct page *page)
+static inline void wait_on_page_locked(struct page *page)
 {
 	if (PageLocked(page))
 		wait_on_page_bit(compound_head(page), PG_locked);
 }
 
-static inline __sched int wait_on_page_locked_killable(struct page *page)
+static inline int wait_on_page_locked_killable(struct page *page)
 {
 	if (!PageLocked(page))
 		return 0;
@@ -543,7 +564,7 @@ extern void put_and_wait_on_page_locked(struct page *page);
 /* 
  * Wait for a page to complete writeback
  */
-static inline __sched void wait_on_page_writeback(struct page *page)
+static inline void wait_on_page_writeback(struct page *page)
 {
 	if (PageWriteback(page))
 		wait_on_page_bit(page, PG_writeback);

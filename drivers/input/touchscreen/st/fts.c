@@ -4716,13 +4716,6 @@ static int fts_probe_internal(struct i2c_client *client,
 	logError(0, "%s SET Event Handler:\n", tag);
 	info->wakeup_source = wakeup_source_register(&client->dev,
 						     dev_name(&client->dev));
-	if (!info->wakeup_source) {
-		logError(1, "%s ERROR: Failed to register wakeup source\n",
-				tag);
-		error = -ENODEV;
-		goto ProbeErrorExit_3_1;
-	}
-
 	info->event_wq = alloc_workqueue("fts-event-queue",
 				WQ_UNBOUND|WQ_HIGHPRI|WQ_CPU_INTENSIVE, 1);
 	if (!info->event_wq) {
@@ -4974,9 +4967,8 @@ ProbeErrorExit_5:
 	destroy_workqueue(info->event_wq);
 
 ProbeErrorExit_4:
-	wakeup_source_unregister(info->wakeup_source);
-ProbeErrorExit_3_1:
 	destroy_workqueue(info->fwu_workqueue);
+	wakeup_source_unregister(info->wakeup_source);
 
 ProbeErrorExit_3:
 	if (info->ts_pinctrl) {

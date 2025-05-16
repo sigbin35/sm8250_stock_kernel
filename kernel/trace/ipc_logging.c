@@ -886,7 +886,6 @@ void ipc_log_context_free(struct kref *kref)
 
 	kfree(ilctxt);
 }
-EXPORT_SYMBOL_GPL(ipc_log_context_free);
 
 /*
  * Destroy debug log context

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/debugfs.h>
@@ -28,16 +28,12 @@
 
 #define IPA_ECM_IPC_LOG_PAGES 50
 
-#ifdef CONFIG_ENABLE_IPC_LOGGING
 #define IPA_ECM_IPC_LOGGING(buf, fmt, args...) \
 	do { \
 		if (buf) \
 			ipc_log_string((buf), fmt, __func__, __LINE__, \
 				## args); \
 	} while (0)
-#else
-#define IPA_ECM_IPC_LOGGING(buf, fmt, args...)
-#endif /* CONFIG_ENABLE_IPC_LOGGING */
 
 static void *ipa_ecm_logbuf;
 
@@ -663,21 +659,13 @@ static void ecm_ipa_packet_receive_notify
 	packet_len = skb->len;
 	ECM_IPA_DEBUG("packet RX, len=%d\n", skb->len);
 
-	if (unlikely(ecm_ipa_ctx == NULL)) {
-		ECM_IPA_DEBUG("Private context is NULL. Drop SKB.\n");
-		dev_kfree_skb_any(skb);
-		return;
-	}
-
 	if (unlikely(ecm_ipa_ctx->state != ECM_IPA_CONNECTED_AND_UP)) {
 		ECM_IPA_DEBUG("Missing pipe connected and/or iface up\n");
-		dev_kfree_skb_any(skb);
 		return;
 	}
 
 	if (unlikely(evt != IPA_RECEIVE)) {
 		ECM_IPA_ERROR("A none IPA_RECEIVE event in ecm_ipa_receive\n");
-		dev_kfree_skb_any(skb);
 		return;
 	}
 
@@ -1232,6 +1220,8 @@ static ssize_t ecm_ipa_debugfs_atomic_read
 	return simple_read_from_buffer(ubuf, count, ppos, atomic_str, nbytes);
 }
 
+#ifdef CONFIG_DEBUG_FS
+
 static void ecm_ipa_debugfs_init(struct ecm_ipa_dev *ecm_ipa_ctx)
 {
 	const mode_t flags_read_write = 0666;
@@ -1244,7 +1234,7 @@ static void ecm_ipa_debugfs_init(struct ecm_ipa_dev *ecm_ipa_ctx)
 		return;
 
 	ecm_ipa_ctx->directory = debugfs_create_dir("ecm_ipa", NULL);
-	if (IS_ERR_OR_NULL(ecm_ipa_ctx->directory)) {
+	if (!ecm_ipa_ctx->directory) {
 		ECM_IPA_ERROR("could not create debugfs directory entry\n");
 		goto fail_directory;
 	}
@@ -1292,6 +1282,14 @@ static void ecm_ipa_debugfs_destroy(struct ecm_ipa_dev *ecm_ipa_ctx)
 {
 	debugfs_remove_recursive(ecm_ipa_ctx->directory);
 }
+
+#else /* !CONFIG_DEBUG_FS*/
+
+static void ecm_ipa_debugfs_init(struct ecm_ipa_dev *ecm_ipa_ctx) {}
+
+static void ecm_ipa_debugfs_destroy(struct ecm_ipa_dev *ecm_ipa_ctx) {}
+
+#endif /* CONFIG_DEBUG_FS */
 
 /**
  * ecm_ipa_ep_cfg() - configure the USB endpoints for ECM

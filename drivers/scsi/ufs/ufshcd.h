@@ -70,18 +70,28 @@
 #include <scsi/scsi_tcq.h>
 #include <scsi/scsi_dbg.h>
 #include <scsi/scsi_eh.h>
-#include <linux/android_kabi.h>
 
 #include <linux/fault-inject.h>
 
+#define CUSTOMIZE_UPIU_FLAGS
+
 #include "ufs.h"
 #include "ufshci.h"
+
+#if defined(CONFIG_UFSFEATURE)
+#include "ufsfeature.h"
+#endif
 
 #define UFSHCD "ufshcd"
 #define UFSHCD_DRIVER_VERSION "0.3"
 
 #define UFS_BIT(x)	BIT(x)
 #define UFS_MASK(x, y)	(x << ((y) % BITS_PER_LONG))
+
+#if defined(CONFIG_UFS_UN_20DIGITS)
+#define SERIAL_NUM_SIZE 7
+#define UFS_UN_MAX_DIGITS 20
+#endif
 
 struct ufs_hba;
 
@@ -147,7 +157,7 @@ enum {
 	UFS_ERR_CLEAR_PEND_XFER_TM,
 	UFS_ERR_INT_FATAL_ERRORS,
 	UFS_ERR_INT_UIC_ERROR,
-	UFS_ERR_HOST_RESET,
+	UFS_ERR_CRYPTO_ENGINE,
 
 	/* other errors */
 	UFS_ERR_HIBERN8_ENTER,
@@ -158,6 +168,19 @@ enum {
 	UFS_ERR_TASK_ABORT,
 	UFS_ERR_MAX,
 };
+
+enum ufs_tw_state {
+	UFS_TW_OFF_STATE	= 0,	/* turbo write disabled state */
+	UFS_TW_ON_STATE		= 1,	/* turbo write enabled state */
+	UFS_TW_ERR_STATE	= 2,	/* turbo write error state */
+};
+
+#define ufshcd_is_tw_off(hba) ((hba)->ufs_tw_state == UFS_TW_OFF_STATE)
+#define ufshcd_is_tw_on(hba) ((hba)->ufs_tw_state == UFS_TW_ON_STATE)
+#define ufshcd_is_tw_err(hba) ((hba)->ufs_tw_state == UFS_TW_ERR_STATE)
+#define ufshcd_set_tw_off(hba) ((hba)->ufs_tw_state = UFS_TW_OFF_STATE)
+#define ufshcd_set_tw_on(hba) ((hba)->ufs_tw_state = UFS_TW_ON_STATE)
+#define ufshcd_set_tw_err(hba) ((hba)->ufs_tw_state = UFS_TW_ERR_STATE)
 
 /*
  * UFS Power management levels.
@@ -232,6 +255,9 @@ struct ufshcd_lrb {
 #endif /* CONFIG_SCSI_UFS_CRYPTO */
 
 	bool req_abort_skip;
+#if defined(CONFIG_UFSFEATURE) && defined(CONFIG_UFSHPB)
+	int hpb_ctx_id;
+#endif
 };
 
 /**
@@ -268,6 +294,7 @@ struct ufs_desc_size {
 	int interc_desc;
 	int unit_desc;
 	int conf_desc;
+	int str_desc;
 	int hlth_desc;
 };
 
@@ -375,18 +402,15 @@ struct ufs_hba_variant_ops {
 	u32	(*get_scale_down_gear)(struct ufs_hba *hba);
 	int	(*set_bus_vote)(struct ufs_hba *hba, bool on);
 	int	(*phy_initialization)(struct ufs_hba *);
+#ifdef CONFIG_QCOM_WB
 	u32	(*get_user_cap_mode)(struct ufs_hba *hba);
+#endif
 #ifdef CONFIG_DEBUG_FS
 	void	(*add_debugfs)(struct ufs_hba *hba, struct dentry *root);
 	void	(*remove_debugfs)(struct ufs_hba *hba);
 #endif
 	int	(*program_key)(struct ufs_hba *hba,
 			       const union ufs_crypto_cfg_entry *cfg, int slot);
-
-	ANDROID_KABI_RESERVE(1);
-	ANDROID_KABI_RESERVE(2);
-	ANDROID_KABI_RESERVE(3);
-	ANDROID_KABI_RESERVE(4);
 };
 
 /**
@@ -407,24 +431,6 @@ struct ufs_hba_variant {
 	const char				*name;
 	struct ufs_hba_variant_ops		*vops;
 	struct ufs_hba_pm_qos_variant_ops	*pm_qos_vops;
-};
-
-/* for manual gc */
-enum {
-	MANUAL_GC_OFF = 0,
-	MANUAL_GC_ON,
-	MANUAL_GC_DISABLE,
-	MANUAL_GC_ENABLE,
-	MANUAL_GC_MAX,
-};
-
-struct ufs_manual_gc {
-	int state;
-	bool hagc_support;
-	struct hrtimer hrtimer;
-	unsigned long delay_ms;
-	struct work_struct hibern8_work;
-	struct workqueue_struct *mgc_workq;
 };
 
 struct keyslot_mgmt_ll_ops;
@@ -448,11 +454,6 @@ struct ufs_hba_crypto_variant_ops {
 				    struct scsi_cmnd *cmd,
 				    struct ufshcd_lrb *lrbp);
 	void *priv;
-
-	ANDROID_KABI_RESERVE(1);
-	ANDROID_KABI_RESERVE(2);
-	ANDROID_KABI_RESERVE(3);
-	ANDROID_KABI_RESERVE(4);
 };
 
 /* clock gating state  */
@@ -608,7 +609,6 @@ struct debugfs_files {
 	struct dentry *dbg_print_en;
 	struct dentry *req_stats;
 	struct dentry *query_stats;
-	struct dentry *io_stats;
 	u32 dme_local_attr_id;
 	u32 dme_peer_attr_id;
 	struct dentry *reset_controller;
@@ -621,7 +621,6 @@ struct debugfs_files {
 	struct fault_attr fail_attr;
 #endif
 };
-#endif
 
 /* tag stats statistics types */
 enum ts_types {
@@ -632,15 +631,7 @@ enum ts_types {
 	TS_URGENT_READ		= 3,
 	TS_URGENT_WRITE		= 4,
 	TS_FLUSH		= 5,
-	TS_DISCARD		= 6,
-	TS_NUM_STATS		= 7,
-};
-
-enum req_show_types {
-	SHOW_IO_MIN	= 0,
-	SHOW_IO_MAX	= 1,
-	SHOW_IO_AVG	= 2,
-	SHOW_IO_SUM	= 3,
+	TS_NUM_STATS		= 6,
 };
 
 /**
@@ -656,24 +647,7 @@ struct ufshcd_req_stat {
 	u64 sum;
 	u64 count;
 };
-
-/**
- * struct ufshcd_io_stat - statistics for I/O amount.
- * @req_count_started: total number of I/O requests, which were started.
- * @total_bytes_started: total I/O amount in bytes, which were started.
- * @req_count_completed: total number of I/O request, which were completed.
- * @total_bytes_completed: total I/O amount in bytes, which were completed.
- * @max_diff_req_count: MAX of 'req_count_started - req_count_completed'.
- * @max_diff_total_bytes: MAX of 'total_bytes_started - total_bytes_completed'.
- */
-struct ufshcd_io_stat {
-	u64 req_count_started;
-	u64 total_bytes_started;
-	u64 req_count_completed;
-	u64 total_bytes_completed;
-	u64 max_diff_req_count;
-	u64 max_diff_total_bytes;
-};
+#endif
 
 enum ufshcd_ctx {
 	QUEUE_CMD,
@@ -726,18 +700,15 @@ struct ufshcd_blk_ctx {
  * @dme_err: tracks dme errors
  */
 struct ufs_stats {
+#ifdef CONFIG_DEBUG_FS
 	bool enabled;
 	u64 **tag_stats;
 	int q_depth;
 	int err_stats[UFS_ERR_MAX];
 	struct ufshcd_req_stat req_stats[TS_NUM_STATS];
-	u64 peak_reqs[TS_NUM_STATS];
-	u64 peak_queue_depth;
 	int query_stats_arr[UPIU_QUERY_OPCODE_MAX][MAX_QUERY_IDN];
-	struct ufshcd_io_stat io_read;
-	struct ufshcd_io_stat io_write;
-	struct ufshcd_io_stat io_readwrite;
 
+#endif
 	u32 last_intr_status;
 	ktime_t last_intr_ts;
 	struct ufshcd_clk_ctx clk_hold;
@@ -757,41 +728,6 @@ struct ufs_stats {
 	u32 dl_err_cnt[UFS_EC_DL_MAX];
 	u32 dme_err_cnt;
 };
-
-static inline bool is_read_opcode(u8 opcode)
-{
-	return opcode == READ_10 || opcode == READ_16;
-}
-
-static inline bool is_write_opcode(u8 opcode)
-{
-	return opcode == WRITE_10 || opcode == WRITE_16;
-}
-
-static inline bool is_unmap_opcode(u8 opcode)
-{
-	return opcode == UNMAP;
-}
-
-static inline char *parse_opcode(u8 opcode)
-{
-	/* string should be less than 12 byte-long */
-	switch (opcode) {
-	case READ_10:
-		return "READ_10";
-	case READ_16:
-		return "READ_16";
-	case WRITE_10:
-		return "WRITE_10";
-	case WRITE_16:
-		return "WRITE_16";
-	case UNMAP:
-		return "UNMAP";
-	case SYNCHRONIZE_CACHE:
-		return "SYNC_CACHE";
-	}
-	return NULL;
-}
 
 /* UFS Host Controller debug print bitmask */
 #define UFSHCD_DBG_PRINT_CLK_FREQ_EN		UFS_BIT(0)
@@ -815,7 +751,7 @@ struct ufshcd_cmd_log_entry {
 	u8 lun;
 	u8 cmd_id;
 	sector_t lba;
-	u32 transfer_len;
+	int transfer_len;
 	u8 idn;		/* used only for query idn */
 	u32 doorbell;
 	u32 outstanding_reqs;
@@ -830,21 +766,126 @@ struct ufshcd_cmd_log {
 	u32 seq_num;
 };
 
-/* UFS Slow I/O operation types */
-enum ufshcd_slowio_optype {
-	UFSHCD_SLOWIO_READ = 0,
-	UFSHCD_SLOWIO_WRITE = 1,
-	UFSHCD_SLOWIO_UNMAP = 2,
-	UFSHCD_SLOWIO_SYNC = 3,
-	UFSHCD_SLOWIO_OP_MAX = 4,
+#define SEC_UFS_ERROR_COUNT
+
+#if defined(SEC_UFS_ERROR_COUNT)
+struct SEC_UFS_op_count {
+	unsigned int HW_RESET_count;
+#define SEC_UFS_HW_RESET	0xff00
+	unsigned int link_startup_count;
+	unsigned int Hibern8_enter_count;
+	unsigned int Hibern8_exit_count;
+	unsigned int op_err;
 };
 
-/* UFS Slow I/O sysfs entry types */
-enum ufshcd_slowio_systype {
-	UFSHCD_SLOWIO_US = 0,
-	UFSHCD_SLOWIO_CNT = 1,
-	UFSHCD_SLOWIO_SYS_MAX = 2,
+struct SEC_UFS_UIC_cmd_count {
+	u8 DME_GET_err;
+	u8 DME_SET_err;
+	u8 DME_PEER_GET_err;
+	u8 DME_PEER_SET_err;
+	u8 DME_POWERON_err;
+	u8 DME_POWEROFF_err;
+	u8 DME_ENABLE_err;
+	u8 DME_RESET_err;
+	u8 DME_END_PT_RST_err;
+	u8 DME_LINK_STARTUP_err;
+	u8 DME_HIBER_ENTER_err;
+	u8 DME_HIBER_EXIT_err;
+	u8 DME_TEST_MODE_err;
+	unsigned int UIC_cmd_err;
 };
+
+struct SEC_UFS_UIC_err_count {
+	u8 PA_ERR_cnt;
+	u8 DL_PA_INIT_ERROR_cnt;
+	u8 DL_NAC_RECEIVED_ERROR_cnt;
+	u8 DL_TC_REPLAY_ERROR_cnt;
+	u8 NL_ERROR_cnt;
+	u8 TL_ERROR_cnt;
+	u8 DME_ERROR_cnt;
+	unsigned int UIC_err;
+};
+
+struct SEC_UFS_Fatal_err_count {
+	u8 DFE;		// Device_Fatal
+	u8 CFE;		// Controller_Fatal
+	u8 SBFE;	// System_Bus_Fatal
+	u8 CEFE;	// Crypto_Engine_Fatal
+	u8 LLE;		// Link Lost
+	unsigned int Fatal_err;
+};
+
+struct SEC_UFS_UTP_count {
+	u8 UTMR_query_task_count;
+	u8 UTMR_abort_task_count;
+	u8 UTR_read_err;
+	u8 UTR_write_err;
+	u8 UTR_sync_cache_err;
+	u8 UTR_unmap_err;
+	u8 UTR_etc_err;
+	unsigned int UTP_err;
+};
+
+struct SEC_UFS_QUERY_count {
+	u8 NOP_err;
+	u8 R_Desc_err;
+	u8 W_Desc_err;
+	u8 R_Attr_err;
+	u8 W_Attr_err;
+	u8 R_Flag_err;
+	u8 Set_Flag_err;
+	u8 Clear_Flag_err;
+	u8 Toggle_Flag_err;
+	unsigned int Query_err;
+};
+
+struct SEC_UFS_counting {
+	struct SEC_UFS_op_count op_count;
+	struct SEC_UFS_UIC_cmd_count UIC_cmd_count;
+	struct SEC_UFS_UIC_err_count UIC_err_count;
+	struct SEC_UFS_Fatal_err_count Fatal_err_count;
+	struct SEC_UFS_UTP_count UTP_count;
+	struct SEC_UFS_QUERY_count query_count;
+};
+#endif
+
+struct SEC_UFS_TW_info {
+	u64 tw_state_ts;
+	u64 tw_enable_ms;
+	u64 tw_disable_ms;
+	u64 tw_amount_W_kb;
+	u64 tw_enable_count;
+	u64 tw_disable_count;
+	u64 tw_setflag_error_count;
+	u64 hibern8_amount_ms;
+	u64 hibern8_enter_count;
+	u64 hibern8_amount_ms_100ms;
+	u64 hibern8_enter_count_100ms;
+	u64 hibern8_max_ms;
+	ktime_t hibern8_enter_ts;
+	struct timespec timestamp;
+	bool tw_info_disable;
+};
+
+#if defined(CONFIG_UFSFEATURE) && defined(CONFIG_UFSHPB)
+struct SEC_UFS_HPB_info {
+	atomic64_t hpb_pinned_rb_cnt;
+	atomic64_t hpb_active_rb_cnt;
+	u64 hpb_amount_R_kb;
+	u64 hpb_amount_R_kb_old;
+	unsigned int hpb_read_err_count;
+	unsigned int hpb_RB_ID_READ_err_count;
+	unsigned int hpb_RB_ID_SET_RT_err_count;
+	unsigned int hpb_WB_ID_PREFETCH_err_count;
+	unsigned int hpb_WB_ID_UNSET_RT_err_count;
+	unsigned int hpb_WB_ID_UNSET_RT_ALL_err_count;
+
+	struct timespec timestamp_old;
+	struct timespec timestamp_new;
+	bool hpb_info_disable;
+	bool hpb_err_count_disable;
+};
+#endif
 
 /**
  * struct ufs_hba - per adapter private structure
@@ -934,6 +975,7 @@ struct ufs_hba {
 
 	enum ufs_dev_pwr_mode curr_dev_pwr_mode;
 	enum uic_link_state uic_link_state;
+	enum ufs_tw_state ufs_tw_state;
 	/* Desired UFS power management level during runtime PM */
 	int rpm_lvl;
 	/* Desired UFS power management level during system PM */
@@ -1063,12 +1105,11 @@ struct ufs_hba {
 	#define UFSHCD_QUIRK_DME_PEER_GET_FAST_MODE		0x20000
 
 	#define UFSHCD_QUIRK_BROKEN_AUTO_HIBERN8		0x40000
-
 	/*
 	 * This quirk needs to be enabled if the host controller advertises
 	 * inline encryption support but it doesn't work correctly.
 	 */
-	#define UFSHCD_QUIRK_BROKEN_CRYPTO			0x80000
+	#define UFSHCD_QUIRK_BROKEN_CRYPTO			0x800
 
 	unsigned int quirks;	/* Deviations from standard UFSHCI spec. */
 
@@ -1099,13 +1140,14 @@ struct ufs_hba {
 	/* HBA Errors */
 	u32 errors;
 	u32 uic_error;
+	u32 ce_error;	/* crypto engine errors */
 	u32 saved_err;
 	u32 saved_uic_err;
 	u32 saved_ce_err;
-	bool silence_err_logs;
 	bool force_host_reset;
 	bool auto_h8_err;
 	struct ufs_stats ufs_stats;
+	bool silence_err_logs;
 
 	/* Device management request data */
 	struct ufs_dev_cmd dev_cmd;
@@ -1127,8 +1169,6 @@ struct ufs_hba {
 
 	/* Number of requests aborts */
 	int req_abort_count;
-
-	u32 security_in;
 
 	/* Number of lanes available (1 or 2) for Rx/Tx */
 	u32 lanes_per_direction;
@@ -1183,12 +1223,11 @@ struct ufs_hba {
 	 * in hibern8 then enable this cap.
 	 */
 #define UFSHCD_CAP_POWER_COLLAPSE_DURING_HIBERN8 (1 << 7)
-
 	/*
 	 * This capability allows the host controller driver to use the
 	 * inline crypto engine, if it is present
 	 */
-#define UFSHCD_CAP_CRYPTO (1 << 8)
+#define UFSHCD_CAP_CRYPTO (1 << 7)
 
 	struct devfreq *devfreq;
 	struct ufs_clk_scaling clk_scaling;
@@ -1199,7 +1238,6 @@ struct ufs_hba {
 
 	/* sync b/w diff contexts */
 	struct rw_semaphore lock;
-	struct rw_semaphore query_lock;
 	unsigned long shutdown_in_prog;
 
 	/* If set, don't gate device ref_clk during clock gating */
@@ -1216,13 +1254,41 @@ struct ufs_hba {
 
 	bool phy_init_g4;
 	bool force_g4;
+#ifdef CONFIG_QCOM_WB
 	bool wb_enabled;
+#endif
+	char unique_number[UFS_UN_MAX_DIGITS + 1];
 
-	struct ufs_manual_gc manual_gc;
+	u32 transferred_sector;
 
-	/* To monitor slow UFS I/O requests. */
-	u64 slowio_min_us;
-	u64 slowio[UFSHCD_SLOWIO_OP_MAX][UFSHCD_SLOWIO_SYS_MAX];
+	unsigned int lc_info;
+	bool support_tw;
+	bool tw_state_not_allowed;
+	struct mutex tw_ctrl_mutex;
+	struct SEC_UFS_TW_info SEC_tw_info;
+	struct SEC_UFS_TW_info SEC_tw_info_old;
+
+#if defined(CONFIG_UFSFEATURE) && defined(CONFIG_UFSHPB)
+	struct SEC_UFS_HPB_info SEC_hpb_info;
+#endif
+
+#if defined(CONFIG_SCSI_UFS_QCOM)
+	struct device_attribute hw_reset_info_attr;
+#endif
+
+#if defined(SEC_UFS_ERROR_COUNT)
+	struct SEC_UFS_counting SEC_err_info;
+#endif
+	bool UFS_fatal_mode_done;
+	struct work_struct fatal_mode_work;
+
+#if defined(CONFIG_UFS_DATA_LOG)
+	atomic_t	log_count;
+#endif
+
+#if defined(CONFIG_UFSFEATURE)
+	struct ufsf_feature ufsf;
+#endif
 
 #ifdef CONFIG_SCSI_UFS_CRYPTO
 	/* crypto */
@@ -1231,11 +1297,6 @@ struct ufs_hba {
 	u32 crypto_cfg_register;
 	struct keyslot_manager *ksm;
 #endif /* CONFIG_SCSI_UFS_CRYPTO */
-
-	ANDROID_KABI_RESERVE(1);
-	ANDROID_KABI_RESERVE(2);
-	ANDROID_KABI_RESERVE(3);
-	ANDROID_KABI_RESERVE(4);
 };
 
 static inline void ufshcd_mark_shutdown_ongoing(struct ufs_hba *hba)
@@ -1299,6 +1360,11 @@ static inline bool ufshcd_is_auto_hibern8_supported(struct ufs_hba *hba)
 static inline bool ufshcd_is_auto_hibern8_enabled(struct ufs_hba *hba)
 {
 	return ufshcd_is_auto_hibern8_supported(hba) && !!hba->ahit;
+}
+
+static inline bool ufshcd_is_crypto_supported(struct ufs_hba *hba)
+{
+	return !!(hba->capabilities & MASK_CRYPTO_SUPPORT);
 }
 
 #define ufshcd_writel(hba, val, reg)	\
@@ -1470,15 +1536,17 @@ static inline bool ufshcd_is_embedded_dev(struct ufs_hba *hba)
 	return false;
 }
 
-extern u64 ufshcd_prev_sum[TS_NUM_STATS];
-extern u64 ufshcd_prev_count[TS_NUM_STATS];
-
+#ifdef CONFIG_DEBUG_FS
 static inline void ufshcd_init_req_stats(struct ufs_hba *hba)
 {
 	memset(hba->ufs_stats.req_stats, 0, sizeof(hba->ufs_stats.req_stats));
-	memset(ufshcd_prev_sum, 0, sizeof(ufshcd_prev_sum));
-	memset(ufshcd_prev_count, 0, sizeof(ufshcd_prev_count));
 }
+#else
+static inline void ufshcd_init_req_stats(struct ufs_hba *hba) {}
+#endif
+
+#define ASCII_STD true
+#define UTF16_STD false
 
 /* Expose Query-Request API */
 int ufshcd_query_descriptor_retry(struct ufs_hba *hba,
@@ -1494,16 +1562,10 @@ int ufshcd_read_desc_param(struct ufs_hba *hba,
 			   u8 param_size);
 int ufshcd_query_attr(struct ufs_hba *hba, enum query_opcode opcode,
 		      enum attr_idn idn, u8 index, u8 selector, u32 *attr_val);
-int ufshcd_query_attr_retry(struct ufs_hba *hba,
-	enum query_opcode opcode, enum attr_idn idn, u8 index, u8 selector,
-	u32 *attr_val);
-int ufshcd_query_flag_retry(struct ufs_hba *hba,
-	enum query_opcode opcode, enum flag_idn idn, bool *flag_res);
 int ufshcd_query_flag(struct ufs_hba *hba, enum query_opcode opcode,
 	enum flag_idn idn, bool *flag_res);
 int ufshcd_read_string_desc(struct ufs_hba *hba, int desc_index,
 			    u8 *buf, u32 size, bool ascii);
-int ufshcd_update_health(struct ufs_hba *hba);
 
 int ufshcd_hold(struct ufs_hba *hba, bool async);
 void ufshcd_release(struct ufs_hba *hba, bool no_sched);
@@ -1512,7 +1574,6 @@ int ufshcd_change_power_mode(struct ufs_hba *hba,
 			     struct ufs_pa_layer_attr *pwr_mode);
 void ufshcd_abort_outstanding_transfer_requests(struct ufs_hba *hba,
 		int result);
-int ufshcd_bkops_ctrl(struct ufs_hba *hba, enum bkops_status status);
 
 int ufshcd_map_desc_id_to_length(struct ufs_hba *hba, enum desc_idn desc_id,
 	int *desc_length);
@@ -1521,6 +1582,20 @@ u32 ufshcd_get_local_unipro_ver(struct ufs_hba *hba);
 
 void ufshcd_scsi_block_requests(struct ufs_hba *hba);
 void ufshcd_scsi_unblock_requests(struct ufs_hba *hba);
+#if defined(CONFIG_UFSFEATURE)
+int ufshcd_exec_dev_cmd(struct ufs_hba *hba,
+		enum dev_cmd_type cmd_type, int timeout);
+int ufshcd_hibern8_hold(struct ufs_hba *hba, bool async);
+void ufshcd_hold_all(struct ufs_hba *hba);
+void ufshcd_release_all(struct ufs_hba *hba);
+int ufshcd_comp_scsi_upiu(struct ufs_hba *hba, struct ufshcd_lrb *lrbp);
+int ufshcd_map_sg(struct ufs_hba *hba, struct ufshcd_lrb *lrbp);
+int ufshcd_query_flag_retry(struct ufs_hba *hba, enum query_opcode opcode,
+                            enum flag_idn idn, bool *flag_res);
+#endif
+#if defined(CONFIG_UFSFEATURE) && defined(CONFIG_UFSHPB) && defined(SEC_UFS_ERROR_COUNT)
+void SEC_ufs_hpb_rb_count(struct ufs_hba *hba, struct ufshpb_region *rgn);
+#endif
 
 /* Wrapper functions for safely calling variant operations */
 static inline const char *ufshcd_get_var_name(struct ufs_hba *hba)
@@ -1654,6 +1729,10 @@ static inline void ufshcd_vops_dbg_register_dump(struct ufs_hba *hba,
 {
 	if (hba->var && hba->var->vops && hba->var->vops->dbg_register_dump)
 		hba->var->vops->dbg_register_dump(hba, no_sleep);
+#if defined(CONFIG_SCSI_UFS_TEST_MODE)
+	/* do not recover system if test mode is enabled */
+	BUG_ON(1);
+#endif
 }
 
 static inline int ufshcd_vops_update_sec_cfg(struct ufs_hba *hba,
@@ -1694,7 +1773,7 @@ static inline void ufshcd_vops_remove_debugfs(struct ufs_hba *hba)
 }
 #else
 static inline void ufshcd_vops_add_debugfs(struct ufs_hba *hba,
-						struct dentry *root)
+					   struct dentry *root)
 {
 }
 
@@ -1738,18 +1817,21 @@ static inline u8 ufshcd_scsi_to_upiu_lun(unsigned int scsi_lun)
 int ufshcd_dump_regs(struct ufs_hba *hba, size_t offset, size_t len,
 		     const char *prefix);
 
+#ifdef CONFIG_QCOM_WB
 static inline unsigned int ufshcd_vops_get_user_cap_mode(struct ufs_hba *hba)
 {
 	if (hba->var && hba->var->vops->get_user_cap_mode)
 		return hba->var->vops->get_user_cap_mode(hba);
 	return 0;
 }
+#endif
 
-void ufshcd_update_slowio_min_us(struct ufs_hba *hba);
-
-#define UFSHCD_MIN_SLOWIO_US		(1000)     /*  1 ms      */
-#define UFSHCD_DEFAULT_SLOWIO_READ_US	(5000000)  /*  5 seconds */
-#define UFSHCD_DEFAULT_SLOWIO_WRITE_US	(10000000) /* 10 seconds */
-#define UFSHCD_DEFAULT_SLOWIO_UNMAP_US	(30000000) /* 30 seconds */
-#define UFSHCD_DEFAULT_SLOWIO_SYNC_US	(10000000) /* 10 seconds */
+#define UFS_DEV_ATTR(name, fmt, args...)					\
+static ssize_t ufs_##name##_show(struct device *dev, struct device_attribute *attr, char *buf)	\
+{										\
+	struct Scsi_Host *host = container_of(dev, struct Scsi_Host, shost_dev);\
+	struct ufs_hba *hba = shost_priv(host);                                 \
+	return sprintf(buf, fmt, args);						\
+}										\
+static DEVICE_ATTR(name, 0444, ufs_##name##_show, NULL)
 #endif /* End of Header */

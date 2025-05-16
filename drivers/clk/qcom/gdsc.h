@@ -68,7 +68,7 @@ struct gdsc_desc {
 	size_t num;
 };
 
-#if IS_ENABLED(CONFIG_QCOM_GDSC)
+#ifdef CONFIG_QCOM_GDSC
 int gdsc_register(struct gdsc_desc *desc, struct reset_controller_dev *,
 		  struct regmap *);
 void gdsc_unregister(struct gdsc_desc *desc);

@@ -150,13 +150,6 @@ static struct smb_params smb5_pm8150b_params = {
 		.max_u	= 3000000,
 		.step_u	= 500000,
 	},
-	.otg_out = {
-		.name   = "usb otg output voltage",
-		.reg    = SCHG_P_DCDC_VBOOST_CFG,
-		.min_u  = 4800000,
-		.max_u  = 5500000,
-		.step_u = 100000,
-	},
 	.dc_icl		= {
 		.name   = "DC input current limit",
 		.reg    = DCDC_CFG_REF_MAX_PSNS_REG,
@@ -226,10 +219,6 @@ struct smb_dt_props {
 	int			term_current_thresh_hi_ma;
 	int			term_current_thresh_lo_ma;
 	int			disable_suspend_on_collapse;
-	int			batt_psy_is_bms;
-	int			batt_psy_disable;
-	int			wdog_snarl_disable;
-	const char		*batt_psy_name;
 };
 
 struct smb5 {
@@ -238,8 +227,7 @@ struct smb5 {
 	struct smb_dt_props	dt;
 };
 
-/* All flags turned on */
-static int __debug_mask = -1;
+static int __debug_mask;
 
 static ssize_t pd_disabled_show(struct device *dev, struct device_attribute
 				*attr, char *buf)
@@ -478,8 +466,7 @@ static int smb5_parse_dt_misc(struct smb5 *chip, struct device_node *node)
 	chg->pd_not_supported = chg->pd_not_supported ||
 			of_property_read_bool(node, "qcom,usb-pd-disable");
 
-	chg->lpd_disabled = chg->lpd_disabled ||
-			of_property_read_bool(node, "qcom,lpd-disable");
+	chg->lpd_disabled = of_property_read_bool(node, "qcom,lpd-disable");
 
 	rc = of_property_read_u32(node, "qcom,wd-bark-time-secs",
 					&chip->dt.wd_bark_time);
@@ -619,29 +606,11 @@ static int smb5_parse_dt_misc(struct smb5 *chip, struct device_node *node)
 	if (chg->chg_param.hvdcp2_max_icl_ua <= 0)
 		chg->chg_param.hvdcp2_max_icl_ua = MICRO_3PA;
 
-	chip->dt.batt_psy_is_bms = of_property_read_bool(node,
-					"google,batt_psy_is_bms");
-	chip->dt.batt_psy_disable = of_property_read_bool(node,
-					"google,batt_psy_disable");
-
-	(void)of_property_read_string(node, "google,batt_psy_name",
-				      &chip->dt.batt_psy_name);
-
-	chip->dt.wdog_snarl_disable = of_property_read_bool(node,
-					"google,wdog_snarl_disable");
-
-	rc = of_property_read_string(node, "google,usb-port-tz-name",
-				     &chg->usb_port_tz_name);
-	if (rc < 0)
-		pr_err("cannot read usb-port-tz-name, rc=%d\n", rc);
-
 	/* Used only in Adapter CV mode of operation */
 	of_property_read_u32(node, "qcom,qc4-max-icl-ua",
 					&chg->chg_param.qc4_max_icl_ua);
 	if (chg->chg_param.qc4_max_icl_ua <= 0)
 		chg->chg_param.qc4_max_icl_ua = MICRO_4PA;
-
-	chg->force_hcmode = of_property_read_bool(node, "google,force-hcmode");
 
 	return 0;
 }
@@ -743,14 +712,11 @@ static int smb5_parse_dt_currents(struct smb5 *chip, struct device_node *node)
 static int smb5_parse_dt_voltages(struct smb5 *chip, struct device_node *node)
 {
 	int rc = 0;
-	struct smb_charger *chg = &chip->chg;
 
 	rc = of_property_read_u32(node,
 				"qcom,fv-max-uv", &chip->dt.batt_profile_fv_uv);
 	if (rc < 0)
 		chip->dt.batt_profile_fv_uv = -EINVAL;
-
-	of_property_read_u32(node, "google,otg-out-uv", &chg->otg_out_uv);
 
 	rc = of_property_read_u32(node, "qcom,chg-inhibit-threshold-mv",
 				&chip->dt.chg_inhibit_thr_mv);
@@ -881,7 +847,6 @@ static enum power_supply_property smb5_usb_props[] = {
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 	POWER_SUPPLY_PROP_PD_CURRENT_MAX,
 	POWER_SUPPLY_PROP_CURRENT_MAX,
-	POWER_SUPPLY_PROP_TEMP,
 	POWER_SUPPLY_PROP_TYPE,
 	POWER_SUPPLY_PROP_TYPEC_MODE,
 	POWER_SUPPLY_PROP_TYPEC_POWER_ROLE,
@@ -907,18 +872,13 @@ static enum power_supply_property smb5_usb_props[] = {
 	POWER_SUPPLY_PROP_ADAPTER_CC_MODE,
 	POWER_SUPPLY_PROP_SCOPE,
 	POWER_SUPPLY_PROP_MOISTURE_DETECTED,
-	POWER_SUPPLY_PROP_CC_TOGGLE_ENABLE,
 	POWER_SUPPLY_PROP_HVDCP_OPTI_ALLOWED,
 	POWER_SUPPLY_PROP_QC_OPTI_DISABLE,
 	POWER_SUPPLY_PROP_VOLTAGE_VPH,
 	POWER_SUPPLY_PROP_THERM_ICL_LIMIT,
 	POWER_SUPPLY_PROP_SKIN_HEALTH,
-	POWER_SUPPLY_PROP_INPUT_CURRENT_MAX,
-	POWER_SUPPLY_PROP_DEAD_BATTERY,
-	POWER_SUPPLY_PROP_OTG_FASTROLESWAP,
 	POWER_SUPPLY_PROP_APSD_RERUN,
 	POWER_SUPPLY_PROP_APSD_TIMEOUT,
-	POWER_SUPPLY_PROP_MOISTURE_DETECTION_ENABLE,
 	POWER_SUPPLY_PROP_CHARGER_STATUS,
 	POWER_SUPPLY_PROP_INPUT_VOLTAGE_SETTLED,
 };
@@ -934,12 +894,6 @@ static int smb5_usb_get_prop(struct power_supply *psy,
 	val->intval = 0;
 
 	switch (psp) {
-	case POWER_SUPPLY_PROP_MOISTURE_DETECTION_ENABLE:
-		val->intval = chg->moisture_detection_enabled ? 1 : 0;
-		break;
-	case POWER_SUPPLY_PROP_CC_TOGGLE_ENABLE:
-		val->intval = chg->cc_toggle_enable ? 1 : 0;
-		break;
 	case POWER_SUPPLY_PROP_PRESENT:
 		rc = smblib_get_prop_usb_present(chg, val);
 		break;
@@ -965,10 +919,7 @@ static int smb5_usb_get_prop(struct power_supply *psy,
 		val->intval = get_client_vote(chg->usb_icl_votable, PD_VOTER);
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
-		rc = smblib_get_charge_current(chg, &val->intval);
-		break;
-	case POWER_SUPPLY_PROP_TEMP:
-		rc = smblib_get_prop_usb_port_temp(chg, val);
+		rc = smblib_get_prop_input_current_max(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_TYPE:
 		val->intval = POWER_SUPPLY_TYPE_USB_PD;
@@ -1031,9 +982,6 @@ static int smb5_usb_get_prop(struct power_supply *psy,
 		val->intval = get_client_vote(chg->usb_icl_votable,
 					      USB_PSY_VOTER);
 		break;
-	case POWER_SUPPLY_PROP_DEAD_BATTERY:
-		val->intval = chg->dead_battery ? 1 : 0;
-		break;
 	case POWER_SUPPLY_PROP_CONNECTOR_TYPE:
 		val->intval = chg->connector_type;
 		break;
@@ -1050,6 +998,9 @@ static int smb5_usb_get_prop(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_SMB_EN_REASON:
 		val->intval = chg->cp_reason;
+		break;
+	case POWER_SUPPLY_PROP_MOISTURE_DETECTED:
+		val->intval = chg->moisture_present;
 		break;
 	case POWER_SUPPLY_PROP_HVDCP_OPTI_ALLOWED:
 		val->intval = !chg->flash_active;
@@ -1073,20 +1024,6 @@ static int smb5_usb_get_prop(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_SKIN_HEALTH:
 		val->intval = smblib_get_skin_temp_status(chg);
-		break;
-	case POWER_SUPPLY_PROP_INPUT_CURRENT_MAX:
-		rc = smblib_get_prop_input_current_max(chg, val);
-		break;
-	case POWER_SUPPLY_PROP_MOISTURE_DETECTED:
-		if (chg->uusb_moisture_protection_enabled)
-			val->intval = chg->moisture_present;
-		else
-			val->intval = (chg->lpd_reason == LPD_MOISTURE_DETECTED
-				       && chg->lpd_stage == LPD_STAGE_COMMIT) ? 1 :
-				       0;
-		break;
-	case POWER_SUPPLY_PROP_OTG_FASTROLESWAP:
-		rc = smblib_get_prop_otg_fastroleswap(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_APSD_RERUN:
 		val->intval = 0;
@@ -1136,13 +1073,6 @@ static int smb5_usb_set_prop(struct power_supply *psy,
 	int icl, rc = 0;
 
 	switch (psp) {
-	case POWER_SUPPLY_PROP_MOISTURE_DETECTION_ENABLE:
-		rc = enable_moisture_detection(chg, val->intval == 1);
-		break;
-	case POWER_SUPPLY_PROP_CC_TOGGLE_ENABLE:
-		chg->cc_toggle_enable = val->intval;
-		rc = smblib_set_prop_typec_power_role(chg, val);
-		break;
 	case POWER_SUPPLY_PROP_PD_CURRENT_MAX:
 		rc = smblib_set_prop_pd_current_max(chg, val);
 		break;
@@ -1178,34 +1108,8 @@ static int smb5_usb_set_prop(struct power_supply *psy,
 		rc = smblib_set_prop_pd_voltage_min(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_SDP_CURRENT_MAX:
-		chg->sdp_current_max = val->intval;
-		if (!(chg->dead_battery && val->intval <= USBIN_25MA))
-			rc = smblib_set_prop_sdp_current_max(chg, val);
+		rc = smblib_set_prop_sdp_current_max(chg, val);
 		break;
-	case POWER_SUPPLY_PROP_DEAD_BATTERY: {
-
-		/* Dead battery can only be cleared. */
-		if (val->intval != 0)
-			rc = -EINVAL;
-
-		/*
-		 * USB Data stack masks vote unless connected to SDP port.
-		 * Enfore USB data stack limit only for SDP port.
-		 */
-		if (chg->dead_battery && (chg->typec_mode ==
-		    POWER_SUPPLY_TYPEC_SOURCE_DEFAULT || chg->connector_type ==
-		    POWER_SUPPLY_CONNECTOR_MICRO_USB) && chg->real_charger_type
-		    == POWER_SUPPLY_TYPE_USB) {
-			union power_supply_propval temp;
-
-			temp.intval = chg->sdp_current_max;
-			rc = smblib_set_prop_sdp_current_max(chg, &temp);
-			chg->dead_battery = !!rc;
-		} else {
-			chg->dead_battery = false;
-		}
-		break;
-	}
 	case POWER_SUPPLY_PROP_CONNECTOR_HEALTH:
 		chg->connector_health = val->intval;
 		power_supply_changed(chg->usb_psy);
@@ -1234,12 +1138,6 @@ static int smb5_usb_set_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_ADAPTER_CC_MODE:
 		chg->adapter_cc_mode = val->intval;
 		break;
-	case POWER_SUPPLY_PROP_INPUT_CURRENT_MAX:
-		rc = smblib_set_prop_input_current_max(chg, val);
-		break;
-	case POWER_SUPPLY_PROP_OTG_FASTROLESWAP:
-		rc = smblib_set_prop_otg_fastroleswap(chg, val);
-		break;
 	case POWER_SUPPLY_PROP_APSD_RERUN:
 		del_timer_sync(&chg->apsd_timer);
 		chg->apsd_ext_timeout = false;
@@ -1263,11 +1161,7 @@ static int smb5_usb_prop_is_writeable(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_THERM_ICL_LIMIT:
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX_LIMIT:
 	case POWER_SUPPLY_PROP_ADAPTER_CC_MODE:
-	case POWER_SUPPLY_PROP_INPUT_CURRENT_MAX:
-	case POWER_SUPPLY_PROP_DEAD_BATTERY:
 	case POWER_SUPPLY_PROP_APSD_RERUN:
-	case POWER_SUPPLY_PROP_MOISTURE_DETECTION_ENABLE:
-	case POWER_SUPPLY_PROP_CC_TOGGLE_ENABLE:
 		return 1;
 	default:
 		break;
@@ -1707,7 +1601,7 @@ static int smb5_dc_get_prop(struct power_supply *psy,
 		rc = smblib_get_prop_voltage_wls_output(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_DC_RESET:
-		val->intval = smblib_get_prop_dc_in_pon(chg, val);
+		val->intval = 0;
 		break;
 	case POWER_SUPPLY_PROP_AICL_DONE:
 		val->intval = chg->dcin_aicl_done;
@@ -1742,9 +1636,6 @@ static int smb5_dc_set_prop(struct power_supply *psy,
 		rc = smblib_set_prop_voltage_wls_output(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_DC_RESET:
-		mutex_lock(&chg->dc_reset_lock);
-		chg->dc_reset = false;
-		mutex_unlock(&chg->dc_reset_lock);
 		rc = smblib_set_prop_dc_reset(chg);
 		break;
 	default:
@@ -2125,7 +2016,7 @@ static int smb5_batt_prop_is_writeable(struct power_supply *psy,
 	return 0;
 }
 
-static struct power_supply_desc batt_psy_desc = {
+static const struct power_supply_desc batt_psy_desc = {
 	.name = "battery",
 	.type = POWER_SUPPLY_TYPE_BATTERY,
 	.properties = smb5_batt_props,
@@ -2141,19 +2032,8 @@ static int smb5_init_batt_psy(struct smb5 *chip)
 	struct smb_charger *chg = &chip->chg;
 	int rc = 0;
 
-	if (chip->dt.batt_psy_disable) {
-		pr_warn("Requested disable of battery power supply\n");
-		return 0;
-	}
-
 	batt_cfg.drv_data = chg;
 	batt_cfg.of_node = chg->dev->of_node;
-
-	if (chip->dt.batt_psy_is_bms)
-		batt_psy_desc.type = POWER_SUPPLY_TYPE_BMS;
-	if (chip->dt.batt_psy_name)
-		batt_psy_desc.name = chip->dt.batt_psy_name;
-
 	chg->batt_psy = devm_power_supply_register(chg->dev,
 					   &batt_psy_desc,
 					   &batt_cfg);
@@ -2185,16 +2065,6 @@ static int smb5_init_vbus_regulator(struct smb5 *chip)
 				      GFP_KERNEL);
 	if (!chg->vbus_vreg)
 		return -ENOMEM;
-
-	if (chg->otg_out_uv != 0) {
-		rc = smblib_set_charge_param(chg, &chg->param.otg_out,
-					     chg->otg_out_uv);
-		if (rc < 0) {
-			pr_err("Couldn't set otg output voltage rc=%d\n", rc);
-
-			return rc;
-		}
-	}
 
 	cfg.dev = chg->dev;
 	cfg.driver_data = chip;
@@ -2606,7 +2476,7 @@ static int smb5_init_dc_peripheral(struct smb_charger *chg)
 		return 0;
 
 	/* Set DCIN ICL to 100 mA */
-	rc = vote(chg->dc_icl_votable, DCIN_AICL_VOTER, true, DCIN_ICL_MIN_UA);
+	rc = smblib_set_charge_param(chg, &chg->param.dc_icl, DCIN_ICL_MIN_UA);
 	if (rc < 0) {
 		dev_err(chg->dev, "Couldn't set dc_icl rc=%d\n", rc);
 		return rc;
@@ -3148,8 +3018,7 @@ static int smb5_determine_initial_status(struct smb5 *chip)
 	batt_temp_changed_irq_handler(0, &irq_data);
 	wdog_bark_irq_handler(0, &irq_data);
 	typec_or_rid_detection_change_irq_handler(0, &irq_data);
-	if (!chip->dt.wdog_snarl_disable)
-		wdog_snarl_irq_handler(0, &irq_data);
+	wdog_snarl_irq_handler(0, &irq_data);
 
 	return 0;
 }
@@ -3496,11 +3365,6 @@ static int smb5_request_interrupts(struct smb5 *chip)
 		}
 	}
 
-	if (chg->irq_info[WDOG_SNARL_IRQ].irq && chip->dt.wdog_snarl_disable) {
-		disable_irq_wake(chg->irq_info[WDOG_SNARL_IRQ].irq);
-		disable_irq_nosync(chg->irq_info[WDOG_SNARL_IRQ].irq);
-	}
-
 	vote(chg->limited_irq_disable_votable, CHARGER_TYPE_VOTER, true, 0);
 	vote(chg->hdc_irq_disable_votable, CHARGER_TYPE_VOTER, true, 0);
 
@@ -3532,12 +3396,13 @@ static void smb5_disable_interrupts(struct smb_charger *chg)
 	}
 }
 
+#if defined(CONFIG_DEBUG_FS)
+
 static int force_batt_psy_update_write(void *data, u64 val)
 {
 	struct smb_charger *chg = data;
 
-	if (chg->batt_psy)
-		power_supply_changed(chg->batt_psy);
+	power_supply_changed(chg->batt_psy);
 	return 0;
 }
 DEFINE_DEBUGFS_ATTRIBUTE(force_batt_psy_update_ops, NULL,
@@ -3597,6 +3462,13 @@ static void smb5_create_debugfs(struct smb5 *chip)
 	if (IS_ERR_OR_NULL(file))
 		pr_err("Couldn't create debug_mask file rc=%ld\n", (long)file);
 }
+
+#else
+
+static void smb5_create_debugfs(struct smb5 *chip)
+{}
+
+#endif
 
 static int smb5_show_charger_status(struct smb5 *chip)
 {
@@ -3692,8 +3564,6 @@ static int smb5_probe(struct platform_device *pdev)
 	chg->connector_health = -EINVAL;
 	chg->otg_present = false;
 	chg->main_fcc_max = -EINVAL;
-	chg->moisture_detection_enabled = true;
-	chg->cc_toggle_enable = true;
 	mutex_init(&chg->adc_lock);
 
 	chg->regmap = dev_get_regmap(chg->dev->parent, NULL);
@@ -3721,16 +3591,10 @@ static int smb5_probe(struct platform_device *pdev)
 	else
 		return -EPROBE_DEFER;
 
-	chg->log = logbuffer_register("smblib");
-	if (IS_ERR_OR_NULL(chg->log)) {
-		pr_err("failed to obtain logbuffer instance\n");
-		chg->log = NULL;
-	}
-
 	rc = smblib_init(chg);
 	if (rc < 0) {
 		pr_err("Smblib_init failed rc=%d\n", rc);
-		goto unregister_buffer;
+		return rc;
 	}
 
 	/* set driver data before resources request it */
@@ -3885,9 +3749,6 @@ free_irq:
 cleanup:
 	smblib_deinit(chg);
 	platform_set_drvdata(pdev, NULL);
-unregister_buffer:
-	if (chg->log)
-		logbuffer_unregister(chg->log);
 
 	return rc;
 }
@@ -3905,8 +3766,6 @@ static int smb5_remove(struct platform_device *pdev)
 	smblib_deinit(chg);
 	sysfs_remove_groups(&chg->dev->kobj, smb5_groups);
 	platform_set_drvdata(pdev, NULL);
-	if (chg->log)
-		logbuffer_unregister(chg->log);
 
 	return 0;
 }

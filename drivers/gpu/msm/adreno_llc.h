@@ -9,7 +9,7 @@
 
 #include "adreno.h"
 
-#if IS_ENABLED(CONFIG_QCOM_LLCC)
+#ifdef CONFIG_QCOM_LLCC
 
 static inline bool adreno_llc_supported(void)
 {

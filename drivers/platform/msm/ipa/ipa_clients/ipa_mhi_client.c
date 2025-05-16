@@ -113,7 +113,7 @@ struct ipa_mhi_channel_ctx {
 	u64 event_context_addr;
 	struct ipa_mhi_ev_ctx ev_ctx_host;
 	bool brstmode_enabled;
-	union gsi_channel_scratch ch_scratch;
+	union __packed gsi_channel_scratch ch_scratch;
 	unsigned long cached_gsi_evt_ring_hdl;
 };
 
@@ -257,6 +257,7 @@ fail_dma_enable:
 	return res;
 }
 
+#ifdef CONFIG_DEBUG_FS
 #define IPA_MHI_MAX_MSG_LEN 512
 static char dbg_buff[IPA_MHI_MAX_MSG_LEN];
 static struct dentry *dent;
@@ -450,7 +451,7 @@ static void ipa_mhi_debugfs_init(void)
 	IPA_MHI_FUNC_ENTRY();
 
 	dent = debugfs_create_dir("ipa_mhi", 0);
-	if (IS_ERR_OR_NULL(dent)) {
+	if (IS_ERR(dent)) {
 		IPA_MHI_ERR("fail to create folder ipa_mhi\n");
 		return;
 	}
@@ -488,6 +489,11 @@ static void ipa_mhi_debugfs_init(void)
 fail:
 	debugfs_remove_recursive(dent);
 }
+
+#else
+static void ipa_mhi_debugfs_init(void) {}
+static void ipa_mhi_debugfs_destroy(void) {}
+#endif /* CONFIG_DEBUG_FS */
 
 static union IpaHwMhiDlUlSyncCmdData_t ipa_cached_dl_ul_sync_info;
 
@@ -766,7 +772,6 @@ fail_pm_activate:
 	ipa_mhi_set_state(IPA_MHI_STATE_INITIALIZED);
 	return res;
 }
-EXPORT_SYMBOL_GPL(ipa_mhi_start);
 
 /**
  * ipa_mhi_get_channel_context() - Get corresponding channel context
@@ -1468,7 +1473,6 @@ fail_start_channel:
 	IPA_ACTIVE_CLIENTS_DEC_EP(in->sys.client);
 	return -EPERM;
 }
-EXPORT_SYMBOL_GPL(ipa_mhi_connect_pipe);
 
 /**
  * ipa_mhi_disconnect_pipe() - Disconnect pipe from IPA and reset corresponding
@@ -1539,7 +1543,6 @@ fail_reset_channel:
 	IPA_ACTIVE_CLIENTS_DEC_EP(ipa_get_client_mapping(clnt_hdl));
 	return res;
 }
-EXPORT_SYMBOL_GPL(ipa_mhi_disconnect_pipe);
 
 static int ipa_mhi_suspend_channels(struct ipa_mhi_channel_ctx *channels,
 	int max_channels)
@@ -2025,7 +2028,6 @@ fail_suspend_dl_channel:
 	ipa_mhi_set_state(IPA_MHI_STATE_STARTED);
 	return res;
 }
-EXPORT_SYMBOL_GPL(ipa_mhi_suspend);
 
 /**
  * ipa_mhi_resume() - Resume MHI accelerated channels
@@ -2109,7 +2111,6 @@ fail_pm_activate:
 	ipa_mhi_set_state(IPA_MHI_STATE_SUSPENDED);
 	return res;
 }
-EXPORT_SYMBOL_GPL(ipa_mhi_resume);
 
 
 static int  ipa_mhi_destroy_channels(struct ipa_mhi_channel_ctx *channels,
@@ -2183,10 +2184,12 @@ int ipa_mhi_destroy_all_channels(void)
 	return 0;
 }
 
+#ifdef CONFIG_DEBUG_FS
 static void ipa_mhi_debugfs_destroy(void)
 {
 	debugfs_remove_recursive(dent);
 }
+#endif
 
 static void ipa_mhi_deregister_pm(void)
 {
@@ -2247,7 +2250,6 @@ void ipa_mhi_destroy(void)
 fail:
 	ipa_assert();
 }
-EXPORT_SYMBOL_GPL(ipa_mhi_destroy);
 
 static void ipa_mhi_pm_cb(void *p, enum ipa_pm_cb_event event)
 {
@@ -2436,7 +2438,6 @@ fail_create_wq:
 fail_alloc_ctx:
 	return res;
 }
-EXPORT_SYMBOL_GPL(ipa_mhi_init);
 
 static void ipa_mhi_cache_dl_ul_sync_info(
 	struct ipa_config_req_msg_v01 *config_req)

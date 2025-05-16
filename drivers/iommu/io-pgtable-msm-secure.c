@@ -7,8 +7,6 @@
 
 #include <linux/iommu.h>
 #include <linux/kernel.h>
-#include <linux/io-pgtable.h>
-#include <linux/module.h>
 #include <linux/scatterlist.h>
 #include <linux/sizes.h>
 #include <linux/slab.h>
@@ -16,6 +14,8 @@
 #include <soc/qcom/scm.h>
 #include <linux/dma-mapping.h>
 #include <asm/cacheflush.h>
+
+#include <linux/io-pgtable.h>
 
 #define IOMMU_SECURE_PTBL_SIZE  3
 #define IOMMU_SECURE_PTBL_INIT  4
@@ -351,6 +351,3 @@ struct io_pgtable_init_fns io_pgtable_arm_msm_secure_init_fns = {
 	.alloc	= msm_secure_alloc_pgtable,
 	.free	= msm_secure_free_pgtable,
 };
-
-MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("MSM IO secure pgtable");

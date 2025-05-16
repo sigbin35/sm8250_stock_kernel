@@ -33,9 +33,13 @@
 
 #include <linux/uaccess.h>
 #include <asm/setup.h>
+#define CREATE_TRACE_POINTS
 #include <trace/events/trace_msm_pil_event.h>
 
 #include "peripheral-loader.h"
+
+#include <linux/sec_debug.h>
+#include <soc/qcom/watchdog.h>
 
 #define pil_err(desc, fmt, ...)						\
 	dev_err(desc->dev, "%s: " fmt, desc->name, ##__VA_ARGS__)
@@ -64,7 +68,7 @@
 static void __iomem *pil_info_base;
 static struct md_global_toc *g_md_toc;
 
-extern void *pil_ipc_log;
+void *pil_ipc_log;
 
 /**
  * proxy_timeout - Override for proxy vote timeouts
@@ -74,6 +78,8 @@ extern void *pil_ipc_log;
  */
 static int proxy_timeout_ms = -1;
 module_param(proxy_timeout_ms, int, 0644);
+
+static bool disable_timeouts;
 
 static struct workqueue_struct *pil_wq;
 
@@ -1224,10 +1230,16 @@ int pil_boot(struct pil_desc *desc)
 	struct pil_priv *priv = desc->priv;
 	bool mem_protect = false;
 	bool hyp_assign = false;
+	bool secure_check_fail = false;
 
+	pil_info(desc, "Sending ON message to AOP ...\n");
 	ret = pil_notify_aop(desc, "on");
 	if (ret < 0) {
 		pil_err(desc, "Failed to send ON message to AOP rc:%d\n", ret);
+		if (ret == -ETIME) {
+			smp_send_stop();
+			msm_trigger_wdog_bite();
+		}
 		return ret;
 	}
 
@@ -1288,6 +1300,7 @@ int pil_boot(struct pil_desc *desc)
 		ret = desc->ops->init_image(desc, fw->data, fw->size);
 	if (ret) {
 		pil_err(desc, "Initializing image failed(rc:%d)\n", ret);
+		secure_check_fail = true;
 		goto err_boot;
 	}
 
@@ -1362,6 +1375,7 @@ int pil_boot(struct pil_desc *desc)
 	ret = desc->ops->auth_and_reset(desc);
 	if (ret) {
 		pil_err(desc, "Failed to bring out of reset(rc:%d)\n", ret);
+		secure_check_fail = true;
 		goto err_auth_and_reset;
 	}
 	pil_log("reset_done", desc);
@@ -1402,6 +1416,11 @@ out:
 		}
 		pil_release_mmap(desc);
 		pil_notify_aop(desc, "off");
+
+		if (IS_ENABLED(SEC_PERIPHERAL_SECURE_CHK) &&
+		    secure_check_fail && (ret == -EINVAL) &&
+		    (!strcmp(desc->name, "mba") || !strcmp(desc->name, "modem")))
+			sec_peripheral_secure_check_fail();
 	}
 	return ret;
 }
@@ -1458,6 +1477,11 @@ void pil_free_memory(struct pil_desc *desc)
 EXPORT_SYMBOL(pil_free_memory);
 
 static DEFINE_IDA(pil_ida);
+
+bool is_timeout_disabled(void)
+{
+	return disable_timeouts;
+}
 
 static int collect_aux_minidump_ids(struct pil_desc *desc)
 {
@@ -1649,8 +1673,6 @@ static struct notifier_block pil_pm_notifier = {
 	.notifier_call = pil_pm_notify,
 };
 
-extern void disable_pil_timeouts(void);
-
 static int __init msm_pil_init(void)
 {
 	struct device_node *np;
@@ -1674,7 +1696,7 @@ static int __init msm_pil_init(void)
 	}
 	if (__raw_readl(pil_info_base) == 0x53444247) {
 		pr_info("pil: pil-imem set to disable pil timeouts\n");
-		disable_pil_timeouts();
+		disable_timeouts = true;
 	}
 	for (i = 0; i < resource_size(&res)/sizeof(u32); i++)
 		writel_relaxed(0, pil_info_base + (i * sizeof(u32)));

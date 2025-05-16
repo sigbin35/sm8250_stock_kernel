@@ -18,11 +18,6 @@
 
 #define pr_fmt(fmt) "cma: " fmt
 
-#ifdef CONFIG_CMA_DEBUG
-#ifndef DEBUG
-#  define DEBUG
-#endif
-#endif
 #define CREATE_TRACE_POINTS
 
 #include <linux/memblock.h>
@@ -50,13 +45,11 @@ phys_addr_t cma_get_base(const struct cma *cma)
 {
 	return PFN_PHYS(cma->base_pfn);
 }
-EXPORT_SYMBOL(cma_get_base);
 
 unsigned long cma_get_size(const struct cma *cma)
 {
 	return cma->count << PAGE_SHIFT;
 }
-EXPORT_SYMBOL(cma_get_size);
 
 const char *cma_get_name(const struct cma *cma)
 {
@@ -415,7 +408,6 @@ err:
 	return ret;
 }
 
-#ifdef CONFIG_CMA_DEBUG
 static void cma_debug_show_areas(struct cma *cma)
 {
 	unsigned long next_zero_bit, next_set_bit, nr_zero;
@@ -440,9 +432,6 @@ static void cma_debug_show_areas(struct cma *cma)
 	pr_cont("=> %lu free of %lu total pages\n", nr_total, cma->count);
 	mutex_unlock(&cma->lock);
 }
-#else
-static inline void cma_debug_show_areas(struct cma *cma) { }
-#endif
 
 /**
  * cma_alloc() - allocate pages from contiguous area
@@ -465,7 +454,7 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
 	struct page *page = NULL;
 	int ret = -ENOMEM;
 	int retry_after_sleep = 0;
-	int max_retries = 2;
+	int max_retries = 20;
 	int available_regions = 0;
 
 	if (!cma || !cma->count)
@@ -501,7 +490,7 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
 				 * are less.
 				 */
 				if (available_regions < 3)
-					max_retries = 5;
+					max_retries = 25;
 				available_regions = 0;
 				/*
 				 * Page may be momentarily pinned by some other
@@ -565,8 +554,8 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
 	}
 
 	if (ret && !no_warn) {
-		pr_err("%s: alloc failed, req-size: %zu pages, ret: %d\n",
-			__func__, count, ret);
+		pr_err("%s: %s: alloc failed, req-size: %zu pages, ret: %d\n",
+			__func__, cma->name, count, ret);
 		cma_debug_show_areas(cma);
 	}
 

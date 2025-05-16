@@ -29,12 +29,17 @@
 #include <linux/timer.h>
 #include <linux/context_tracking.h>
 #include <linux/mm.h>
+#include <linux/rq_stats.h>
 
 #include <asm/irq_regs.h>
 
 #include "tick-internal.h"
 
 #include <trace/events/timer.h>
+
+struct rq_data rq_info;
+struct workqueue_struct *rq_wq;
+spinlock_t rq_lock;
 
 /*
  * Per-CPU nohz control structure
@@ -1073,7 +1078,6 @@ ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next)
 
 	return ktime_sub(next_event, now);
 }
-EXPORT_SYMBOL_GPL(tick_nohz_get_sleep_length);
 
 /**
  * tick_nohz_get_idle_calls_cpu - return the current idle calls counter value
@@ -1264,17 +1268,16 @@ void tick_irq_enter(void)
  * High resolution timer specific code
  */
 #ifdef CONFIG_HIGH_RES_TIMERS
-
-static void (*wake_callback)(void);
-
-void register_tick_sched_wakeup_callback(void (*cb)(void))
+static void wakeup_user(void)
 {
-	if (!wake_callback)
-		wake_callback = cb;
-	else
-		pr_warn("tick-sched wake cb already exists; skipping.\n");
+	unsigned long jiffy_gap;
+
+	jiffy_gap = jiffies - rq_info.def_timer_last_jiffy;
+	if (jiffy_gap >= rq_info.def_timer_jiffies) {
+		rq_info.def_timer_last_jiffy = jiffies;
+		queue_work(rq_wq, &rq_info.def_timer_work);
+	}
 }
-EXPORT_SYMBOL_GPL(register_tick_sched_wakeup_callback);
 
 /*
  * We rearm the timer until we get disabled by the idle code.
@@ -1295,11 +1298,12 @@ static enum hrtimer_restart tick_sched_timer(struct hrtimer *timer)
 	 */
 	if (regs) {
 		tick_sched_handle(ts, regs);
-		if (wake_callback && tick_do_timer_cpu == smp_processor_id()) {
+		if (rq_info.init == 1 &&
+				tick_do_timer_cpu == smp_processor_id()) {
 			/*
 			 * wakeup user if needed
 			 */
-			wake_callback();
+			wakeup_user();
 		}
 	}
 	else
@@ -1423,3 +1427,25 @@ ktime_t *get_next_event_cpu(unsigned int cpu)
 	return &(per_cpu(tick_cpu_device, cpu).evtdev->next_event);
 }
 EXPORT_SYMBOL_GPL(get_next_event_cpu);
+
+struct tick_sched saved_pcpu_ts[NR_CPUS];
+
+void save_pcpu_tick(int cpu)
+{
+	saved_pcpu_ts[cpu] = per_cpu(tick_cpu_sched, cpu);
+	kcpustat_cpu(cpu).cpustat[CPUTIME_IDLE] =
+		ktime_to_us(saved_pcpu_ts[cpu].idle_sleeptime) * NSEC_PER_USEC;
+	kcpustat_cpu(cpu).cpustat[CPUTIME_IOWAIT] =
+		ktime_to_us(saved_pcpu_ts[cpu].iowait_sleeptime) * NSEC_PER_USEC;
+}
+EXPORT_SYMBOL(save_pcpu_tick);
+
+void restore_pcpu_tick(int cpu)
+{
+	struct tick_sched *ts = &per_cpu(tick_cpu_sched, cpu);
+
+	ts->idle_sleeptime = saved_pcpu_ts[cpu].idle_sleeptime;
+	ts->iowait_sleeptime = saved_pcpu_ts[cpu].iowait_sleeptime;
+	ts->idle_calls = saved_pcpu_ts[cpu].idle_calls;
+}
+EXPORT_SYMBOL(restore_pcpu_tick);

@@ -23,8 +23,6 @@
 #define TSENS_CTRL_ADDR(n)			(n)
 #define TSENS_TM_SN_STATUS(n)			((n) + 0xa0)
 
-#define TSENS_DRIVER_NAME			"msm-tsens"
-
 #define ONE_PT_CALIB		0x1
 #define ONE_PT_CALIB2		0x2
 #define TWO_PT_CALIB		0x3
@@ -96,7 +94,7 @@ struct tsens_device;
 #define	TSENS_DUMP(dev, msg, x...)		pr_info(msg, ##x)
 #endif
 
-#if IS_ENABLED(CONFIG_THERMAL_TSENS)
+#if defined(CONFIG_THERMAL_TSENS)
 int tsens2xxx_dbg(struct tsens_device *data, u32 id, u32 dbg_type, int *temp);
 #else
 static inline int tsens2xxx_dbg(struct tsens_device *data, u32 id,
@@ -139,7 +137,6 @@ struct tsens_sensor {
 	struct tsens_context		thr_state;
 	int				offset;
 	int				slope;
-	int				emul_temperature;
 };
 
 /**
@@ -156,7 +153,6 @@ struct tsens_ops {
 								int *temp);
 	int (*sensor_en)(struct tsens_device *tmdev, u32 sensor_id);
 	int (*calibrate)(struct tsens_device *tmdev);
-	int (*set_emul_temp)(struct tsens_sensor *tm_sensor, int *temp);
 };
 
 struct tsens_irqs {

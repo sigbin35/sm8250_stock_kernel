@@ -2,20 +2,6 @@
 
 menu "Qualcomm Technologies, Inc. Charger and Fuel Gauge support"
 
-config QPNP_PMIC_VOTER
-	tristate "QPNP PMIC Voter library"
-	help
-		Say Y here to enable the Qualcomm Technologies, Inc. PMIC Voter library
-		which is used by several of the QPNP drivers.
-
-config QPNP_BATTERY
-	tristate "QPNP Battery library"
-	default m if QPNP_SMB5=m || QPNP_QNOVO5=m
-	default y if QPNP_SMB5=y || QPNP_QNOVO5=y
-	help
-		Say Y here to enable the Qualcomm Technologies, Inc. Battery library
-		which is used by several of the QPNP drivers.
-
 config QPNP_SMB2
         tristate "SMB2 Battery Charger"
         depends on MFD_SPMI_PMIC
@@ -32,8 +18,6 @@ config QPNP_SMB2
 config QPNP_SMB5
 	tristate "SMB5 Battery Charger"
 	depends on MFD_SPMI_PMIC
-	depends on QPNP_PMIC_VOTER
-	depends on QPNP_REVID
 	help
 	  Say Y to enables support for the SMB5 charging peripheral.
 	  The QPNP SMB5 charger driver supports the charger peripheral
@@ -69,9 +53,7 @@ config SMB138X_CHARGER
 
 config SMB1390_CHARGE_PUMP_PSY
 	tristate "SMB1390 power supply framework based driver"
-	depends on MFD_SPMI_PMIC
-	depends on QPNP_PMIC_VOTER
-	depends on QPNP_REVID
+	depends on MFD_I2C_PMIC
 	help
 	  Say Y to include support for SMB1390 Charge Pump driver based on
 	  power supply framework.
@@ -94,8 +76,6 @@ config SMB1351_USB_CHARGER
 config SMB1355_SLAVE_CHARGER
 	tristate "SMB1355 Slave Battery Charger"
 	depends on MFD_I2C_PMIC
-	depends on QPNP_PMIC_VOTER
-	depends on QPNP_REVID
 	help
 	  Say Y to include support for SMB1355 Battery Charger.
 	  SMB1355 is a single phase 5A battery charger.
@@ -104,9 +84,8 @@ config SMB1355_SLAVE_CHARGER
 	  A charger status change triggers an IRQ via the device STAT pin.
 
 config QPNP_QNOVO5
-	tristate "QPNP QNOVO5 driver"
+	bool "QPNP QNOVO5 driver"
 	depends on MFD_SPMI_PMIC
-	depends on QPNP_PMIC_VOTER
 	help
 	  Say Y here to enable the Qnovo5 PBS-based pulse charging engine.
 	  Qnovo5 driver accepts pulse parameters via sysfs entries and programs
@@ -125,8 +104,6 @@ config QPNP_FG_GEN3
 config QPNP_FG_GEN4
 	tristate "QPNP GEN4 fuel gauge driver"
 	depends on MFD_SPMI_PMIC
-	depends on QPNP_PMIC_VOTER
-	depends on QPNP_REVID
 	help
 	  Say Y here to enable the GEN4 Fuel Gauge driver. This adds support
 	  for battery fuel gauging and state of charge of battery connected to
@@ -135,10 +112,8 @@ config QPNP_FG_GEN4
 	  when the capacity is updated.
 
 config QPNP_QG
-	tristate "QPNP Qgauge driver"
+	bool "QPNP Qgauge driver"
 	depends on MFD_SPMI_PMIC
-	depends on QPNP_PMIC_VOTER
-	depends on QPNP_REVID
 	help
 	  Say Y here to enable the Qualcomm Technologies, Inc. QGauge driver
 	  which uses the periodic sampling of the battery voltage and current

@@ -62,6 +62,11 @@ struct msm_rpmstats_kobj_attr {
 	struct msm_rpmstats_platform_data *pd;
 };
 
+#ifdef CONFIG_SEC_PM
+struct msm_rpmstats_platform_data *debug_pdata;
+u64 last_accumulated[5];
+#endif
+
 static inline u64 get_time_in_sec(u64 counter)
 {
 	do_div(counter, MSM_ARCH_TIMER_FREQ);
@@ -167,69 +172,120 @@ static inline int msm_rpmstats_copy_stats(
 	return length;
 }
 
-struct msm_rpmstats_platform_data *rpmstats_pdata;
-void __iomem *rpmstats_base;
-static DEFINE_MUTEX(rpm_stats_mutex);
-int msm_rpmstats_stats_dump(void)
+#ifdef CONFIG_SEC_PM
+void debug_rpmstats_show(char *annotation)
 {
 	void __iomem *reg;
-	char *buf;
-	int j, curr_len = 0;
 	struct msm_rpm_stats_data data;
-	char stat_type[5] = {0};
-	u64 actual_last_sleep = 0;
-	int ret = 0;
+	int i;
+	char stat_type[5];
+	u64 time_in_last_mode;
+	u64 time_since_last_mode;
+	u64 actual_last_sleep;
+	char buf[256];
+	char *buf_ptr = buf;
 
-	mutex_lock(&rpm_stats_mutex);
-
-	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
-	if (!buf) {
-		ret = -ENOMEM;
-		goto err_unlock;
-	}
-	reg = rpmstats_base;
+	reg = ioremap_nocache(debug_pdata->phys_addr_base,
+					debug_pdata->phys_size);
 	if (!reg) {
-		ret = -EBUSY;
-		goto err_kfree;
+		pr_err("%s: ERROR could not ioremap start=%pa, len=%u\n",
+			__func__, &debug_pdata->phys_addr_base,
+			debug_pdata->phys_size);
+		return;
 	}
 
-	for (j = 0; j < rpmstats_pdata->num_records; j++) {
-		data.stat_type = msm_rpmstats_read_long_register(reg, j,
-			offsetof(struct msm_rpm_stats_data, stat_type));
-		data.count = msm_rpmstats_read_long_register(reg, j,
-			offsetof(struct msm_rpm_stats_data, count));
-		data.accumulated = msm_rpmstats_read_quad_register(reg, j,
-			offsetof(struct msm_rpm_stats_data, accumulated));
+	buf_ptr += sprintf(buf_ptr, "PM: %s: ", annotation);
+	for (i = 0; i < debug_pdata->num_records; i++) {
+		data.stat_type = msm_rpmstats_read_long_register(reg, i,
+				offsetof(struct msm_rpm_stats_data,
+					stat_type));
+		data.count = msm_rpmstats_read_long_register(reg, i,
+				offsetof(struct msm_rpm_stats_data, count));
+		data.last_entered_at = msm_rpmstats_read_quad_register(reg,
+				i, offsetof(struct msm_rpm_stats_data,
+					last_entered_at));
+		data.last_exited_at = msm_rpmstats_read_quad_register(reg,
+				i, offsetof(struct msm_rpm_stats_data,
+					last_exited_at));
+		data.accumulated = msm_rpmstats_read_quad_register(reg,
+				i, offsetof(struct msm_rpm_stats_data,
+					accumulated));
 
+		stat_type[4] = 0;
 		memcpy(stat_type, &data.stat_type, sizeof(u32));
+
+		time_in_last_mode = data.last_exited_at - data.last_entered_at;
+		time_in_last_mode = get_time_in_sec(time_in_last_mode);
+		time_since_last_mode = arch_counter_get_cntvct()
+						- data.last_exited_at;
+		time_since_last_mode = get_time_in_sec(time_since_last_mode);
 		actual_last_sleep = get_time_in_sec(data.accumulated);
 
-		if (curr_len < PAGE_SIZE) {
-			curr_len += snprintf(buf + curr_len,
-				PAGE_SIZE - curr_len,
-				"(%s,", stat_type);
-		}
-		if (curr_len < PAGE_SIZE) {
-			curr_len += snprintf(buf + curr_len,
-				PAGE_SIZE - curr_len,
-				"%d,sleep:%llus) ", data.count,
-				actual_last_sleep);
-		}
+#ifdef CONFIG_SEC_PM
+		if (data.accumulated == last_accumulated[i])
+			buf_ptr += sprintf(buf_ptr, " *");
+
+		last_accumulated[i] = data.accumulated;
+#endif
+
+		buf_ptr += sprintf(buf_ptr, "%s(%d, %llu, %llu, %llu)",
+			stat_type, data.count, time_in_last_mode,
+			time_since_last_mode, actual_last_sleep);
+
+		if (i < (debug_pdata->num_records - 1))
+			buf_ptr += sprintf(buf_ptr, ", ");
+		else
+			buf_ptr += sprintf(buf_ptr, "\n");
 	}
 
-	if (curr_len < PAGE_SIZE) {
-		buf[curr_len] = '\0';
-		pr_info("%s\n", buf);
-	} else
-		pr_err("Failed to allocate string range\n");
+	iounmap(reg);
 
-err_kfree:
-	kfree(buf);
-err_unlock:
-	mutex_unlock(&rpm_stats_mutex);
+	printk(KERN_INFO "%s", buf);
 
-	return ret;
+	return;
 }
+EXPORT_SYMBOL(debug_rpmstats_show);
+
+static ssize_t cxsd_stats_show(struct kobject *kobj,
+					struct kobj_attribute *attr,
+					char *buf)
+{
+	void __iomem *reg;
+	struct msm_rpm_stats_data data;
+	int i;
+	char stat_type[5];
+	u64 accumulated_sleep_time;
+
+	reg = ioremap_nocache(debug_pdata->phys_addr_base,
+					debug_pdata->phys_size);
+	if (!reg) {
+		pr_err("%s: ERROR could not ioremap start=%pa, len=%u\n",
+			__func__, &debug_pdata->phys_addr_base,
+			debug_pdata->phys_size);
+		return 0;
+	}
+
+	for (i = 0; i < debug_pdata->num_records; i++) {
+		data.stat_type = msm_rpmstats_read_long_register(reg, i,
+				offsetof(struct msm_rpm_stats_data, stat_type));
+		memcpy(stat_type, &data.stat_type, sizeof(u32));
+
+		if(!strncmp(stat_type, "cxsd", 4))
+			break;
+		else
+			continue;
+	}
+	data.count = msm_rpmstats_read_long_register(reg, i,
+			offsetof(struct msm_rpm_stats_data, count));
+	data.accumulated = msm_rpmstats_read_quad_register(reg,
+			i, offsetof(struct msm_rpm_stats_data, accumulated));
+	accumulated_sleep_time = get_time_in_sec(data.accumulated);
+
+	iounmap(reg);
+
+	return sprintf(buf, "%d %llu\n", data.count, accumulated_sleep_time);
+}
+#endif
 
 static ssize_t rpmstats_show(struct kobject *kobj,
 			struct kobj_attribute *attr, char *buf)
@@ -265,6 +321,9 @@ static int msm_rpmstats_create_sysfs(struct platform_device *pdev,
 {
 	struct kobject *rpmstats_kobj = NULL;
 	struct msm_rpmstats_kobj_attr *rpms_ka = NULL;
+#ifdef CONFIG_SEC_PM
+	struct msm_rpmstats_kobj_attr *rpms_ka_cx = NULL;
+#endif
 	int ret = 0;
 
 	rpmstats_kobj = kobject_create_and_add("system_sleep", power_kobj);
@@ -293,6 +352,26 @@ static int msm_rpmstats_create_sysfs(struct platform_device *pdev,
 	ret = sysfs_create_file(rpmstats_kobj, &rpms_ka->ka.attr);
 	platform_set_drvdata(pdev, rpms_ka);
 
+#ifdef CONFIG_SEC_PM
+	rpms_ka_cx = kzalloc(sizeof(*rpms_ka_cx), GFP_KERNEL);
+	if (!rpms_ka_cx) {
+		kobject_put(rpmstats_kobj);
+		ret = -ENOMEM;
+		goto fail;
+	}
+
+	rpms_ka_cx->kobj = rpmstats_kobj;
+
+	sysfs_attr_init(&rpms_ka_cx->ka.attr);
+	rpms_ka_cx->pd = pd;
+	rpms_ka_cx->ka.attr.mode = 0444;
+	rpms_ka_cx->ka.attr.name = "cxsd_stats";
+	rpms_ka_cx->ka.show = cxsd_stats_show;
+	rpms_ka_cx->ka.store = NULL;
+
+	ret = sysfs_create_file(rpmstats_kobj, &rpms_ka_cx->ka.attr);
+	platform_set_drvdata(pdev, rpms_ka_cx);
+#endif
 fail:
 	return ret;
 }
@@ -334,18 +413,11 @@ static int msm_rpmstats_probe(struct platform_device *pdev)
 	if (of_property_read_u32(pdev->dev.of_node, key, &pdata->num_records))
 		pdata->num_records = RPM_STATS_NUM_REC;
 
-	msm_rpmstats_create_sysfs(pdev, pdata);
+#ifdef CONFIG_SEC_PM
+	debug_pdata = pdata;
+#endif
 
-	rpmstats_pdata = pdata;
-	rpmstats_base = ioremap_nocache(
-		rpmstats_pdata->phys_addr_base,
-		rpmstats_pdata->phys_size);
-	if (!rpmstats_base) {
-		pr_err("Failed to ioremap offset address base=%pa, size=%u\n",
-			&rpmstats_pdata->phys_addr_base,
-			rpmstats_pdata->phys_size);
-		return -ENODEV;
-	}
+	msm_rpmstats_create_sysfs(pdev, pdata);
 
 	return 0;
 }
@@ -382,6 +454,4 @@ static struct platform_driver msm_rpmstats_driver = {
 		.of_match_table = rpm_stats_table,
 	},
 };
-module_platform_driver(msm_rpmstats_driver);
-MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("MSM RPMH Statistics driver");
+builtin_platform_driver(msm_rpmstats_driver);

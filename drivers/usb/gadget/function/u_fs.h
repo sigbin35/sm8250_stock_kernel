@@ -18,9 +18,7 @@
 #include <linux/mutex.h>
 #include <linux/workqueue.h>
 #include <linux/refcount.h>
-#ifndef CONFIG_IPC_LOGGING_MODULE
 #include <linux/ipc_logging.h>
-#endif
 
 #ifdef VERBOSE_DEBUG
 #ifndef pr_vdebug

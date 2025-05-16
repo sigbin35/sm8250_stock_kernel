@@ -26,7 +26,12 @@
 #define REG_DATA_HI 0x8
 
 #define GET_ADDR(REG, UNIT_NO) (REG + (UNIT_DIST * UNIT_NO))
+
+#ifdef CONFIG_SEC_PM
 #define MSM_ARCH_TIMER_FREQ	19200000
+#define GET_SEC(A)		((A) / (MSM_ARCH_TIMER_FREQ))
+#define GET_MSEC(A)		(((A) / (MSM_ARCH_TIMER_FREQ / 1000)) % 1000)
+#endif
 
 enum master_smem_id {
 	MPSS = 605,
@@ -96,6 +101,65 @@ static void __iomem *rpmh_unit_base;
 
 static DEFINE_MUTEX(rpmh_stats_mutex);
 
+#ifdef CONFIG_SEC_PM
+void debug_masterstats_show(char *annotation)
+{
+	int i = 0;
+	size_t size = 0;
+	struct msm_rpmh_master_stats *record = NULL;
+	uint64_t accumulated_duration;
+	unsigned int duration_sec, duration_msec;
+	char buf[256];
+	char *buf_ptr = buf;
+
+	mutex_lock(&rpmh_stats_mutex);
+
+	buf_ptr += sprintf(buf_ptr, "PM: %s: ", annotation);
+	/* Read SMEM data written by other masters */
+	for (i = 0; i < ARRAY_SIZE(rpmh_masters); i++) {
+		record = (struct msm_rpmh_master_stats *) qcom_smem_get(
+					rpmh_masters[i].pid,
+					rpmh_masters[i].smem_id, &size);
+
+		if (!IS_ERR_OR_NULL(record)) {
+			accumulated_duration = record->accumulated_duration;
+			if (record->last_entered > record->last_exited)
+				accumulated_duration +=
+					(arch_counter_get_cntvct() -
+						record->last_entered);
+
+			if (accumulated_duration == record->accumulated_duration)
+				buf_ptr += sprintf(buf_ptr, "*");
+
+			duration_sec = GET_SEC(accumulated_duration);
+			duration_msec = GET_MSEC(accumulated_duration);
+#ifdef CONFIG_DSP_SLEEP_RECOVERY
+			subsystem_update_sleep_time(annotation,
+				rpmh_masters[i].master_name,
+				accumulated_duration);
+#endif
+			buf_ptr += sprintf(buf_ptr, "%s(%d, %u.%u), ",
+					rpmh_masters[i].master_name,
+					record->counts,
+					duration_sec, duration_msec);
+		} else {
+			continue;
+		}
+	}
+
+	buf_ptr--;
+	buf_ptr--;
+	buf_ptr += sprintf(buf_ptr, "\n");
+	mutex_unlock(&rpmh_stats_mutex);
+
+	printk(KERN_INFO "%s", buf);
+#ifdef CONFIG_DSP_SLEEP_RECOVERY
+	subsystem_monitor_sleep_issue();
+#endif
+}
+EXPORT_SYMBOL(debug_masterstats_show);
+#endif
+
 static ssize_t msm_rpmh_master_stats_print_data(char *prvbuf, ssize_t length,
 				struct msm_rpmh_master_stats *record,
 				const char *name)
@@ -120,69 +184,6 @@ static ssize_t msm_rpmh_master_stats_print_data(char *prvbuf, ssize_t length,
 			name, record->version_id, record->counts,
 			record->last_entered, record->last_exited,
 			accumulated_duration);
-}
-
-static inline u64 get_time_in_sec(u64 counter)
-{
-	do_div(counter, MSM_ARCH_TIMER_FREQ);
-
-	return counter;
-}
-
-void msm_rpmh_master_stats_dump(void)
-{
-	int i = 0, len = 0;
-	size_t size = 0;
-	struct msm_rpmh_master_stats *record = NULL;
-	u64 temp_sleep_time = 0;
-	char read_buf[256];
-
-	mutex_lock(&rpmh_stats_mutex);
-
-	record = &apss_master_stats;
-	temp_sleep_time = record->accumulated_duration;
-
-	if (record->last_entered > record->last_exited) {
-		temp_sleep_time +=
-			(arch_counter_get_cntvct()
-			- record->last_entered);
-	}
-
-	len += snprintf(read_buf, sizeof(read_buf),
-		"%s(%d,sleep:%llus) ", "APSS", record->counts,
-		get_time_in_sec(temp_sleep_time));
-
-	for (i = 0; i < ARRAY_SIZE(rpmh_masters); i++) {
-		record = (struct msm_rpmh_master_stats *)qcom_smem_get(
-			rpmh_masters[i].pid,
-			rpmh_masters[i].smem_id, &size);
-		if (!IS_ERR_OR_NULL(record)) {
-			temp_sleep_time = record->accumulated_duration;
-
-			if (record->last_entered > record->last_exited) {
-				temp_sleep_time +=
-					(arch_counter_get_cntvct()
-					- record->last_entered);
-			}
-
-			if (len < sizeof(read_buf)) {
-				len += snprintf(read_buf + len,
-					sizeof(read_buf) - len,
-					"%s(%d,sleep:%llus) ",
-					rpmh_masters[i].master_name,
-					record->counts,
-					get_time_in_sec(temp_sleep_time));
-			}
-		}
-	}
-
-	if (len < sizeof(read_buf)) {
-		read_buf[len] = '\0';
-		pr_info("%s\n", read_buf);
-	} else
-		pr_err("Failed to allocate string range\n");
-
-	mutex_unlock(&rpmh_stats_mutex);
 }
 
 static ssize_t msm_rpmh_master_stats_show(struct kobject *kobj,
@@ -298,6 +299,7 @@ static int msm_rpmh_master_stats_probe(struct platform_device *pdev)
 
 	apss_master_stats.version_id = 0x1;
 	platform_set_drvdata(pdev, prvdata);
+
 	return ret;
 
 fail_iomap:

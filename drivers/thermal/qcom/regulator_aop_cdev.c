@@ -217,7 +217,4 @@ static struct platform_driver reg_dev_driver = {
 	},
 	.probe = reg_dev_probe,
 };
-module_platform_driver(reg_dev_driver);
-
-MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("QTI AOP Regulator cooling device");
+builtin_platform_driver(reg_dev_driver);

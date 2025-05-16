@@ -50,8 +50,8 @@ enum se_protocol_types {
  * @geni_pinctrl:	Handle to the pinctrl configuration.
  * @geni_gpio_active:	Handle to the default/active pinctrl state.
  * @geni_gpi_sleep:	Handle to the sleep pinctrl state.
- * @num_clk_levels:	Number of valid clock levels in clk_perf_tbl.
- * @clk_perf_tbl:	Table of clock frequency input to Serial Engine clock.
+ * @num_clk_levels: Number of valid clock levels in clk_perf_tbl.
+ * @clk_perf_tbl: Table of clock frequency input to Serial Engine clock.
  */
 struct se_geni_rsc {
 	struct device *ctrl_dev;
@@ -380,7 +380,7 @@ if (print) { \
 } while (0)
 
 
-#if IS_ENABLED(CONFIG_QCOM_GENI_SE)
+#ifdef CONFIG_QCOM_GENI_SE
 /**
  * geni_read_reg_nolog() - Helper function to read from a GENI register
  * @base:	Base address of the serial engine's register block.
@@ -819,6 +819,7 @@ int geni_se_iommu_free_buf(struct device *wrapper_dev, dma_addr_t *iova,
  */
 void geni_se_dump_dbg_regs(struct se_geni_rsc *rsc, void __iomem *base,
 				void *ipc);
+
 #else
 static inline unsigned int geni_read_reg_nolog(void __iomem *base, int offset)
 {

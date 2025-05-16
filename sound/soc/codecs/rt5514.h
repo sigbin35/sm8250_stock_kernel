@@ -57,8 +57,6 @@
 #define RT5514_ANA_CTRL_INBUF			0x2228
 #define RT5514_ANA_CTRL_VREF			0x222c
 #define RT5514_ANA_CTRL_PLL3			0x2240
-#define RT5514_ANA_CTRL_PLL2_1			0x2250
-#define RT5514_ANA_CTRL_PLL2_2			0x2254
 #define RT5514_ANA_CTRL_PLL1_1			0x2260
 #define RT5514_ANA_CTRL_PLL1_2			0x2264
 #define RT5514_DMIC_LP_CTRL			0x2e00
@@ -70,7 +68,6 @@
 #define RT5514_VENDOR_ID2			0x2ff4
 
 #define RT5514_DSP_MAPPING			0x18000000
-#define RT5514_DSP_CHRE_INFORM			0x18002fec
 
 /* RT5514_PWR_ANA1 (0x2004) */
 #define RT5514_POW_LDO18_IN			(0x1 << 5)
@@ -85,10 +82,6 @@
 #define RT5514_POW_BG_LDO21_BIT			1
 
 /* RT5514_PWR_ANA2 (0x2008) */
-#define RT5514_POW_PLL2				(0x1 << 22)
-#define RT5514_POW_PLL2_BIT			22
-#define RT5514_POW_PLL2_LDO			(0x1 << 20)
-#define RT5514_POW_PLL2_LDO_BIT			20
 #define RT5514_POW_PLL1				(0x1 << 18)
 #define RT5514_POW_PLL1_BIT			18
 #define RT5514_POW_PLL1_LDO			(0x1 << 16)
@@ -174,6 +167,18 @@
 #define RT5514_I2S_DL_24			(0x2 << 0)
 #define RT5514_I2S_DL_8				(0x3 << 0)
 
+/* RT5514_I2S_CTRL2 (0x2014) */
+#define RT5514_TDM_DOCKING_MODE			(0x1 << 31)
+#define RT5514_TDM_DOCKING_MODE_SFT		31
+#define RT5514_TDM_DOCKING_VALID_CH_MASK	(0x1 << 29)
+#define RT5514_TDM_DOCKING_VALID_CH_SFT		29
+#define RT5514_TDM_DOCKING_VALID_CH2		(0x0 << 29)
+#define RT5514_TDM_DOCKING_VALID_CH4		(0x1 << 29)
+#define RT5514_TDM_DOCKING_START_MASK		(0x1 << 28)
+#define RT5514_TDM_DOCKING_START_SFT		28
+#define RT5514_TDM_DOCKING_START_SLOT0		(0x0 << 28)
+#define RT5514_TDM_DOCKING_START_SLOT4		(0x1 << 28)
+
 /* RT5514_DIG_SOURCE_CTRL (0x20a4) */
 #define RT5514_AD1_DMIC_INPUT_SEL		(0x1 << 1)
 #define RT5514_AD1_DMIC_INPUT_SEL_SFT		1
@@ -185,10 +190,6 @@
 #define RT5514_PLL_1_SEL_SFT			12
 #define RT5514_PLL_1_SEL_SCLK			(0x3 << 12)
 #define RT5514_PLL_1_SEL_MCLK			(0x4 << 12)
-#define RT5514_PLL_2_SEL_MASK			(0x7 << 8)
-#define RT5514_PLL_2_SEL_SFT			8
-#define RT5514_PLL_2_SEL_SCLK			(0x3 << 8)
-#define RT5514_PLL_2_SEL_MCLK			(0x4 << 8)
 
 /* RT5514_CLK_CTRL1 (0x2104) */
 #define RT5514_CLK_AD_ANA1_EN			(0x1 << 31)
@@ -243,91 +244,37 @@
 #define RT5514_PLL_M_MASK			(RT5514_PLL_M_MAX << 0)
 #define RT5514_PLL_M_SFT			0
 
-/*  RT5514_ANA_CTRL_PLL1/2_2 (0x2254 0x2264) */
+/*  RT5514_ANA_CTRL_PLL1_2 (0x2264) */
 #define RT5514_PLL_M_BP				(0x1 << 2)
 #define RT5514_PLL_M_BP_SFT			2
 #define RT5514_PLL_K_BP				(0x1 << 1)
 #define RT5514_PLL_K_BP_SFT			1
-#define RT5514_EN_LDO_PLL			(0x1 << 0)
-#define RT5514_EN_LDO_PLL_BIT			0
+#define RT5514_EN_LDO_PLL1			(0x1 << 0)
+#define RT5514_EN_LDO_PLL1_BIT			0
 
 #define RT5514_PLL_INP_MAX			40000000
 #define RT5514_PLL_INP_MIN			256000
 
 #define RT5514_FIRMWARE1	"rt5514_dsp_fw1.bin"
 #define RT5514_FIRMWARE2	"rt5514_dsp_fw2.bin"
-#define RT5514_FIRMWARE3	"rt5514_dsp_fw3.bin"
-#define RT5514_FIRMWARE4	"rt5514_dsp_fw4.bin"
-
-#define RT5514P_FIRMWARE1	"rt5514p_dsp_fw1.bin"
-#define RT5514P_FIRMWARE2	"rt5514p_dsp_fw2.bin"
-#define RT5514P_FIRMWARE3	"rt5514p_dsp_fw3.bin"
-#define RT5514P_FIRMWARE4	"rt5514p_dsp_fw4.bin"
-
-#define AMBIENT_COMMON_MAX_PAYLOAD_BUFFER_SIZE	(128)
-#define DSP_IDENTIFIER_SIZE			(40)
-
-#define DIVIDER_1_P024		1024000
-#define DIVIDER_1_P536		1536000
-#define DIVIDER_2_P048		2048000
-#define DIVIDER_3_P072		3072000
-
-#define UNMUTE_TIMEOUT_MS	1000
-#define UNMUTE_SWITCH_MS	85
 
 /* System Clock Source */
 enum {
 	RT5514_SCLK_S_MCLK,
-	RT5514_SCLK_S_PLL,
+	RT5514_SCLK_S_PLL1,
 };
 
-/* PLL Source */
+/* PLL1 Source */
 enum {
-	RT5514_PLL_S_MCLK,
-	RT5514_PLL_S_BCLK,
-};
-
-enum {
-	RT5514_DSP_WOV_BOTH,
-	RT5514_DSP_WOV_HOTWORD,
-	RT5514_DSP_WOV_MUSDET,
-	RT5514_DSP_WOV_NON,
-};
-
-enum {
-	RT5514_DSP_FUNC_WOV,
-	RT5514_DSP_FUNC_WOV_SENSOR,
-	RT5514_DSP_FUNC_WOV_I2S,
-	RT5514_DSP_FUNC_WOV_I2S_SENSOR,
-	RT5514_DSP_FUNC_SUSPEND,
-	RT5514_DSP_FUNC_I2S,
-};
-
-struct _payload_st {
-	unsigned int size;
-	unsigned int status;
-	char data[AMBIENT_COMMON_MAX_PAYLOAD_BUFFER_SIZE];
-};
-
-struct _dsp_fw_ver_st {
-	unsigned short chip_id;
-	unsigned short feature_id;
-	unsigned short version;
-	unsigned short sub_version;
-};
-
-struct _dsp_mem_st {
-	unsigned int iram;
-	unsigned int dram;
+	RT5514_PLL1_S_MCLK,
+	RT5514_PLL1_S_BCLK,
 };
 
 struct rt5514_priv {
 	struct rt5514_platform_data pdata;
 	struct snd_soc_component *component;
 	struct regmap *i2c_regmap, *regmap;
-	struct clk *mclk;
-	struct gpio_desc *gpiod_reset;
-	const struct firmware *fw[4];
+	struct clk *mclk, *dsp_calib_clk;
 	int sysclk;
 	int sysclk_src;
 	int lrck;
@@ -335,26 +282,8 @@ struct rt5514_priv {
 	int pll_src;
 	int pll_in;
 	int pll_out;
-	int dsp_enabled, dsp_enabled_last, dsp_test, spi_switch;
-	int dsp_adc_enabled, dsp_buffer_channel;
-	int dsp_req, adc_req;
-	u8 *hotword_model_buf, *musdet_model_buf;
-	unsigned int hotword_model_len, musdet_model_len;
-	int divider_param;
-	struct _payload_st payload;
-	bool v_p;
-	int i2c_patch_size;
-	char *fw_name[4];
-	unsigned int fw_addr[4];
-	bool is_streaming;
-	bool need_reload;
-#if IS_ENABLED(CONFIG_SND_SOC_RT5514_QMI)
-	bool need_reset;
-#endif
-	struct mutex stream_lock;
-	unsigned int sound_model_addr[2];
-	bool load_default_sound_model;
-	struct delayed_work unmute_work;
+	int dsp_enabled;
+	unsigned int pll3_cal_value;
 };
 
 #endif /* __RT5514_H__ */

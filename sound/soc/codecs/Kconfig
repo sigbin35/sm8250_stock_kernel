@@ -53,8 +53,8 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_CS35L33 if I2C
 	select SND_SOC_CS35L34 if I2C
 	select SND_SOC_CS35L35 if I2C
-	select SND_SOC_CS35L41_SPI if SPI_MASTER
 	select SND_SOC_CS35L41_I2C if I2C
+	select SND_SOC_CS35L41_SPI if SPI_MASTER
 	select SND_SOC_CS42L42 if I2C
 	select SND_SOC_CS42L51_I2C if I2C
 	select SND_SOC_CS42L52 if I2C && INPUT
@@ -279,6 +279,7 @@ config SND_SOC_WM_ADSP
 	default m if SND_SOC_WM5102=m
 	default m if SND_SOC_WM5110=m
 	default m if SND_SOC_WM2200=m
+	default y if SND_SOC_CS35L41=y
 
 config SND_SOC_AB8500_CODEC
 	tristate
@@ -467,17 +468,13 @@ config SND_SOC_CS35L41
 	tristate "Cirrus Logic CS35L41 CODEC"
 	select SND_SOC_WM_ADSP
 
-config SND_SOC_CS35L41_SPI
-	tristate "Cirrus Logic CS35L41 CODEC (SPI)"
-	depends on SPI_MASTER
+config SND_SOC_CS35L41_4SPK
+	tristate "Cirrus Logic CS35L41 CODEC"
 	select SND_SOC_CS35L41
-	select REGMAP_SPI
 
-config SND_SOC_CS35L41_I2C
-	tristate "Cirrus Logic CS35L41 CODEC (I2C)"
-	depends on I2C
+config SND_SOC_CS35L41_3SPK
+	tristate "Cirrus Logic CS35L41 CODEC"
 	select SND_SOC_CS35L41
-	select REGMAP_I2C
 
 config SND_SOC_CS42L42
 	tristate "Cirrus Logic CS42L42 CODEC"
@@ -840,13 +837,10 @@ config SND_SOC_RT1305
 	tristate
 
 config SND_SOC_RT5514
-	tristate "Realtek RT5514 CODEC"
-
-config SND_SOC_RT5514_QMI
-	tristate "Realtek RT5514 CODEC QMI"
+	tristate
 
 config SND_SOC_RT5514_SPI
-	tristate "Realtek RT5514 CODEC SPI"
+	tristate
 
 config SND_SOC_RT5514_SPI_BUILTIN
 	bool # force RT5514_SPI to be built-in to avoid link errors
@@ -1331,8 +1325,5 @@ config SND_SOC_NAU8825
 config SND_SOC_TPA6130A2
 	tristate "Texas Instruments TPA6130A2 headphone amplifier"
 	depends on I2C
-
-config SND_SOC_CODEC_DETECT
-	tristate "Google CODEC DETECT"
 
 endmenu

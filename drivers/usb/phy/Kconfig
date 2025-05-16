@@ -1,4 +1,3 @@
-# SPDX-License-Identifier: GPL-2.0
 #
 # Physical Layer USB driver configuration
 #
@@ -147,6 +146,13 @@ config USB_MSM_SSPHY_QMP
 	  This driver supports the PHY which uses the QSCRATCH-based register
 	  set for its control sequences, normally paired with newer DWC3-based
 	  SuperSpeed controllers.
+
+config USB_MSM_SSPHY_QMP_TUNING
+	bool "USB MSM SSPHY QMP TUNING support"
+	depends on USB_MSM_SSPHY_QMP
+	bool
+	help
+	  Enable this to tune ssphy QMP register.
 
 config MSM_QUSB_PHY
 	tristate "MSM QUSB2 PHY Driver"

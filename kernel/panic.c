@@ -32,6 +32,8 @@
 #include <asm/sections.h>
 #include <soc/qcom/minidump.h>
 
+#include <linux/sec_debug.h>
+
 #define PANIC_TIMER_STEP 100
 #define PANIC_BLINK_SPD 18
 
@@ -42,26 +44,14 @@ static int pause_on_oops;
 static int pause_on_oops_flag;
 static DEFINE_SPINLOCK(pause_on_oops_lock);
 bool crash_kexec_post_notifiers;
-
-/*
- * With panic_on_warn, it enable too many panic on all warnings, and kernel may
- * not be free from legit warnings. So use CONFIG_PANIC_ON_WARN_DEFAULT_ENABLE
- * to control panic_on_warn in debug purpose.
- */
-#ifdef CONFIG_PANIC_ON_WARN_DEFAULT_ENABLE
-int panic_on_warn __read_mostly = 1;
-#else
 int panic_on_warn __read_mostly;
-#endif
 
 int panic_timeout = CONFIG_PANIC_TIMEOUT;
 EXPORT_SYMBOL_GPL(panic_timeout);
 
 ATOMIC_NOTIFIER_HEAD(panic_notifier_list);
-EXPORT_SYMBOL(panic_notifier_list);
 
-void (*vendor_panic_cb)(u64 sp);
-EXPORT_SYMBOL_GPL(vendor_panic_cb);
+EXPORT_SYMBOL(panic_notifier_list);
 
 static long no_blink(int state)
 {
@@ -155,6 +145,10 @@ void panic(const char *fmt, ...)
 	int old_cpu, this_cpu;
 	bool _crash_kexec_post_notifiers = crash_kexec_post_notifiers;
 
+	sec_debug_store_extc_idx(false);
+	/*To prevent watchdog reset during panic handling. */
+	emerg_pet_watchdog();
+
 	/*
 	 * Disable local interrupts. This will prevent panic_smp_self_stop
 	 * from deadlocking the first cpu that invokes the panic, since
@@ -185,13 +179,15 @@ void panic(const char *fmt, ...)
 	if (old_cpu != PANIC_CPU_INVALID && old_cpu != this_cpu)
 		panic_smp_self_stop();
 
+	sec_debug_sched_msg("!!panic!!");
+	sec_debug_sched_msg("!!panic!!");
+
 	console_verbose();
 	bust_spinlocks(1);
 	va_start(args, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
-	if (vendor_panic_cb)
-		vendor_panic_cb(0);
+	dump_stack_minidump(0);
 	pr_emerg("Kernel panic - not syncing: %s\n", buf);
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 	/*
@@ -200,6 +196,9 @@ void panic(const char *fmt, ...)
 	if (!test_taint(TAINT_DIE) && oops_in_progress <= 1)
 		dump_stack();
 #endif
+
+	sec_debug_summary_save_panic_info(buf,
+			(unsigned long)__builtin_return_address(0));
 
 	/*
 	 * If we have crashed and we have a crash kernel loaded let it handle

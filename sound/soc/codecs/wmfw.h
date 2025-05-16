@@ -1,5 +1,3 @@
-/* SPDX-License-Identifier: GPL-2.0 */
-
 /*
  * wmfw.h - Wolfson firmware format information
  *

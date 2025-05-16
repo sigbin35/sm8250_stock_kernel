@@ -72,7 +72,6 @@ static struct coresight_device *activated_sink;
  * it needs to look for another sync sequence.
  */
 const u32 barrier_pkt[4] = {0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff};
-EXPORT_SYMBOL_GPL(barrier_pkt);
 
 static int coresight_id_match(struct device *dev, void *data)
 {
@@ -1072,7 +1071,6 @@ void coresight_disable_all_source_link(void)
 
 	mutex_unlock(&coresight_mutex);
 }
-EXPORT_SYMBOL_GPL(coresight_disable_all_source_link);
 
 void coresight_enable_all_source_link(void)
 {
@@ -1091,7 +1089,6 @@ void coresight_enable_all_source_link(void)
 	activated_sink = NULL;
 	mutex_unlock(&coresight_mutex);
 }
-EXPORT_SYMBOL_GPL(coresight_enable_all_source_link);
 
 int coresight_enable(struct coresight_device *csdev)
 {
@@ -1466,7 +1463,6 @@ int coresight_timeout(void __iomem *addr, u32 offset, int position, int value)
 
 	return -EAGAIN;
 }
-EXPORT_SYMBOL_GPL(coresight_timeout);
 
 static ssize_t reset_source_sink_store(struct bus_type *bus,
 				       const char *buf, size_t size)

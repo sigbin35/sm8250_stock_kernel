@@ -6,7 +6,6 @@
 #include <linux/kernel.h>
 #include <linux/hw_random.h>
 #include <linux/io.h>
-#include <linux/module.h>
 
 #include <soc/qcom/scm.h>
 
@@ -54,15 +53,3 @@ void __init init_random_pool(void)
 	}
 }
 
-#ifdef MODULE
-int __init early_random_init(void)
-{
-	init_random_pool();
-	return 0;
-}
-
-module_init(early_random_init);
-#endif
-
-MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("Early Random");

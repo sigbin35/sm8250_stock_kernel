@@ -21,13 +21,11 @@
 #define UFS_ANY_VENDOR 0xFFFF
 #define UFS_ANY_MODEL  "ANY_MODEL"
 
-#define UFS_VENDOR_MICRON      0x12C
 #define UFS_VENDOR_TOSHIBA     0x198
 #define UFS_VENDOR_SAMSUNG     0x1CE
 #define UFS_VENDOR_SKHYNIX     0x1AD
 #define UFS_VENDOR_WDC         0x145
 #define UFS_VENDOR_MICRON      0x12C
-
 /**
  * ufs_dev_fix - ufs device quirk info
  * @card: ufs card details
@@ -157,11 +155,10 @@ struct ufs_dev_fix {
 #define UFS_DEVICE_QUIRK_WAIT_AFTER_REF_CLK_UNGATE	(1 << 11)
 
 /*
- * UFSv2.1 customized feature uses the same descriptor bit with write
- * boost. Disable the check function to avoid triggering write boost
- * unexpectedly.
+ * Some UFS devices support the FATAL MODE
+ * to gether the debug info.
  */
-#define UFS_DEVICE_QUIRK_DISABLE_WRITE_BOOST	(1 << 12)
+#define UFS_DEVICE_QUIRK_SUPPORT_QUERY_FATAL_MODE	(1 << 12)
 
 /*
  * Few samsung UFS device models advertise PA_HIBERN8TIME as

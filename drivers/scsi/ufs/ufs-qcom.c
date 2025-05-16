@@ -19,7 +19,7 @@
 #include <linux/phy/phy-qcom-ufs.h>
 #include <linux/clk/qcom.h>
 
-#if IS_ENABLED(CONFIG_QCOM_BUS_SCALING)
+#ifdef CONFIG_QCOM_BUS_SCALING
 #include <linux/msm-bus.h>
 #endif
 
@@ -30,6 +30,7 @@
 #include "ufshci.h"
 #include "ufs-qcom-debugfs.h"
 #include "ufs_quirks.h"
+#include "ufshcd-crypto-qti.h"
 
 #define MAX_PROP_SIZE		   32
 #define VDDP_REF_CLK_MIN_UV        1200000
@@ -411,7 +412,6 @@ static int ufs_qcom_hce_enable_notify(struct ufs_hba *hba,
 	case POST_CHANGE:
 		/* check if UFS PHY moved from DISABLED to HIBERN8 */
 		err = ufs_qcom_check_hibern8(hba);
-		ufs_qcom_ice_enable(host);
 		break;
 	default:
 		dev_err(hba->dev, "%s: invalid status %d\n", __func__, status);
@@ -838,6 +838,7 @@ static int ufs_qcom_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 		if (host->vddp_ref_clk && ufs_qcom_is_link_off(hba))
 			ret = ufs_qcom_disable_vreg(hba->dev,
 					host->vddp_ref_clk);
+
 		if (host->vccq_parent && !hba->auto_bkops_enabled)
 			ufs_qcom_config_vreg(hba->dev,
 					host->vccq_parent, false);
@@ -881,10 +882,6 @@ static int ufs_qcom_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 	if (err)
 		goto out;
 
-	err = ufs_qcom_ice_resume(host);
-	if (err)
-		return err;
-
 	hba->is_sys_suspended = false;
 
 out:
@@ -893,7 +890,16 @@ out:
 
 static int ufs_qcom_full_reset(struct ufs_hba *hba)
 {
+	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
 	int ret = -ENOTSUPP;
+
+	host->hw_reset_count++;
+	host->last_hw_reset = (unsigned long)ktime_to_us(ktime_get());
+	host->hw_reset_saved_err = hba->saved_err;
+	host->hw_reset_saved_uic_err = hba->saved_uic_err;
+	host->hw_reset_outstanding_tasks = hba->outstanding_tasks;
+	host->hw_reset_outstanding_reqs = hba->outstanding_reqs;
+	memcpy(&host->hw_reset_ufs_stats, &hba->ufs_stats, sizeof(struct ufs_stats));
 
 	if (!hba->core_reset) {
 		dev_err(hba->dev, "%s: failed, err = %d\n", __func__,
@@ -1022,7 +1028,7 @@ static int ufs_qcom_get_pwr_dev_param(struct ufs_qcom_dev_params *qcom_param,
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_QCOM_BUS_SCALING)
+#ifdef CONFIG_QCOM_BUS_SCALING
 static int ufs_qcom_get_bus_vote(struct ufs_qcom_host *host,
 		const char *speed_mode)
 {
@@ -1463,6 +1469,13 @@ static void ufs_qcom_advertise_quirks(struct ufs_hba *hba)
 
 	if (host->disable_lpm)
 		hba->quirks |= UFSHCD_QUIRK_BROKEN_AUTO_HIBERN8;
+
+	/*
+	 * Inline crypto is currently broken with ufs-qcom at least because the
+	 * device tree doesn't include the crypto registers.  There are likely
+	 * to be other issues that will need to be addressed too.
+	 */
+	//hba->quirks |= UFSHCD_QUIRK_BROKEN_CRYPTO;
 }
 
 static void ufs_qcom_set_caps(struct ufs_hba *hba)
@@ -1472,6 +1485,7 @@ static void ufs_qcom_set_caps(struct ufs_hba *hba)
 	if (!host->disable_lpm) {
 		hba->caps |= UFSHCD_CAP_CLK_GATING;
 		hba->caps |= UFSHCD_CAP_HIBERN8_WITH_CLK_GATING;
+		hba->caps |= UFSHCD_CAP_CLK_SCALING;
 	}
 	hba->caps |= UFSHCD_CAP_AUTO_BKOPS_SUSPEND;
 
@@ -1529,8 +1543,8 @@ static int ufs_qcom_setup_clocks(struct ufs_hba *hba, bool on,
 		/* enable the device ref clock for HS mode*/
 		if (ufshcd_is_hs_mode(&hba->pwr_info))
 			ufs_qcom_dev_ref_clk_ctrl(host, true);
-	} else if (!on && (status == PRE_CHANGE)) {
 
+	} else if (!on && (status == PRE_CHANGE)) {
 		/*
 		 * If auto hibern8 is enabled then the link will already
 		 * be in hibern8 state and the ref clock can be gated.
@@ -2111,6 +2125,7 @@ static int ufs_qcom_init(struct ufs_hba *hba)
 
 	/* Make a two way bind between the qcom host and the hba */
 	host->hba = hba;
+
 	ufshcd_set_variant(hba, host);
 
 	host->generic_phy = devm_phy_get(dev, "ufsphy");
@@ -2136,6 +2151,12 @@ static int ufs_qcom_init(struct ufs_hba *hba)
 
 	/* restore the secure configuration */
 	ufs_qcom_update_sec_cfg(hba, true);
+
+	/*
+	 * Set the vendor specific ops needed for ICE.
+	 * Default implementation if the ops are not set.
+	 */
+	ufshcd_crypto_qti_set_vops(hba);
 
 	err = ufs_qcom_bus_register(host);
 	if (err)
@@ -2208,13 +2229,6 @@ static int ufs_qcom_init(struct ufs_hba *hba)
 	ufs_qcom_set_caps(hba);
 	ufs_qcom_advertise_quirks(hba);
 
-	err = ufs_qcom_ice_init(host);
-	if (err) {
-		if (err != -ENODEV)
-			goto out_variant_clear;
-		hba->quirks |= UFSHCD_QUIRK_BROKEN_CRYPTO;
-	}
-
 	ufs_qcom_set_bus_vote(hba, true);
 	ufs_qcom_setup_clocks(hba, true, POST_CHANGE);
 
@@ -2244,6 +2258,13 @@ out_variant_clear:
 	devm_kfree(dev, host);
 	ufshcd_set_variant(hba, NULL);
 out:
+	/*
+	 * host->hw_reset_count's default is -1
+	 * because full_reset is called 1 time on ufshcd_hba_probe()
+	 */
+	if (host)
+		host->hw_reset_count = -1;
+
 	return err;
 }
 
@@ -2686,20 +2707,15 @@ static void ufs_qcom_dump_dbg_regs(struct ufs_hba *hba, bool no_sleep)
 		return;
 
 	/* sleep a bit intermittently as we are dumping too much data */
-	udelay(1000);
+	usleep_range(1000, 1100);
 	ufs_qcom_testbus_read(hba);
-	udelay(1000);
+	usleep_range(1000, 1100);
 	ufs_qcom_print_unipro_testbus(hba);
-	udelay(1000);
+	usleep_range(1000, 1100);
 	ufs_qcom_print_utp_hci_testbus(hba);
-	udelay(1000);
+	usleep_range(1000, 1100);
 	ufs_qcom_phy_dbg_register_dump(phy);
-	udelay(1000);
-}
-
-static u32 ufs_qcom_get_user_cap_mode(struct ufs_hba *hba)
-{
-	return UFS_WB_BUFF_PRESERVE_USER_SPACE;
+	usleep_range(1000, 1100);
 }
 
 /**
@@ -2728,8 +2744,6 @@ static struct ufs_hba_variant_ops ufs_hba_qcom_vops = {
 #ifdef CONFIG_DEBUG_FS
 	.add_debugfs		= ufs_qcom_dbg_add_debugfs,
 #endif
-	.get_user_cap_mode	= ufs_qcom_get_user_cap_mode,
-	.program_key		= ufs_qcom_ice_program_key,
 };
 
 static struct ufs_hba_pm_qos_variant_ops ufs_hba_pm_qos_variant_ops = {

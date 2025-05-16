@@ -783,7 +783,6 @@ config LEDS_QTI_TRI_LED
 config LEDS_QPNP_FLASH_V2
         tristate "Support for QPNP V2 Flash LEDs"
         depends on LEDS_CLASS && MFD_SPMI_PMIC
-	depends on QPNP_REVID
 	select LEDS_TRIGGERS
         help
           This driver supports the flash V2 LED functionality of Qualcomm
@@ -799,6 +798,24 @@ config LEDS_QPNP_VIBRATOR_LDO
 	  This option enables device driver support for the vibrator-ldo
 	  peripheral found on Qualcomm Technologies, Inc. QPNP PMICs.
 	  The vibrator-ldo peripheral is capable of driving ERM vibrators.
+
+config LEDS_S2MPB02
+	bool "LED support for the S2MPB02"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for the LEDs on the S2MPB02.
+
+config LEDS_KTD2692
+	bool "LED support for the KTD2692"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for the LEDs on the KTD2692.
+
+config LEDS_RT8547
+	bool "LED support for the RT8547"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for the LEDs on the RT8547.
 
 comment "LED Triggers"
 source "drivers/leds/trigger/Kconfig"

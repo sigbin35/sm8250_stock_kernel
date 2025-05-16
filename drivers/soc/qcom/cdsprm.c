@@ -1131,6 +1131,3 @@ err_wq:
 }
 
 late_initcall(cdsprm_init);
-
-MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("Qualcomm CDSP Resource manager");

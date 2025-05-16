@@ -36,7 +36,6 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/uaccess.h>
-#include <linux/bldr_debug_tools.h>
 
 #include "internal.h"
 
@@ -100,11 +99,11 @@ static void *pstore_ftrace_seq_next(struct seq_file *s, void *v, loff_t *pos)
 	struct pstore_private *ps = s->private;
 	struct pstore_ftrace_seq_data *data = v;
 
-	(*pos)++;
 	data->off += REC_SIZE;
 	if (data->off + REC_SIZE > ps->total_size)
 		return NULL;
 
+	(*pos)++;
 	return data;
 }
 
@@ -113,9 +112,6 @@ static int pstore_ftrace_seq_show(struct seq_file *s, void *v)
 	struct pstore_private *ps = s->private;
 	struct pstore_ftrace_seq_data *data = v;
 	struct pstore_ftrace_record *rec;
-
-	if (!data)
-		return 0;
 
 	rec = (struct pstore_ftrace_record *)(ps->record->buf + data->off);
 
@@ -140,18 +136,9 @@ static ssize_t pstore_file_read(struct file *file, char __user *userbuf,
 {
 	struct seq_file *sf = file->private_data;
 	struct pstore_private *ps = sf->private;
-	ssize_t len = 0;
 
 	if (ps->record->type == PSTORE_TYPE_FTRACE)
 		return seq_read(file, userbuf, count, ppos);
-
-	if (ps->record->type == PSTORE_TYPE_CONSOLE) {
-		len = bldr_log_read(ps->record->buf, ps->total_size, userbuf,
-							count, ppos);
-		if(len > 0)
-			return len;
-	}
-
 	return simple_read_from_buffer(userbuf, count, ppos,
 				       ps->record->buf, ps->total_size);
 }
@@ -402,10 +389,6 @@ int pstore_mkfile(struct dentry *root, struct pstore_record *record)
 
 	private->record = record;
 	inode->i_size = private->total_size = size;
-
-	if (record->type == PSTORE_TYPE_CONSOLE)
-		inode->i_size += bldr_log_total_size();
-
 	inode->i_private = private;
 
 	if (record->time.tv_sec)

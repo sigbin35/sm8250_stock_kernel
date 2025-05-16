@@ -11,7 +11,6 @@
 
 #include <linux/types.h>
 #include <linux/tracepoint.h>
-#include <trace/events/mmflags.h>
 
 #define DEV_NAME_NONE "None"
 
@@ -169,286 +168,109 @@ DEFINE_EVENT(ion_access_cmo_class, ion_end_cpu_access_notmapped,
 	TP_ARGS(dev, name, cached, hlos_accessible, dir, only_mapped)
 );
 
-DECLARE_EVENT_CLASS(
-	ion_alloc,
+DECLARE_EVENT_CLASS(ion_rbin,
 
-	TP_PROTO(const char *client_name, const char *heap_name, size_t len,
-		 unsigned int mask, unsigned int flags),
+	TP_PROTO(const char *heap_name,
+		 void *buffer,
+		 unsigned long size,
+		 void *page),
+	TP_ARGS(heap_name, buffer, size, page),
 
-	TP_ARGS(client_name, heap_name, len, mask, flags),
+	TP_STRUCT__entry(
+		__field(	const char *,	heap_name)
+		__field(	void *,		buffer	)
+		__field(	unsigned long,	size	)
+		__field(	void *,		page	)
+	),
 
-	TP_STRUCT__entry(__array(char, client_name, 64) __field(const char *,
-								heap_name)
-				 __field(size_t, len)
-					 __field(unsigned int, mask)
-						 __field(unsigned int, flags)),
+	TP_fast_assign(
+		__entry->heap_name	= heap_name;
+		__entry->buffer		= buffer;
+		__entry->size		= size;
+		__entry->page		= page;
+	),
 
-	TP_fast_assign(strlcpy(__entry->client_name, client_name, 64);
-		       __entry->heap_name = heap_name; __entry->len = len;
-		       __entry->mask = mask; __entry->flags = flags;),
-
-	TP_printk("client_name=%s heap_name=%s len=%zu mask=0x%x flags=0x%x",
-		  __entry->client_name, __entry->heap_name, __entry->len,
-		  __entry->mask, __entry->flags));
-
-DEFINE_EVENT(ion_alloc, ion_alloc_buffer_start,
-
-	     TP_PROTO(const char *client_name, const char *heap_name,
-		      size_t len, unsigned int mask, unsigned int flags),
-
-	     TP_ARGS(client_name, heap_name, len, mask, flags));
-
-DEFINE_EVENT(ion_alloc, ion_alloc_buffer_end,
-
-	     TP_PROTO(const char *client_name, const char *heap_name,
-		      size_t len, unsigned int mask, unsigned int flags),
-
-	     TP_ARGS(client_name, heap_name, len, mask, flags));
-
-DECLARE_EVENT_CLASS(
-	ion_alloc_error,
-
-	TP_PROTO(const char *client_name, const char *heap_name, size_t len,
-		 unsigned int mask, unsigned int flags, long error),
-
-	TP_ARGS(client_name, heap_name, len, mask, flags, error),
-
-	TP_STRUCT__entry(__field(const char *,
-				 client_name) __field(const char *, heap_name)
-				 __field(size_t, len)
-					 __field(unsigned int, mask)
-						 __field(unsigned int, flags)
-							 __field(long, error)),
-
-	TP_fast_assign(__entry->client_name = client_name;
-		       __entry->heap_name = heap_name; __entry->len = len;
-		       __entry->mask = mask; __entry->flags = flags;
-		       __entry->error = error;),
-
-	TP_printk(
-		"client_name=%s heap_name=%s len=%zu mask=0x%x flags=0x%x error=%ld",
-		__entry->client_name, __entry->heap_name, __entry->len,
-		__entry->mask, __entry->flags, __entry->error));
-
-DEFINE_EVENT(ion_alloc_error, ion_alloc_buffer_fallback,
-
-	     TP_PROTO(const char *client_name, const char *heap_name,
-		      size_t len, unsigned int mask, unsigned int flags,
-		      long error),
-
-	     TP_ARGS(client_name, heap_name, len, mask, flags, error));
-
-DEFINE_EVENT(ion_alloc_error, ion_alloc_buffer_fail,
-
-	     TP_PROTO(const char *client_name, const char *heap_name,
-		      size_t len, unsigned int mask, unsigned int flags,
-		      long error),
-
-	     TP_ARGS(client_name, heap_name, len, mask, flags, error));
-
-DECLARE_EVENT_CLASS(ion_alloc_pages,
-
-		    TP_PROTO(gfp_t gfp_flags, unsigned int order),
-
-		    TP_ARGS(gfp_flags, order),
-
-		    TP_STRUCT__entry(__field(gfp_t, gfp_flags)
-					     __field(unsigned int, order)),
-
-		    TP_fast_assign(__entry->gfp_flags = gfp_flags;
-				   __entry->order = order;),
-
-		    TP_printk("gfp_flags=%s order=%d",
-			      show_gfp_flags(__entry->gfp_flags),
-			      __entry->order));
-
-DEFINE_EVENT(ion_alloc_pages, alloc_pages_iommu_start,
-	     TP_PROTO(gfp_t gfp_flags, unsigned int order),
-
-	     TP_ARGS(gfp_flags, order));
-
-DEFINE_EVENT(ion_alloc_pages, alloc_pages_iommu_end,
-	     TP_PROTO(gfp_t gfp_flags, unsigned int order),
-
-	     TP_ARGS(gfp_flags, order));
-
-DEFINE_EVENT(ion_alloc_pages, alloc_pages_iommu_fail,
-	     TP_PROTO(gfp_t gfp_flags, unsigned int order),
-
-	     TP_ARGS(gfp_flags, order));
-
-DEFINE_EVENT(ion_alloc_pages, alloc_pages_sys_start,
-	     TP_PROTO(gfp_t gfp_flags, unsigned int order),
-
-	     TP_ARGS(gfp_flags, order));
-
-DEFINE_EVENT(ion_alloc_pages, alloc_pages_sys_end,
-	     TP_PROTO(gfp_t gfp_flags, unsigned int order),
-
-	     TP_ARGS(gfp_flags, order));
-
-DEFINE_EVENT(ion_alloc_pages, alloc_pages_sys_fail,
-	     TP_PROTO(gfp_t gfp_flags, unsigned int order),
-
-	     TP_ARGS(gfp_flags, order)
-
+	TP_printk("heap_name=%s buffer=%p size=%lu page=%p",
+		__entry->heap_name,
+		__entry->buffer,
+		__entry->size,
+		__entry->page
+	)
 );
 
-DECLARE_EVENT_CLASS(
-	ion_secure_cma_add_to_pool,
+DEFINE_EVENT(ion_rbin, ion_rbin_alloc_start,
+	TP_PROTO(const char *heap_name, void *buffer, unsigned long size,
+		 void *page),
 
-	TP_PROTO(unsigned long len, int pool_total, bool is_prefetch),
+	TP_ARGS(heap_name, buffer, size, page)
+);
 
-	TP_ARGS(len, pool_total, is_prefetch),
+DEFINE_EVENT(ion_rbin, ion_rbin_alloc_end,
+	TP_PROTO(const char *heap_name, void *buffer, unsigned long size,
+		 void *page),
 
-	TP_STRUCT__entry(__field(unsigned long, len) __field(int, pool_total)
-				 __field(bool, is_prefetch)),
+	TP_ARGS(heap_name, buffer, size, page)
+);
 
-	TP_fast_assign(__entry->len = len; __entry->pool_total = pool_total;
-		       __entry->is_prefetch = is_prefetch;),
+DEFINE_EVENT(ion_rbin, ion_rbin_free_start,
+	TP_PROTO(const char *heap_name, void *buffer, unsigned long size,
+		 void *page),
 
-	TP_printk("len %lx, pool total %x is_prefetch %d", __entry->len,
-		  __entry->pool_total, __entry->is_prefetch));
+	TP_ARGS(heap_name, buffer, size, page)
+);
 
-DEFINE_EVENT(ion_secure_cma_add_to_pool, ion_secure_cma_add_to_pool_start,
-	     TP_PROTO(unsigned long len, int pool_total, bool is_prefetch),
+DEFINE_EVENT(ion_rbin, ion_rbin_free_end,
+	TP_PROTO(const char *heap_name, void *buffer, unsigned long size,
+		 void *page),
 
-	     TP_ARGS(len, pool_total, is_prefetch));
+	TP_ARGS(heap_name, buffer, size, page)
+);
 
-DEFINE_EVENT(ion_secure_cma_add_to_pool, ion_secure_cma_add_to_pool_end,
-	     TP_PROTO(unsigned long len, int pool_total, bool is_prefetch),
+DEFINE_EVENT(ion_rbin, ion_rbin_partial_alloc_start,
+	TP_PROTO(const char *heap_name, void *buffer, unsigned long size,
+		 void *page),
 
-	     TP_ARGS(len, pool_total, is_prefetch));
+	TP_ARGS(heap_name, buffer, size, page)
+);
 
-DECLARE_EVENT_CLASS(
-	ion_secure_cma_shrink_pool,
+DEFINE_EVENT(ion_rbin, ion_rbin_partial_alloc_end,
+	TP_PROTO(const char *heap_name, void *buffer, unsigned long size,
+		 void *page),
 
-	TP_PROTO(unsigned long drained_size, unsigned long skipped_size),
+	TP_ARGS(heap_name, buffer, size, page)
+);
 
-	TP_ARGS(drained_size, skipped_size),
+DEFINE_EVENT(ion_rbin, ion_rbin_partial_free_start,
+	TP_PROTO(const char *heap_name, void *buffer, unsigned long size,
+		 void *page),
 
-	TP_STRUCT__entry(__field(unsigned long, drained_size)
-				 __field(unsigned long, skipped_size)),
+	TP_ARGS(heap_name, buffer, size, page)
+);
 
-	TP_fast_assign(__entry->drained_size = drained_size;
-		       __entry->skipped_size = skipped_size;),
+DEFINE_EVENT(ion_rbin, ion_rbin_partial_free_end,
+	TP_PROTO(const char *heap_name, void *buffer, unsigned long size,
+		 void *page),
 
-	TP_printk("drained size %lx, skipped size %lx", __entry->drained_size,
-		  __entry->skipped_size));
+	TP_ARGS(heap_name, buffer, size, page)
+);
 
-DEFINE_EVENT(ion_secure_cma_shrink_pool, ion_secure_cma_shrink_pool_start,
-	     TP_PROTO(unsigned long drained_size, unsigned long skipped_size),
 
-	     TP_ARGS(drained_size, skipped_size));
+DEFINE_EVENT(ion_rbin, ion_rbin_pool_alloc_start,
 
-DEFINE_EVENT(ion_secure_cma_shrink_pool, ion_secure_cma_shrink_pool_end,
-	     TP_PROTO(unsigned long drained_size, unsigned long skipped_size),
+	TP_PROTO(const char *heap_name, void *buffer, unsigned long size,
+		 void *page),
 
-	     TP_ARGS(drained_size, skipped_size));
+	TP_ARGS(heap_name, buffer, size, page)
+);
 
-TRACE_EVENT(ion_prefetching,
+DEFINE_EVENT(ion_rbin, ion_rbin_pool_alloc_end,
 
-	    TP_PROTO(unsigned long len),
+	TP_PROTO(const char *heap_name, void *buffer, unsigned long size,
+		 void *page),
 
-	    TP_ARGS(len),
-
-	    TP_STRUCT__entry(__field(unsigned long, len)),
-
-	    TP_fast_assign(__entry->len = len;),
-
-	    TP_printk("prefetch size %lx", __entry->len));
-
-DECLARE_EVENT_CLASS(
-	ion_secure_cma_allocate,
-
-	TP_PROTO(const char *heap_name, unsigned long len, unsigned long flags),
-
-	TP_ARGS(heap_name, len, flags),
-
-	TP_STRUCT__entry(__field(const char *, heap_name)
-				 __field(unsigned long, len)
-					 __field(unsigned long, flags)),
-
-	TP_fast_assign(__entry->heap_name = heap_name; __entry->len = len;
-		       __entry->flags = flags;),
-
-	TP_printk("heap_name=%s len=%lx flags=%lx", __entry->heap_name,
-		  __entry->len, __entry->flags));
-
-DEFINE_EVENT(ion_secure_cma_allocate, ion_secure_cma_allocate_start,
-	     TP_PROTO(const char *heap_name, unsigned long len,
-		      unsigned long flags),
-
-	     TP_ARGS(heap_name, len, flags));
-
-DEFINE_EVENT(ion_secure_cma_allocate, ion_secure_cma_allocate_end,
-	     TP_PROTO(const char *heap_name, unsigned long len,
-		      unsigned long flags),
-
-	     TP_ARGS(heap_name, len, flags));
-
-DECLARE_EVENT_CLASS(
-	ion_cp_secure_buffer,
-
-	TP_PROTO(const char *heap_name, unsigned long len, unsigned long flags),
-
-	TP_ARGS(heap_name, len, flags),
-
-	TP_STRUCT__entry(__field(const char *, heap_name)
-				 __field(unsigned long, len)
-					 __field(unsigned long, flags)),
-
-	TP_fast_assign(__entry->heap_name = heap_name; __entry->len = len;
-		       __entry->flags = flags;),
-
-	TP_printk("heap_name=%s len=%lx flags=%lx", __entry->heap_name,
-		  __entry->len, __entry->flags));
-
-DEFINE_EVENT(ion_cp_secure_buffer, ion_cp_secure_buffer_start,
-	     TP_PROTO(const char *heap_name, unsigned long len,
-		      unsigned long flags),
-
-	     TP_ARGS(heap_name, len, flags));
-
-DEFINE_EVENT(ion_cp_secure_buffer, ion_cp_secure_buffer_end,
-	     TP_PROTO(const char *heap_name, unsigned long len,
-		      unsigned long flags),
-
-	     TP_ARGS(heap_name, len, flags));
-
-#ifndef __ION_PTR_TO_HASHVAL
-static unsigned int __maybe_unused __ion_ptr_to_hash(const void *ptr)
-{
-	unsigned long hashval;
-
-	if (ptr_to_hashval(ptr, &hashval))
-		return 0;
-
-	/* The hashed value is only 32-bit */
-	return (unsigned int)hashval;
-}
-
-#define __ION_PTR_TO_HASHVAL
-#endif
-
-TRACE_EVENT(ion_stat,
-	    TP_PROTO(const void *addr, long len,
-		     unsigned long total_allocated),
-	    TP_ARGS(addr, len, total_allocated),
-	    TP_STRUCT__entry(__field(unsigned int, buffer_id)
-		__field(long, len)
-		__field(unsigned long, total_allocated)
-	    ),
-	    TP_fast_assign(__entry->buffer_id = __ion_ptr_to_hash(addr);
-		__entry->len = len;
-		__entry->total_allocated = total_allocated;
-	    ),
-	    TP_printk("buffer_id=%u len=%ldB total_allocated=%ldB",
-		      __entry->buffer_id,
-		      __entry->len,
-		      __entry->total_allocated)
-	    );
-
+	TP_ARGS(heap_name, buffer, size, page)
+);
 #endif /* _TRACE_ION_H */
 
 #include <trace/define_trace.h>
+

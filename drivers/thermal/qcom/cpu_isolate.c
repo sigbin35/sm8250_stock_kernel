@@ -21,6 +21,10 @@ struct cpu_isolate_cdev {
 	struct work_struct reg_work;
 };
 
+#ifdef CONFIG_SEC_PM
+extern void *thermal_ipc_log;
+#endif
+
 static DEFINE_MUTEX(cpu_isolate_lock);
 static LIST_HEAD(cpu_isolate_cdev_list);
 static atomic_t in_suspend;
@@ -185,6 +189,9 @@ static int cpu_isolate_set_cur_state(struct thermal_cooling_device *cdev,
 			(!cpumask_test_and_set_cpu(cpu,
 			&cpus_isolated_by_thermal))) {
 			mutex_unlock(&cpu_isolate_lock);
+#ifdef CONFIG_SEC_PM
+			THERMAL_IPC_LOG("isolate cpu%d\n", cpu);
+#endif
 			if (sched_isolate_cpu(cpu))
 				cpumask_clear_cpu(cpu,
 					&cpus_isolated_by_thermal);
@@ -209,6 +216,9 @@ static int cpu_isolate_set_cur_state(struct thermal_cooling_device *cdev,
 		} else if (cpumask_test_and_clear_cpu(cpu,
 			&cpus_isolated_by_thermal)) {
 			mutex_unlock(&cpu_isolate_lock);
+#ifdef CONFIG_SEC_PM
+			THERMAL_IPC_LOG("unisolate cpu%d\n", cpu);
+#endif
 			sched_unisolate_cpu(cpu);
 			mutex_lock(&cpu_isolate_lock);
 		}
@@ -347,5 +357,4 @@ static struct platform_driver cpu_isolate_driver = {
 		.of_match_table = cpu_isolate_match,
 	},
 };
-module_platform_driver(cpu_isolate_driver);
-MODULE_LICENSE("GPL v2");
+builtin_platform_driver(cpu_isolate_driver);

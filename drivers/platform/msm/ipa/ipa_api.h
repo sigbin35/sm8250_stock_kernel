@@ -5,9 +5,7 @@
 
 #include <linux/ipa_mhi.h>
 #include <linux/ipa_uc_offload.h>
-#include <linux/ipa_usb.h>
 #include <linux/ipa_wdi3.h>
-#include <linux/rndis_ipa.h>
 #include "ipa_common_i.h"
 
 #ifndef _IPA_API_H_
@@ -298,7 +296,7 @@ struct ipa_api_controller {
 			enum ipa_client_type client,
 			bool LPTransitionRejected,
 			bool brstmode_enabled,
-			union gsi_channel_scratch ch_scratch,
+			union __packed gsi_channel_scratch ch_scratch,
 			u8 index);
 
 	int  (*ipa_mhi_destroy_channel)(enum ipa_client_type client);
@@ -486,7 +484,7 @@ struct ipa_api_controller {
 	int (*ipa_get_prot_id)(enum ipa_client_type client);
 };
 
-#if IS_ENABLED(CONFIG_IPA3)
+#ifdef CONFIG_IPA3
 int ipa3_plat_drv_probe(struct platform_device *pdev_p,
 	struct ipa_api_controller *api_ctrl,
 	const struct of_device_id *pdrv_match);

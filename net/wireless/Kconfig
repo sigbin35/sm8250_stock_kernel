@@ -38,7 +38,6 @@ if CFG80211
 
 config NL80211_TESTMODE
 	bool "nl80211 testmode command"
-        default y
 	help
 	  The nl80211 testmode command helps implementing things like
 	  factory calibration or validation tools for wireless chips.
@@ -251,3 +250,12 @@ config LIB80211_DEBUG
 	  from lib80211.
 
 	  If unsure, say N.
+
+config CFG80211_REG_NOT_UPDATED
+	bool "Do not update Regulatory configuration"
+	depends on CFG80211
+	default n
+	help
+	  Regulation should not updated even if device found other country
+	  Access Point Beacon once since device should find around other
+	  Access Points.

@@ -2277,6 +2277,13 @@ static struct sched_cluster init_cluster = {
 	.aggr_grp_load		=	0,
 };
 
+#ifdef CONFIG_SEC_DEBUG
+int get_num_clusters(void)
+{
+	return num_sched_clusters;
+}
+#endif
+
 void init_clusters(void)
 {
 	init_cluster.cpus = *cpu_possible_mask;
@@ -2651,7 +2658,6 @@ int register_cpu_cycle_counter_cb(struct cpu_cycle_counter_cb *cb)
 				    CPUFREQ_TRANSITION_NOTIFIER);
 	return 0;
 }
-EXPORT_SYMBOL_GPL(register_cpu_cycle_counter_cb);
 
 static void transfer_busy_time(struct rq *rq, struct related_thread_group *grp,
 				struct task_struct *p, int event);
@@ -3138,7 +3144,6 @@ void sched_update_cpu_freq_min_max(const cpumask_t *cpus, u32 fmin, u32 fmax)
 	if (update_capacity)
 		walt_cpus_capacity_changed(cpus);
 }
-EXPORT_SYMBOL_GPL(sched_update_cpu_freq_min_max);
 
 void note_task_waking(struct task_struct *p, u64 wallclock)
 {
@@ -3455,19 +3460,11 @@ void walt_irq_work(struct irq_work *irq_work)
 	/*
 	 * If the window change request is in pending, good place to
 	 * change sched_ravg_window since all rq locks are acquired.
-	 *
-	 * If the current window roll over is delayed such that the
-	 * mark_start (current wallclock with which roll over is done)
-	 * of the current task went past the window start with the
-	 * updated new window size, delay the update to the next
-	 * window roll over. Otherwise the CPU counters (prs and crs) are
-	 * not rolled over properly as mark_start > window_start.
 	 */
 	if (!is_migration) {
 		spin_lock_irqsave(&sched_ravg_window_lock, flags);
 
-		if ((sched_ravg_window != new_sched_ravg_window) &&
-		    (wc < this_rq()->window_start + new_sched_ravg_window)) {
+		if (sched_ravg_window != new_sched_ravg_window) {
 			sched_ravg_window_change_time = sched_ktime_clock();
 			printk_deferred("ALERT: changing window size from %u to %u at %lu\n",
 					sched_ravg_window,

@@ -19,6 +19,7 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
+#define pr_fmt(fmt)	"[dp-mst-hlpr] %s: " fmt, __func__
 
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -29,11 +30,24 @@
 #include <linux/i2c.h>
 #include <drm/drm_dp_mst_helper.h>
 #include <drm/drmP.h>
-#include <linux/iopoll.h>
 
 #include <drm/drm_fixed.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
+
+#ifdef CONFIG_SEC_DISPLAYPORT
+#include <linux/secdp_logger.h>
+
+#ifdef DRM_DEBUG_KMS
+#undef DRM_DEBUG_KMS
+#define DRM_DEBUG_KMS	pr_debug
+#endif
+
+#ifdef DRM_ERROR
+#undef DRM_ERROR
+#define DRM_ERROR	pr_err
+#endif
+#endif
 
 /**
  * DOC: dp mst helper
@@ -485,7 +499,7 @@ static bool drm_dp_sideband_parse_enum_path_resources_ack(struct drm_dp_sideband
 {
 	int idx = 1;
 	repmsg->u.path_resources.port_number = (raw->msg[idx] >> 4) & 0xf;
-	repmsg->u.path_resources.fec_capable = raw->msg[idx] & 0x1;
+	repmsg->u.path_resources.fec_capability = (raw->msg[idx]) & 0x1;
 	idx++;
 	if (idx > raw->curlen)
 		goto fail_len;
@@ -1022,9 +1036,20 @@ static struct drm_dp_mst_port *drm_dp_mst_get_port_ref_locked(struct drm_dp_mst_
 static struct drm_dp_mst_port *drm_dp_get_validated_port_ref(struct drm_dp_mst_topology_mgr *mgr, struct drm_dp_mst_port *port)
 {
 	struct drm_dp_mst_port *rport = NULL;
+
 	mutex_lock(&mgr->lock);
-	if (mgr->mst_primary)
-		rport = drm_dp_mst_get_port_ref_locked(mgr->mst_primary, port);
+	/*
+	 * Port may or may not be 'valid' but we don't care about that when
+	 * destroying the port and we are guaranteed that the port pointer
+	 * will be valid until we've finished
+	 */
+	if (current_work() == &mgr->destroy_connector_work) {
+		kref_get(&port->kref);
+		rport = port;
+	} else if (mgr->mst_primary) {
+		rport = drm_dp_mst_get_port_ref_locked(mgr->mst_primary,
+						       port);
+	}
 	mutex_unlock(&mgr->lock);
 	return rport;
 }
@@ -1668,6 +1693,8 @@ static void drm_dp_send_link_address(struct drm_dp_mst_topology_mgr *mgr,
 	if (!txmsg)
 		return;
 
+	pr_debug("+++\n");
+
 	txmsg->dst = mstb;
 	len = build_link_address(txmsg);
 
@@ -1722,6 +1749,8 @@ static int drm_dp_send_enum_path_resources(struct drm_dp_mst_topology_mgr *mgr,
 	if (!txmsg)
 		return -ENOMEM;
 
+	pr_debug("+++\n");
+
 	txmsg->dst = mstb;
 	len = build_enum_path_resources(txmsg, port->port_num);
 
@@ -1736,11 +1765,12 @@ static int drm_dp_send_enum_path_resources(struct drm_dp_mst_topology_mgr *mgr,
 				DRM_ERROR("got incorrect port in response\n");
 			DRM_DEBUG_KMS("enum path resources %d: %d %d %d\n",
 			txmsg->reply.u.path_resources.port_number,
-			txmsg->reply.u.path_resources.fec_capable,
+			txmsg->reply.u.path_resources.fec_capability,
 			txmsg->reply.u.path_resources.full_payload_bw_number,
 			txmsg->reply.u.path_resources.avail_payload_bw_number);
 			port->available_pbn = txmsg->reply.u.path_resources.avail_payload_bw_number;
-			port->fec_capable = txmsg->reply.u.path_resources.fec_capable;
+			port->fec_capability =
+				txmsg->reply.u.path_resources.fec_capability;
 		}
 	}
 
@@ -1789,6 +1819,8 @@ static int drm_dp_payload_send_msg(struct drm_dp_mst_topology_mgr *mgr,
 	int len, ret, port_num;
 	u8 sinks[DRM_DP_MAX_SDP_STREAMS];
 	int i;
+
+	pr_debug("+++\n");
 
 	port = drm_dp_get_validated_port_ref(mgr, port);
 	if (!port)
@@ -1841,6 +1873,8 @@ int drm_dp_send_power_updown_phy(struct drm_dp_mst_topology_mgr *mgr,
 	struct drm_dp_sideband_msg_tx *txmsg;
 	int len, ret;
 
+	pr_debug("+++\n");
+
 	port = drm_dp_get_validated_port_ref(mgr, port);
 	if (!port)
 		return -EINVAL;
@@ -1885,7 +1919,7 @@ int drm_dp_mst_get_dsc_info(struct drm_dp_mst_topology_mgr *mgr,
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(drm_dp_mst_get_dsc_info);
+EXPORT_SYMBOL(drm_dp_mst_get_dsc_info);
 
 int drm_dp_mst_update_dsc_info(struct drm_dp_mst_topology_mgr *mgr,
 		struct drm_dp_mst_port *port,
@@ -1903,7 +1937,7 @@ int drm_dp_mst_update_dsc_info(struct drm_dp_mst_topology_mgr *mgr,
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(drm_dp_mst_update_dsc_info);
+EXPORT_SYMBOL(drm_dp_mst_update_dsc_info);
 
 static int drm_dp_create_payload_step1(struct drm_dp_mst_topology_mgr *mgr,
 				       int id,
@@ -2084,13 +2118,15 @@ int drm_dp_update_payload_part2(struct drm_dp_mst_topology_mgr *mgr)
 EXPORT_SYMBOL(drm_dp_update_payload_part2);
 
 int drm_dp_send_dpcd_read(struct drm_dp_mst_topology_mgr *mgr,
-			  struct drm_dp_mst_port *port,
-			  int offset, int size, u8 *bytes)
+				 struct drm_dp_mst_port *port,
+				 int offset, int size, u8 *bytes)
 {
 	int len;
 	int ret;
 	struct drm_dp_sideband_msg_tx *txmsg;
 	struct drm_dp_mst_branch *mstb;
+
+	pr_debug("+++\n");
 
 	memset(bytes, 0, size);
 
@@ -2137,7 +2173,7 @@ fail_put:
 	drm_dp_put_mst_branch_device(mstb);
 	return ret;
 }
-EXPORT_SYMBOL_GPL(drm_dp_send_dpcd_read);
+EXPORT_SYMBOL(drm_dp_send_dpcd_read);
 
 int drm_dp_send_dpcd_write(struct drm_dp_mst_topology_mgr *mgr,
 			   struct drm_dp_mst_port *port,
@@ -2147,6 +2183,8 @@ int drm_dp_send_dpcd_write(struct drm_dp_mst_topology_mgr *mgr,
 	int ret;
 	struct drm_dp_sideband_msg_tx *txmsg;
 	struct drm_dp_mst_branch *mstb;
+
+	pr_debug("+++\n");
 
 	mstb = drm_dp_get_validated_mstb_ref(mgr, port->parent);
 	if (!mstb)
@@ -2175,7 +2213,7 @@ fail_put:
 	drm_dp_put_mst_branch_device(mstb);
 	return ret;
 }
-EXPORT_SYMBOL_GPL(drm_dp_send_dpcd_write);
+EXPORT_SYMBOL(drm_dp_send_dpcd_write);
 
 int drm_dp_mst_get_max_sdp_streams_supported(
 		struct drm_dp_mst_topology_mgr *mgr,
@@ -2190,7 +2228,7 @@ int drm_dp_mst_get_max_sdp_streams_supported(
 	drm_dp_put_port(port);
 	return ret;
 }
-EXPORT_SYMBOL_GPL(drm_dp_mst_get_max_sdp_streams_supported);
+EXPORT_SYMBOL(drm_dp_mst_get_max_sdp_streams_supported);
 
 static int drm_dp_encode_up_ack_reply(struct drm_dp_sideband_msg_tx *msg, u8 req_type)
 {
@@ -2263,11 +2301,11 @@ static bool drm_dp_get_vc_payload_bw(int dp_link_bw,
 int drm_dp_mst_topology_mgr_set_mst(struct drm_dp_mst_topology_mgr *mgr, bool mst_state)
 {
 	int ret = 0;
+	int i = 0;
 	struct drm_dp_mst_branch *mstb = NULL;
 	u8 buf;
 	u32 offset = DP_DPCD_REV;
 
-	mutex_lock(&mgr->payload_lock);
 	mutex_lock(&mgr->lock);
 	if (mst_state == mgr->mst_state)
 		goto out_unlock;
@@ -2339,18 +2377,25 @@ int drm_dp_mst_topology_mgr_set_mst(struct drm_dp_mst_topology_mgr *mgr, bool ms
 		/* this can fail if the device is gone */
 		drm_dp_dpcd_writeb(mgr->aux, DP_MSTM_CTRL, 0);
 		ret = 0;
-		memset(mgr->payloads, 0,
-		       mgr->max_payloads * sizeof(mgr->payloads[0]));
-		memset(mgr->proposed_vcpis, 0,
-		       mgr->max_payloads * sizeof(mgr->proposed_vcpis[0]));
+		mutex_lock(&mgr->payload_lock);
+		memset(mgr->payloads, 0, mgr->max_payloads * sizeof(struct drm_dp_payload));
 		mgr->payload_mask = 0;
 		set_bit(0, &mgr->payload_mask);
+		for (i = 0; i < mgr->max_payloads; i++) {
+			struct drm_dp_vcpi *vcpi = mgr->proposed_vcpis[i];
+
+			if (vcpi) {
+				vcpi->vcpi = 0;
+				vcpi->num_slots = 0;
+			}
+			mgr->proposed_vcpis[i] = NULL;
+		}
 		mgr->vcpi_mask = 0;
+		mutex_unlock(&mgr->payload_lock);
 	}
 
 out_unlock:
 	mutex_unlock(&mgr->lock);
-	mutex_unlock(&mgr->payload_lock);
 	if (mstb)
 		drm_dp_put_mst_branch_device(mstb);
 	return ret;
@@ -2711,18 +2756,18 @@ bool drm_dp_mst_port_has_audio(struct drm_dp_mst_topology_mgr *mgr,
 EXPORT_SYMBOL(drm_dp_mst_port_has_audio);
 
 bool drm_dp_mst_has_fec(struct drm_dp_mst_topology_mgr *mgr,
-			struct drm_dp_mst_port *port)
+		struct drm_dp_mst_port *port)
 {
 	bool ret = false;
 
 	port = drm_dp_get_validated_port_ref(mgr, port);
 	if (!port)
 		return ret;
-	ret = port->fec_capable;
+	ret = port->fec_capability;
 	drm_dp_put_port(port);
 	return ret;
 }
-EXPORT_SYMBOL_GPL(drm_dp_mst_has_fec);
+EXPORT_SYMBOL(drm_dp_mst_has_fec);
 
 /**
  * drm_dp_mst_get_edid() - get EDID for an MST port
@@ -2880,11 +2925,11 @@ bool drm_dp_mst_allocate_vcpi(struct drm_dp_mst_topology_mgr *mgr,
 {
 	int ret;
 
-	if (slots < 0)
-		return false;
-
 	port = drm_dp_get_validated_port_ref(mgr, port);
 	if (!port)
+		return false;
+
+	if (slots < 0)
 		return false;
 
 	if (port->vcpi.vcpi > 0) {
@@ -2899,7 +2944,6 @@ bool drm_dp_mst_allocate_vcpi(struct drm_dp_mst_topology_mgr *mgr,
 	if (ret) {
 		DRM_DEBUG_KMS("failed to init vcpi slots=%d max=63 ret=%d\n",
 				DIV_ROUND_UP(pbn, mgr->pbn_div), ret);
-		drm_dp_put_port(port);
 		goto out;
 	}
 	DRM_DEBUG_KMS("initing vcpi for pbn=%d slots=%d\n",
@@ -3004,17 +3048,6 @@ fail:
 	return ret;
 }
 
-static int do_get_act_status(struct drm_dp_aux *aux)
-{
-	int ret;
-	u8 status;
-
-	ret = drm_dp_dpcd_readb(aux, DP_PAYLOAD_TABLE_UPDATE_STATUS, &status);
-	if (ret < 0)
-		return ret;
-
-	return status;
-}
 
 /**
  * drm_dp_check_act_status() - Check ACT handled status.
@@ -3024,29 +3057,33 @@ static int do_get_act_status(struct drm_dp_aux *aux)
  */
 int drm_dp_check_act_status(struct drm_dp_mst_topology_mgr *mgr)
 {
-	/*
-	 * There doesn't seem to be any recommended retry count or timeout in
-	 * the MST specification. Since some hubs have been observed to take
-	 * over 1 second to update their payload allocations under certain
-	 * conditions, we use a rather large timeout value.
-	 */
-	const int timeout_ms = 3000;
-	int ret, status;
+	u8 status;
+	int ret;
+	int count = 0;
 
-	ret = readx_poll_timeout(do_get_act_status, mgr->aux, status,
-				 status & DP_PAYLOAD_ACT_HANDLED || status < 0,
-				 200, timeout_ms * USEC_PER_MSEC);
-	if (ret < 0 && status >= 0) {
-		DRM_DEBUG_KMS("Failed to get ACT after %dms, last status: %02x\n",
-			      timeout_ms, status);
-		return -EINVAL;
-	} else if (status < 0) {
-		DRM_DEBUG_KMS("Failed to read payload table status: %d\n",
-			      status);
-		return status;
+	do {
+		ret = drm_dp_dpcd_readb(mgr->aux, DP_PAYLOAD_TABLE_UPDATE_STATUS, &status);
+
+		if (ret < 0) {
+			DRM_DEBUG_KMS("failed to read payload table status %d\n", ret);
+			goto fail;
+		}
+
+		if (status & DP_PAYLOAD_ACT_HANDLED)
+			break;
+		count++;
+		udelay(100);
+
+	} while (count < 30);
+
+	if (!(status & DP_PAYLOAD_ACT_HANDLED)) {
+		DRM_DEBUG_KMS("failed to get ACT bit %d after %d retries\n", status, count);
+		ret = -EINVAL;
+		goto fail;
 	}
-
 	return 0;
+fail:
+	return ret;
 }
 EXPORT_SYMBOL(drm_dp_check_act_status);
 
@@ -3447,6 +3484,8 @@ static int drm_dp_mst_i2c_xfer(struct i2c_adapter *adapter, struct i2c_msg *msgs
 	struct drm_dp_sideband_msg_req_body msg;
 	struct drm_dp_sideband_msg_tx *txmsg = NULL;
 	int ret;
+
+	pr_debug("+++\n");
 
 	mstb = drm_dp_get_validated_mstb_ref(mgr, port->parent);
 	if (!mstb)

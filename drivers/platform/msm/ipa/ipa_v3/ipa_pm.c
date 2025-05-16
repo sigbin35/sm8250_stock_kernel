@@ -675,7 +675,6 @@ int ipa_pm_init(struct ipa_pm_init_params *params)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(ipa_pm_init);
 
 int ipa_pm_destroy(void)
 {
@@ -693,7 +692,6 @@ int ipa_pm_destroy(void)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(ipa_pm_destroy);
 
 /**
  * ipa_pm_register() - register an IPA PM client with the PM
@@ -777,7 +775,6 @@ int ipa_pm_register(struct ipa_pm_register_params *params, u32 *hdl)
 	IPA_PM_DBG("IPA PM client registered with handle %d\n", *hdl);
 	return 0;
 }
-EXPORT_SYMBOL_GPL(ipa_pm_register);
 
 /**
  * ipa_pm_deregister() - deregister IPA client from the PM
@@ -840,7 +837,6 @@ int ipa_pm_deregister(u32 hdl)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(ipa_pm_deregister);
 
 /**
  * ipa_pm_associate_ipa_cons_to_client() - add mapping to pipe with ipa cllent
@@ -895,7 +891,6 @@ int ipa_pm_associate_ipa_cons_to_client(u32 hdl, enum ipa_client_type consumer)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(ipa_pm_associate_ipa_cons_to_client);
 
 static int ipa_pm_activate_helper(struct ipa_pm_client *client, bool sync)
 {
@@ -994,7 +989,6 @@ int ipa_pm_activate(u32 hdl)
 
 	return ipa_pm_activate_helper(ipa_pm_ctx->clients[hdl], false);
 }
-EXPORT_SYMBOL_GPL(ipa_pm_activate);
 
 /**
  * ipa_pm_activate(): activate ipa client to vote for clock synchronously.
@@ -1018,7 +1012,6 @@ int ipa_pm_activate_sync(u32 hdl)
 
 	return ipa_pm_activate_helper(ipa_pm_ctx->clients[hdl], true);
 }
-EXPORT_SYMBOL_GPL(ipa_pm_activate_sync);
 
 /**
  * ipa_pm_deferred_deactivate(): schedule a timer to deactivate client and
@@ -1081,7 +1074,6 @@ int ipa_pm_deferred_deactivate(u32 hdl)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(ipa_pm_deferred_deactivate);
 
 /**
  * ipa_pm_deactivate_all_deferred(): Cancel the deferred deactivation timer and
@@ -1146,7 +1138,6 @@ int ipa_pm_deactivate_all_deferred(void)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(ipa_pm_deactivate_all_deferred);
 
 /**
  * ipa_pm_deactivate_sync(): deactivate ipa client and devote clock. Cannot be
@@ -1202,7 +1193,6 @@ int ipa_pm_deactivate_sync(u32 hdl)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(ipa_pm_deactivate_sync);
 
 /**
  * ipa_pm_handle_suspend(): calls the callbacks of suspended clients to wake up
@@ -1245,7 +1235,6 @@ int ipa_pm_handle_suspend(u32 pipe_bitmask)
 	mutex_unlock(&ipa_pm_ctx->client_mutex);
 	return 0;
 }
-EXPORT_SYMBOL_GPL(ipa_pm_handle_suspend);
 
 /**
  * ipa_pm_set_throughput(): Adds/changes the throughput requirement to IPA PM
@@ -1302,7 +1291,6 @@ int ipa_pm_set_throughput(u32 hdl, int throughput)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(ipa_pm_set_throughput);
 
 void ipa_pm_set_clock_index(int index)
 {

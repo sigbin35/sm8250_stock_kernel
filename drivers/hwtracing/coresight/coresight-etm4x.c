@@ -75,9 +75,8 @@ static void etm4_os_lock(struct etmv4_drvdata *drvdata)
 
 static bool etm4_arch_supported(u8 arch)
 {
-	/* Mask out the minor version number */
-	switch (arch & 0xf0) {
-	case ETM_ARCH_V4:
+	switch (arch) {
+	case ETM_ARCH_MAJOR_V4:
 		break;
 	default:
 		return false;
@@ -648,7 +647,7 @@ static void etm4_init_arch_data(void *info)
 	 * TRCARCHMIN, bits[7:4] architecture the minor version number
 	 * TRCARCHMAJ, bits[11:8] architecture major versin number
 	 */
-	drvdata->arch = BMVAL(etmidr1, 4, 11);
+	drvdata->arch = BMVAL(etmidr1, 8, 11);
 
 	/* maximum size of resources */
 	etmidr2 = readl_relaxed(drvdata->base + TRCIDR2);
@@ -694,8 +693,8 @@ static void etm4_init_arch_data(void *info)
 	else
 		drvdata->sysstall = false;
 
-	/* NUMPROC, bits[30:28] the number of PEs available for tracing */
-	drvdata->nr_pe = BMVAL(etmidr3, 28, 30);
+	/* NUMPROC, bits[13:12, 30:28] the number of PEs available for trace */
+	drvdata->nr_pe = (BMVAL(etmidr3, 12, 13) << 3) | BMVAL(etmidr3, 28, 30);
 
 	/* NOOVERFLOW, bit[31] is trace overflow prevention supported */
 	if (BMVAL(etmidr3, 31, 31))
@@ -1107,6 +1106,7 @@ static void etm4_init_trace_id(struct etmv4_drvdata *drvdata)
 	drvdata->trcid = coresight_get_trace_id(drvdata->cpu);
 }
 
+#ifdef CONFIG_CPU_PM
 static int etm4_cpu_save(struct etmv4_drvdata *drvdata)
 {
 	int i, ret = 0;
@@ -1159,7 +1159,7 @@ static int etm4_cpu_save(struct etmv4_drvdata *drvdata)
 	state->trcvdsacctlr = readl(drvdata->base + TRCVDSACCTLR);
 	state->trcvdarcctlr = readl(drvdata->base + TRCVDARCCTLR);
 
-	for (i = 0; i < drvdata->nrseqstate - 1; i++)
+	for (i = 0; i < drvdata->nrseqstate; i++)
 		state->trcseqevr[i] = readl(drvdata->base + TRCSEQEVRn(i));
 
 	state->trcseqrstevr = readl(drvdata->base + TRCSEQRSTEVR);
@@ -1182,8 +1182,8 @@ static int etm4_cpu_save(struct etmv4_drvdata *drvdata)
 	}
 
 	for (i = 0; i < drvdata->nr_addr_cmp * 2; i++) {
-		state->trcacvr[i] = readq(drvdata->base + TRCACVRn(i));
-		state->trcacatr[i] = readq(drvdata->base + TRCACATRn(i));
+		state->trcacvr[i] = readl(drvdata->base + TRCACVRn(i));
+		state->trcacatr[i] = readl(drvdata->base + TRCACATRn(i));
 	}
 
 	/*
@@ -1194,16 +1194,16 @@ static int etm4_cpu_save(struct etmv4_drvdata *drvdata)
 	 */
 
 	for (i = 0; i < drvdata->numcidc; i++)
-		state->trccidcvr[i] = readq(drvdata->base + TRCCIDCVRn(i));
+		state->trccidcvr[i] = readl(drvdata->base + TRCCIDCVRn(i));
 
 	for (i = 0; i < drvdata->numvmidc; i++)
-		state->trcvmidcvr[i] = readq(drvdata->base + TRCVMIDCVRn(i));
+		state->trcvmidcvr[i] = readl(drvdata->base + TRCVMIDCVRn(i));
 
 	state->trccidcctlr0 = readl(drvdata->base + TRCCIDCCTLR0);
 	state->trccidcctlr1 = readl(drvdata->base + TRCCIDCCTLR1);
 
 	state->trcvmidcctlr0 = readl(drvdata->base + TRCVMIDCCTLR0);
-	state->trcvmidcctlr1 = readl(drvdata->base + TRCVMIDCCTLR1);
+	state->trcvmidcctlr0 = readl(drvdata->base + TRCVMIDCCTLR1);
 
 	state->trcclaimset = readl(drvdata->base + TRCCLAIMCLR);
 
@@ -1264,7 +1264,7 @@ static void etm4_cpu_restore(struct etmv4_drvdata *drvdata)
 	writel_relaxed(state->trcvdsacctlr, drvdata->base + TRCVDSACCTLR);
 	writel_relaxed(state->trcvdarcctlr, drvdata->base + TRCVDARCCTLR);
 
-	for (i = 0; i < drvdata->nrseqstate - 1; i++)
+	for (i = 0; i < drvdata->nrseqstate; i++)
 		writel_relaxed(state->trcseqevr[i],
 			       drvdata->base + TRCSEQEVRn(i));
 
@@ -1295,25 +1295,25 @@ static void etm4_cpu_restore(struct etmv4_drvdata *drvdata)
 	}
 
 	for (i = 0; i < drvdata->nr_addr_cmp * 2; i++) {
-		writeq_relaxed(state->trcacvr[i],
+		writel_relaxed(state->trcacvr[i],
 			       drvdata->base + TRCACVRn(i));
-		writeq_relaxed(state->trcacatr[i],
+		writel_relaxed(state->trcacatr[i],
 			       drvdata->base + TRCACATRn(i));
 	}
 
 	for (i = 0; i < drvdata->numcidc; i++)
-		writeq_relaxed(state->trccidcvr[i],
+		writel_relaxed(state->trccidcvr[i],
 			       drvdata->base + TRCCIDCVRn(i));
 
 	for (i = 0; i < drvdata->numvmidc; i++)
-		writeq_relaxed(state->trcvmidcvr[i],
+		writel_relaxed(state->trcvmidcvr[i],
 			       drvdata->base + TRCVMIDCVRn(i));
 
 	writel_relaxed(state->trccidcctlr0, drvdata->base + TRCCIDCCTLR0);
 	writel_relaxed(state->trccidcctlr1, drvdata->base + TRCCIDCCTLR1);
 
 	writel_relaxed(state->trcvmidcctlr0, drvdata->base + TRCVMIDCCTLR0);
-	writel_relaxed(state->trcvmidcctlr1, drvdata->base + TRCVMIDCCTLR1);
+	writel_relaxed(state->trcvmidcctlr0, drvdata->base + TRCVMIDCCTLR1);
 
 	writel_relaxed(state->trcclaimset, drvdata->base + TRCCLAIMSET);
 
@@ -1376,17 +1376,17 @@ static struct notifier_block etm4_cpu_pm_nb = {
 
 static int etm4_cpu_pm_register(void)
 {
-	if (IS_ENABLED(CONFIG_CPU_PM))
-		return cpu_pm_register_notifier(&etm4_cpu_pm_nb);
-
-	return 0;
+	return cpu_pm_register_notifier(&etm4_cpu_pm_nb);
 }
 
 static void etm4_cpu_pm_unregister(void)
 {
-	if (IS_ENABLED(CONFIG_CPU_PM))
-		cpu_pm_unregister_notifier(&etm4_cpu_pm_nb);
+	cpu_pm_unregister_notifier(&etm4_cpu_pm_nb);
 }
+#else
+static int etm4_cpu_pm_register(void) { return 0; }
+static void etm4_cpu_pm_unregister(void) { }
+#endif
 
 static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
 {
@@ -1508,7 +1508,6 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
 	return 0;
 
 err_arch_supported:
-	etmdrvdata[drvdata->cpu] = NULL;
 	if (--etm4_count == 0) {
 		etm4_cpu_pm_unregister();
 

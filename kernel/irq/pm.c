@@ -10,7 +10,6 @@
 #include <linux/interrupt.h>
 #include <linux/suspend.h>
 #include <linux/syscore_ops.h>
-#include <linux/wakeup_reason.h>
 
 #include "internals.h"
 

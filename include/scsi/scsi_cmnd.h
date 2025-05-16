@@ -11,7 +11,6 @@
 #include <linux/scatterlist.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_request.h>
-#include <linux/android_kabi.h>
 
 struct Scsi_Host;
 struct scsi_driver;
@@ -148,11 +147,6 @@ struct scsi_cmnd {
 	int flags;		/* Command flags */
 
 	unsigned char tag;	/* SCSI-II queued command tag */
-
-	ANDROID_KABI_RESERVE(1);
-	ANDROID_KABI_RESERVE(2);
-	ANDROID_KABI_RESERVE(3);
-	ANDROID_KABI_RESERVE(4);
 };
 
 /*
@@ -311,11 +305,6 @@ static inline unsigned char scsi_get_prot_type(struct scsi_cmnd *scmd)
 static inline sector_t scsi_get_lba(struct scsi_cmnd *scmd)
 {
 	return blk_rq_pos(scmd->request);
-}
-
-static inline u32 scsi_get_bytes(struct scsi_cmnd *scmd)
-{
-	return blk_rq_bytes(scmd->request);
 }
 
 static inline unsigned int scsi_prot_interval(struct scsi_cmnd *scmd)

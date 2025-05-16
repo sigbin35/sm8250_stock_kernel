@@ -37,9 +37,9 @@ static size_t get_keysize_bytes(enum ufs_crypto_key_size size)
 	}
 }
 
-static int ufshcd_crypto_cap_find(struct ufs_hba *hba,
-				  enum blk_crypto_mode_num crypto_mode,
-				  unsigned int data_unit_size)
+int ufshcd_crypto_cap_find(struct ufs_hba *hba,
+			   enum blk_crypto_mode_num crypto_mode,
+			   unsigned int data_unit_size)
 {
 	enum ufs_crypto_alg ufs_alg;
 	u8 data_unit_mask;
@@ -71,6 +71,7 @@ static int ufshcd_crypto_cap_find(struct ufs_hba *hba,
 
 	return -EINVAL;
 }
+EXPORT_SYMBOL(ufshcd_crypto_cap_find);
 
 /**
  * ufshcd_crypto_cfg_entry_write_key - Write a key into a crypto_cfg_entry
@@ -158,7 +159,7 @@ out:
 
 static void ufshcd_clear_keyslot(struct ufs_hba *hba, int slot)
 {
-	union ufs_crypto_cfg_entry cfg = { 0 };
+	union ufs_crypto_cfg_entry cfg = { {0} };
 	int err;
 
 	err = ufshcd_program_key(hba, &cfg, slot);
@@ -397,7 +398,13 @@ int ufshcd_prepare_lrbp_crypto_spec(struct ufs_hba *hba,
 
 	lrbp->crypto_enable = true;
 	lrbp->crypto_key_slot = bc->bc_keyslot;
-	lrbp->data_unit_num = bc->bc_dun[0];
+
+	if(bc->is_ext4) {
+		lrbp->data_unit_num = (u64)cmd->request->bio->bi_iter.bi_sector;
+		lrbp->data_unit_num >>= 3; 
+	} else {
+		lrbp->data_unit_num = bc->bc_dun[0];
+	}
 
 	return 0;
 }

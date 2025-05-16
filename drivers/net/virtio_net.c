@@ -1242,11 +1242,9 @@ static bool try_fill_recv(struct virtnet_info *vi, struct receive_queue *rq,
 			break;
 	} while (rq->vq->num_free);
 	if (virtqueue_kick_prepare(rq->vq) && virtqueue_notify(rq->vq)) {
-		unsigned long flags;
-
-		flags = u64_stats_update_begin_irqsave(&rq->stats.syncp);
+		u64_stats_update_begin(&rq->stats.syncp);
 		rq->stats.kicks++;
-		u64_stats_update_end_irqrestore(&rq->stats.syncp, flags);
+		u64_stats_update_end(&rq->stats.syncp);
 	}
 
 	return !oom;
@@ -2077,16 +2075,14 @@ static int virtnet_set_channels(struct net_device *dev,
 
 	get_online_cpus();
 	err = _virtnet_set_queues(vi, queue_pairs);
-	if (err) {
-		put_online_cpus();
-		goto err;
+	if (!err) {
+		netif_set_real_num_tx_queues(dev, queue_pairs);
+		netif_set_real_num_rx_queues(dev, queue_pairs);
+
+		virtnet_set_affinity(vi);
 	}
-	virtnet_set_affinity(vi);
 	put_online_cpus();
 
-	netif_set_real_num_tx_queues(dev, queue_pairs);
-	netif_set_real_num_rx_queues(dev, queue_pairs);
- err:
 	return err;
 }
 

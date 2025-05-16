@@ -55,16 +55,12 @@
 
 #define IPA_RNDIS_IPC_LOG_PAGES 50
 
-#ifdef CONFIG_ENABLE_IPC_LOGGING
 #define IPA_RNDIS_IPC_LOGGING(buf, fmt, args...) \
 	do { \
 		if (buf) \
 			ipc_log_string((buf), fmt, __func__, __LINE__, \
 				## args); \
 	} while (0)
-#else
-#define IPA_RNDIS_IPC_LOGGING(buf, fmt, args...)
-#endif /* CONFIG_ENABLE_IPC_LOGGING */
 
 static void *ipa_rndis_logbuf;
 
@@ -291,6 +287,8 @@ static enum rndis_ipa_state rndis_ipa_next_state
 	(enum rndis_ipa_state current_state,
 	enum rndis_ipa_operation operation);
 static const char *rndis_ipa_state_string(enum rndis_ipa_state state);
+static int rndis_ipa_init_module(void);
+static void rndis_ipa_cleanup_module(void);
 
 struct rndis_ipa_dev *rndis_ipa;
 
@@ -1124,12 +1122,6 @@ static void rndis_ipa_packet_receive_notify(
 		("packet Rx, len=%d\n",
 		skb->len);
 
-	if (unlikely(rndis_ipa_ctx == NULL)) {
-		RNDIS_IPA_DEBUG("Private context is NULL. Drop SKB.\n");
-		dev_kfree_skb_any(skb);
-		return;
-	}
-
 	if (unlikely(rndis_ipa_ctx->rx_dump_enable))
 		rndis_ipa_dump_skb(skb);
 
@@ -1137,15 +1129,11 @@ static void rndis_ipa_packet_receive_notify(
 		RNDIS_IPA_DEBUG("use connect()/up() before receive()\n");
 		RNDIS_IPA_DEBUG("packet dropped (length=%d)\n",
 				skb->len);
-		rndis_ipa_ctx->rx_dropped++;
-		dev_kfree_skb_any(skb);
 		return;
 	}
 
 	if (unlikely(evt != IPA_RECEIVE)) {
 		RNDIS_IPA_ERROR("a none IPA_RECEIVE event in driver RX\n");
-		rndis_ipa_ctx->rx_dropped++;
-		dev_kfree_skb_any(skb);
 		return;
 	}
 
@@ -2135,6 +2123,7 @@ static void rndis_ipa_dump_skb(struct sk_buff *skb)
 		("packet dump ended for skb->len=%d\n", skb->len);
 }
 
+#ifdef CONFIG_DEBUG_FS
 /**
  * Creates the root folder for the driver
  */
@@ -2152,7 +2141,7 @@ static void rndis_ipa_debugfs_init(struct rndis_ipa_dev *rndis_ipa_ctx)
 		return;
 
 	rndis_ipa_ctx->directory = debugfs_create_dir(DEBUGFS_DIR_NAME, NULL);
-	if (IS_ERR_OR_NULL(rndis_ipa_ctx->directory)) {
+	if (!rndis_ipa_ctx->directory) {
 		RNDIS_IPA_ERROR("could not create debugfs directory entry\n");
 		goto fail_directory;
 	}
@@ -2360,6 +2349,14 @@ static void rndis_ipa_debugfs_destroy(struct rndis_ipa_dev *rndis_ipa_ctx)
 	debugfs_remove_recursive(rndis_ipa_ctx->directory);
 }
 
+#else /* !CONFIG_DEBUG_FS */
+
+static void rndis_ipa_debugfs_init(struct rndis_ipa_dev *rndis_ipa_ctx) {}
+
+static void rndis_ipa_debugfs_destroy(struct rndis_ipa_dev *rndis_ipa_ctx) {}
+
+#endif /* CONFIG_DEBUG_FS*/
+
 static int rndis_ipa_debugfs_aggr_open
 		(struct inode *inode,
 		struct file *file)
@@ -2423,7 +2420,7 @@ static ssize_t rndis_ipa_debugfs_atomic_read
 	return simple_read_from_buffer(ubuf, count, ppos, atomic_str, nbytes);
 }
 
-int __init rndis_ipa_init_module(void)
+static int rndis_ipa_init_module(void)
 {
 	ipa_rndis_logbuf = ipc_log_context_create(IPA_RNDIS_IPC_LOG_PAGES,
 		"ipa_rndis", 0);
@@ -2434,7 +2431,7 @@ int __init rndis_ipa_init_module(void)
 	return 0;
 }
 
-void __exit rndis_ipa_cleanup_module(void)
+static void rndis_ipa_cleanup_module(void)
 {
 	if (ipa_rndis_logbuf)
 		ipc_log_context_destroy(ipa_rndis_logbuf);
@@ -2446,7 +2443,5 @@ void __exit rndis_ipa_cleanup_module(void)
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("RNDIS_IPA network interface");
 
-#ifndef CONFIG_IPA3_MODULE
 late_initcall(rndis_ipa_init_module);
 module_exit(rndis_ipa_cleanup_module);
-#endif

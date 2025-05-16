@@ -1125,6 +1125,7 @@ const char * const vmstat_text[] = {
 	"nr_zspages",
 #endif
 	"nr_free_cma",
+	"nr_free_rbin",
 
 	/* enum numa_stat_item counters */
 #ifdef CONFIG_NUMA
@@ -1165,13 +1166,13 @@ const char * const vmstat_text[] = {
 	"nr_vmscan_immediate_reclaim",
 	"nr_dirtied",
 	"nr_written",
+#ifdef CONFIG_KZEROD
+	"zero_page_alloc_total",
+	"zero_page_alloc_prezero",
+#endif
 	"nr_kernel_misc_reclaimable",
 	"nr_unreclaimable_pages",
 
-
-	"nr_ion_heap",
-	"nr_ion_heap_pool",
-	"nr_gpu_heap",
 	/* enum writeback_stat_item counters */
 	"nr_dirty_threshold",
 	"nr_dirty_background_threshold",
@@ -1265,6 +1266,9 @@ const char * const vmstat_text[] = {
 	"thp_split_page",
 	"thp_split_page_failed",
 	"thp_deferred_split_page",
+#ifdef CONFIG_HUGEPAGE_POOL
+	"thp_deferred_split_page_current",
+#endif
 	"thp_split_pmd",
 #ifdef CONFIG_HAVE_ARCH_TRANSPARENT_HUGEPAGE_PUD
 	"thp_split_pud",
@@ -1296,7 +1300,17 @@ const char * const vmstat_text[] = {
 	"swap_ra",
 	"swap_ra_hit",
 #endif
-#endif /* CONFIG_VM_EVENTS_COUNTERS */
+#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
+	"speculative_pgfault_anon",
+	"speculative_pgfault_file",
+#endif
+#ifdef CONFIG_ZRAM_LRU_WRITEBACK
+	"sqzr_objcnt",
+	"sqzr_count",
+	"sqzr_read",
+	"sqzr_write",
+#endif
+#endif /* CONFIG_VM_EVENT_COUNTERS */
 };
 #endif /* CONFIG_PROC_FS || CONFIG_SYSFS || CONFIG_NUMA */
 
@@ -1705,9 +1719,6 @@ static void *vmstat_start(struct seq_file *m, loff_t *pos)
 static void *vmstat_next(struct seq_file *m, void *arg, loff_t *pos)
 {
 	(*pos)++;
-	//nr_gpu_heap is out-of-tree now so we don't want to export it.
-	if (*pos == NR_VM_ZONE_STAT_ITEMS + NR_VM_NUMA_STAT_ITEMS + NR_GPU_HEAP)
-		(*pos)++;
 	if (*pos >= ARRAY_SIZE(vmstat_text))
 		return NULL;
 	return (unsigned long *)m->private + *pos;

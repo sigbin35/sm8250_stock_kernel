@@ -22,6 +22,8 @@
 #include <asm/timex.h>
 #include <soc/qcom/minidump.h>
 
+#include <linux/sec_debug.h>
+
 #define SENTINEL_BYTE_1 0xFF
 #define SENTINEL_BYTE_2 0xAA
 #define SENTINEL_BYTE_3 0xFF
@@ -226,10 +228,11 @@ int notrace uncached_logk_pc(enum logk_event_type log_type, void *caller,
 }
 EXPORT_SYMBOL(uncached_logk_pc);
 
-noinline int notrace _uncached_logk(enum logk_event_type log_type, void *data)
+noinline int notrace uncached_logk(enum logk_event_type log_type, void *data)
 {
 	return uncached_logk_pc(log_type, __builtin_return_address(0), data);
 }
+EXPORT_SYMBOL(uncached_logk);
 
 static int msm_rtb_probe(struct platform_device *pdev)
 {
@@ -238,10 +241,6 @@ static int msm_rtb_probe(struct platform_device *pdev)
 #if defined(CONFIG_QCOM_RTB_SEPARATE_CPUS)
 	unsigned int cpu;
 #endif
-	struct device_node *np;
-	struct resource res;
-	void __iomem *imem_base;
-	int num_reg = 0;
 	int ret;
 
 	if (!pdev->dev.of_node) {
@@ -313,43 +312,6 @@ static int msm_rtb_probe(struct platform_device *pdev)
 	atomic_notifier_chain_register(&panic_notifier_list,
 						&msm_rtb_panic_blk);
 	msm_rtb.initialized = 1;
-
-	/* Store msm_rtb to imem for bootloader */
-	np = of_find_compatible_node(NULL, NULL, "msm-imem-rtb_info");
-	if (!np) {
-		pr_warn("%s: msm-imem-rtb_info node does not exist\n",
-				__func__);
-		return 0;
-	}
-
-	ret = of_address_to_resource(np, num_reg, &res);
-	if(ret) {
-		pr_warn("%s: invalid argument, ret %d\n", __func__, ret);
-		return 0;
-	}
-
-	if ((!res.start) ||
-		(resource_size(&res) < sizeof(struct msm_rtb_state))) {
-		pr_warn("%s: unexpected resource start %llx and size %llx\n",
-				__func__, res.start, resource_size(&res));
-		return 0;
-	}
-
-	imem_base = ioremap(res.start, resource_size(&res));
-	if (!imem_base) {
-		pr_warn("%s: rtb info imem offset mapping failed\n",
-				__func__);
-		return 0;
-	}
-
-	memset_io(imem_base, 0, resource_size(&res));
-
-	// Target to backup msm_rtb.rtb address for bootloader parser
-	memcpy_toio(imem_base, &msm_rtb, sizeof(struct msm_rtb_state));
-	iounmap(imem_base);
-
-	set_uncached_logk_func(_uncached_logk);
-
 	return 0;
 }
 
@@ -368,7 +330,37 @@ static struct platform_driver msm_rtb_driver = {
 };
 module_platform_driver(msm_rtb_driver);
 
-MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("Msm Rtb");
-MODULE_SOFTDEP("pre: watchdog_v2");
-MODULE_SOFTDEP("pre: early_random");
+#ifdef CONFIG_SEC_DEBUG_SUMMARY
+#define __set_rtb_state_info(name, member)				\
+	apss->iolog.rtb_state.name.size = sizeof(msm_rtb.member);	\
+	apss->iolog.rtb_state.name.offset =				\
+			offsetof(struct msm_rtb_state, member)
+#define __set_rtb_entry_info(name, member)				\
+	apss->iolog.rtb_entry.name.size =				\
+			sizeof(((struct msm_rtb_layout *)0)->member);	\
+	apss->iolog.rtb_entry.name.offset =				\
+			offsetof(struct msm_rtb_layout, member)
+
+void sec_debug_summary_set_rtb_info(struct sec_debug_summary_data_apss *apss)
+{
+	apss->iolog.rtb_state_pa = (uint64_t)virt_to_phys(&msm_rtb);
+
+	__set_rtb_state_info(rtb_phys, phys);
+	__set_rtb_state_info(nentries, nentries);
+	__set_rtb_state_info(size, size);
+	__set_rtb_state_info(enabled, enabled);
+	__set_rtb_state_info(initialized, initialized);
+	__set_rtb_state_info(step_size, step_size);
+
+	apss->iolog.rtb_entry.struct_size = sizeof(struct msm_rtb_layout);
+	__set_rtb_entry_info(log_type, log_type);
+	__set_rtb_entry_info(idx, idx);
+	__set_rtb_entry_info(caller, caller);
+	__set_rtb_entry_info(data, data);
+	__set_rtb_entry_info(timestamp, timestamp);
+	__set_rtb_entry_info(cycle_count, cycle_count);
+
+	apss->iolog.rtb_pcpu_idx_pa = virt_to_phys(&msm_rtb_idx_cpu);
+
+}
+#endif /* CONFIG_SEC_DEBUG_SUMMARY */

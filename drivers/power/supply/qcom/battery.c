@@ -2121,7 +2121,6 @@ cleanup:
 	kfree(chip);
 	return rc;
 }
-EXPORT_SYMBOL_GPL(qcom_batt_init);
 
 void qcom_batt_deinit(void)
 {
@@ -2146,7 +2145,3 @@ void qcom_batt_deinit(void)
 	the_chip = NULL;
 	kfree(chip);
 }
-EXPORT_SYMBOL_GPL(qcom_batt_deinit);
-
-MODULE_DESCRIPTION("QPNP Battery driver");
-MODULE_LICENSE("GPL v2");

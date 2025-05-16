@@ -176,7 +176,4 @@ static struct platform_driver lmh_cpu_vdd_driver = {
 		.of_match_table = lmh_cpu_vdd_match,
 	},
 };
-module_platform_driver(lmh_cpu_vdd_driver);
-
-MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("QTI CPU Voltage cooling devices");
+builtin_platform_driver(lmh_cpu_vdd_driver);

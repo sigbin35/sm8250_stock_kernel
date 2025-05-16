@@ -3293,7 +3293,7 @@ int c4iw_connect(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
 		if (raddr->sin_addr.s_addr == htonl(INADDR_ANY)) {
 			err = pick_local_ipaddrs(dev, cm_id);
 			if (err)
-				goto fail3;
+				goto fail2;
 		}
 
 		/* find a route */
@@ -3315,7 +3315,7 @@ int c4iw_connect(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
 		if (ipv6_addr_type(&raddr6->sin6_addr) == IPV6_ADDR_ANY) {
 			err = pick_local_ip6addrs(dev, cm_id);
 			if (err)
-				goto fail3;
+				goto fail2;
 		}
 
 		/* find a route */
@@ -3782,7 +3782,11 @@ static void build_cpl_pass_accept_req(struct sk_buff *skb, int stid , u8 tos)
 	 */
 	memset(&tmp_opt, 0, sizeof(tmp_opt));
 	tcp_clear_options(&tmp_opt);
+#ifdef CONFIG_MPTCP
+	tcp_parse_options(&init_net, skb, &tmp_opt, NULL, 0, NULL, NULL);
+#else
 	tcp_parse_options(&init_net, skb, &tmp_opt, 0, NULL);
+#endif
 
 	req = __skb_push(skb, sizeof(*req));
 	memset(req, 0, sizeof(*req));

@@ -37,6 +37,7 @@ config ARM_GIC_V3
 	select GENERIC_IRQ_MULTI_HANDLER
 	select IRQ_DOMAIN_HIERARCHY
 	select PARTITION_PERCPU
+	select QCOM_SHOW_RESUME_IRQ
 	select GENERIC_IRQ_EFFECTIVE_AFF_MASK
 
 config ARM_GIC_V3_ITS
@@ -382,7 +383,7 @@ config GOLDFISH_PIC
          for Goldfish based virtual platforms.
 
 config QCOM_PDC
-	tristate "QCOM PDC"
+	bool "QCOM PDC"
 	depends on ARCH_QCOM
 	select IRQ_DOMAIN
 	select IRQ_DOMAIN_HIERARCHY

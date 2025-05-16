@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2019-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020, The Linux Foundation. All rights reserved.
  */
 
 #define ARM_SMMU_TESTBUS_SEL			0x25E4
@@ -58,7 +58,7 @@ enum testbus_ops {
 #define INTR_CLR			(1 << 0)
 #define RESET_VALID			(1 << 7)
 
-#if IS_ENABLED(CONFIG_ARM_SMMU)
+#ifdef CONFIG_ARM_SMMU
 
 u32 arm_smmu_debug_tbu_testbus_select(void __iomem *tbu_base,
 		void __iomem *tcu_base, u32 testbus_version,

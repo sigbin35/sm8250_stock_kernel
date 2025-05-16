@@ -17,10 +17,6 @@
 #include <linux/delay.h>
 #include <linux/input/qpnp-power-on.h>
 #include <linux/of_address.h>
-#include <linux/kdebug.h>
-#include <linux/notifier.h>
-#include <linux/kallsyms.h>
-#include <linux/io.h>
 
 #include <asm/cacheflush.h>
 #include <asm/system_misc.h>
@@ -30,6 +26,12 @@
 #include <soc/qcom/restart.h>
 #include <soc/qcom/watchdog.h>
 #include <soc/qcom/minidump.h>
+
+#include <linux/sec_debug.h>
+
+#if defined(CONFIG_SEC_ABC)
+#include <linux/sti/abc_common.h>
+#endif
 
 #define EMERGENCY_DLOAD_MAGIC1    0x322A4F99
 #define EMERGENCY_DLOAD_MAGIC2    0xC67E4350
@@ -44,11 +46,6 @@
 #define SCM_DLOAD_CMD			0x10
 #define SCM_DLOAD_MINIDUMP		0X20
 #define SCM_DLOAD_BOTHDUMPS	(SCM_DLOAD_MINIDUMP | SCM_DLOAD_FULLDUMP)
-#define MAX_SZ_DIAG_ERR_MSG		100
-
-struct reboot_params {
-	u8 msg[0];
-};
 
 #define DL_MODE_PROP "qcom,msm-imem-download_mode"
 #define EDL_MODE_PROP "qcom,msm-imem-emergency_download_mode"
@@ -58,9 +55,18 @@ struct reboot_params {
 #define KASLR_OFFSET_BIT_MASK	0x00000000FFFFFFFF
 
 static int restart_mode;
-static void *restart_reason, *dload_type_addr;
-static struct reboot_params *reboot_params;
-static size_t rst_msg_size;
+
+#ifdef CONFIG_SEC_DEBUG
+/* This variable is updated in sec_debug
+ because device_initcall might be called too late to use this
+ when any expection occurs in the early stage of bootup.
+*/
+extern void __iomem *restart_reason;
+#else
+static void __iomem *restart_reason;
+#endif
+
+static void __iomem *dload_type_addr;
 static bool scm_pmic_arbiter_disable_supported;
 static bool scm_deassert_ps_hold_supported;
 /* Download mode master kill-switch */
@@ -75,7 +81,6 @@ static void scm_disable_sdi(void);
  */
 static int download_mode = 1;
 static struct kobject dload_kobj;
-#define KASLR_OFFSET_PROP "qcom,msm-imem-kaslr_offset"
 
 static int in_panic;
 static int dload_type = SCM_DLOAD_FULLDUMP;
@@ -85,8 +90,6 @@ static void *emergency_dload_mode_addr;
 static bool scm_dload_supported;
 
 static bool force_warm_reboot;
-static bool force_warm_reboot_on_thermal;
-static bool force_warm_reboot_on_ab_update;
 
 /* interface for exporting attributes */
 struct reset_attribute {
@@ -109,7 +112,7 @@ static size_t store_emmc_dload(struct kobject *kobj, struct attribute *attr,
 			       const char *buf, size_t count);
 RESET_ATTR(emmc_dload, 0644, show_emmc_dload, store_emmc_dload);
 
-#if IS_ENABLED(CONFIG_QCOM_MINIDUMP)
+#ifdef CONFIG_QCOM_MINIDUMP
 static ssize_t show_dload_mode(struct kobject *kobj, struct attribute *attr,
 			       char *buf);
 static size_t store_dload_mode(struct kobject *kobj, struct attribute *attr,
@@ -119,7 +122,7 @@ RESET_ATTR(dload_mode, 0644, show_dload_mode, store_dload_mode);
 
 static struct attribute *reset_attrs[] = {
 	&reset_attr_emmc_dload.attr,
-#if IS_ENABLED(CONFIG_QCOM_MINIDUMP)
+#ifdef CONFIG_QCOM_MINIDUMP
 	&reset_attr_dload_mode.attr,
 #endif
 	NULL
@@ -132,42 +135,6 @@ static struct attribute_group reset_attr_group = {
 static int dload_set(const char *val, const struct kernel_param *kp);
 module_param_call(download_mode, dload_set, param_get_int,
 			&download_mode, 0644);
-
-static bool scandump_test;
-module_param(scandump_test, bool, 0644);
-MODULE_PARM_DESC(scandump_test, "Set 1 to enable scandump test");
-
-static bool warm_reset;
-module_param(warm_reset, bool, 0644);
-MODULE_PARM_DESC(warm_reset, "Set 1 to override default cold-reset");
-
-static struct die_args *tombstone;
-
-static inline void set_restart_msg(const char *msg)
-{
-	if (!reboot_params || rst_msg_size == 0)
-		return;
-
-	pr_info("%s: set restart msg = `%s'\r\n", __func__, msg?:"<null>");
-	memset_io(reboot_params->msg, 0, rst_msg_size);
-	memcpy_toio(reboot_params->msg, msg,
-			min(strlen(msg), rst_msg_size - 1));
-}
-
-int die_notify(struct notifier_block *self,
-				       unsigned long val, void *data)
-{
-	static struct die_args args;
-
-	memcpy(&args, data, sizeof(args));
-	tombstone = &args;
-	pr_debug("saving oops: %pK\n", (void *) tombstone);
-	return NOTIFY_DONE;
-}
-
-static struct notifier_block die_nb = {
-	.notifier_call = die_notify,
-};
 
 static ssize_t attr_show(struct kobject *kobj, struct attribute *attr,
 			       char *buf);
@@ -185,35 +152,6 @@ static struct kobj_type reset_ktype = {
 static int panic_prep_restart(struct notifier_block *this,
 			      unsigned long event, void *ptr)
 {
-	char kernel_panic_msg[MAX_SZ_DIAG_ERR_MSG] = "Kernel Panic";
-
-	if (rst_msg_size <= 0)
-		goto out;
-
-	if (tombstone) { /* tamper the panic message for Oops */
-		char pc_symn[KSYM_SYMBOL_LEN] = "<unknown>";
-		char lr_symn[KSYM_SYMBOL_LEN] = "<unknown>";
-
-#if defined(CONFIG_ARM)
-		sprint_symbol(pc_symn, tombstone->regs->ARM_pc);
-		sprint_symbol(lr_symn, tombstone->regs->ARM_lr);
-#elif defined(CONFIG_ARM64)
-		sprint_symbol(pc_symn, tombstone->regs->pc);
-		sprint_symbol(lr_symn, tombstone->regs->regs[30]);
-#endif
-
-		scnprintf(kernel_panic_msg, rst_msg_size - 1,
-				"KP: %s PC:%s LR:%s",
-				current->comm, pc_symn, lr_symn);
-
-	} else {
-		scnprintf(kernel_panic_msg, rst_msg_size - 1,
-				"KP: %s", (char *)ptr);
-	}
-
-	set_restart_msg(kernel_panic_msg);
-
-out:
 	in_panic = 1;
 	return NOTIFY_DONE;
 }
@@ -241,7 +179,10 @@ int scm_set_dload_mode(int arg1, int arg2)
 				&desc);
 }
 
-static void set_dload_mode(int on)
+#ifndef CONFIG_SEC_DEBUG
+static
+#endif
+void set_dload_mode(int on)
 {
 	int ret;
 
@@ -258,6 +199,10 @@ static void set_dload_mode(int on)
 		pr_err("Failed to set secure DLOAD mode: %d\n", ret);
 
 	dload_mode_enabled = on;
+
+#ifdef CONFIG_SEC_DEBUG
+	pr_err("set_dload_mode <%d> ( %lx )\n", on, CALLER_ADDR0);
+#endif
 }
 
 static bool get_dload_mode(void)
@@ -265,6 +210,7 @@ static bool get_dload_mode(void)
 	return dload_mode_enabled;
 }
 
+#ifndef CONFIG_SEC_DEBUG
 static void enable_emergency_dload_mode(void)
 {
 	int ret;
@@ -291,6 +237,7 @@ static void enable_emergency_dload_mode(void)
 	if (ret)
 		pr_err("Failed to set secure EDLOAD mode: %d\n", ret);
 }
+#endif
 
 static int dload_set(const char *val, const struct kernel_param *kp)
 {
@@ -366,7 +313,6 @@ static void setup_dload_mode_support(void)
 	if (scm_is_call_available(SCM_SVC_BOOT, SCM_DLOAD_CMD) > 0)
 		scm_dload_supported = true;
 
-	register_die_notifier(&die_nb);
 	atomic_notifier_chain_register(&panic_notifier_list, &panic_blk);
 
 	dload_mode_addr = map_prop_mem(DL_MODE_PROP);
@@ -459,7 +405,7 @@ static size_t store_emmc_dload(struct kobject *kobj, struct attribute *attr,
 	return count;
 }
 
-#if IS_ENABLED(CONFIG_QCOM_MINIDUMP)
+#ifdef CONFIG_QCOM_MINIDUMP
 static DEFINE_MUTEX(tcsr_lock);
 
 static ssize_t show_dload_mode(struct kobject *kobj, struct attribute *attr,
@@ -546,11 +492,9 @@ static void halt_spmi_pmic_arbiter(void)
 
 static void msm_restart_prepare(const char *cmd)
 {
-	bool need_warm_reset = warm_reset;
+	bool need_warm_reset = false;
 
-	/* configure reset reason back to 0 before reset */
-	qpnp_pon_set_restart_reason(PON_RESTART_REASON_UNKNOWN);
-
+#ifndef CONFIG_SEC_DEBUG
 	/* Write download mode flags if we're panic'ing
 	 * Write download mode flags if restart_mode says so
 	 * Kill download mode if master-kill switch is set
@@ -558,27 +502,43 @@ static void msm_restart_prepare(const char *cmd)
 
 	set_dload_mode(download_mode &&
 			(in_panic || restart_mode == RESTART_DLOAD));
+#else
+	sec_debug_update_dload_mode(restart_mode, in_panic);
+#endif
 
+#ifndef CONFIG_SEC_DEBUG
 	if (qpnp_pon_check_hard_reset_stored()) {
 		/* Set warm reset as true when device is in dload mode */
 		if (get_dload_mode() ||
 			((cmd != NULL && cmd[0] != '\0') &&
 			!strcmp(cmd, "edl")))
 			need_warm_reset = true;
-	} else if (get_dload_mode() || (cmd != NULL && cmd[0] != '\0')) {
-		need_warm_reset = true;
+	} else {
+		need_warm_reset = (get_dload_mode() ||
+				(cmd != NULL && cmd[0] != '\0'));
 	}
 
 	if (force_warm_reboot)
 		pr_info("Forcing a warm reset of the system\n");
+#else
+	need_warm_reset = get_dload_mode();
+#endif
 
-	if (in_panic) {
-		qpnp_pon_set_restart_reason(PON_RESTART_REASON_PANIC);
-	} else if (cmd != NULL) {
+	/* Hard reset the PMIC unless memory contents must be maintained. */
+	if (force_warm_reboot || need_warm_reset)
+		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
+	else
+		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
+
+	if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
 			qpnp_pon_set_restart_reason(
 				PON_RESTART_REASON_BOOTLOADER);
 			__raw_writel(0x77665500, restart_reason);
+		} else if (!strncmp(cmd, "recovery-update", 15)) {
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_RECOVERY_UPDATE);
+			__raw_writel(0x776655cc, restart_reason);
 		} else if (!strncmp(cmd, "recovery", 8)) {
 			qpnp_pon_set_restart_reason(
 				PON_RESTART_REASON_RECOVERY);
@@ -599,14 +559,16 @@ static void msm_restart_prepare(const char *cmd)
 			qpnp_pon_set_restart_reason(
 				PON_RESTART_REASON_KEYS_CLEAR);
 			__raw_writel(0x7766550a, restart_reason);
-		} else if (!strcmp(cmd, "shutdown,thermal")) {
+		} else if (!strncmp(cmd, "cross_fail", 10)) {
 			qpnp_pon_set_restart_reason(
-				PON_RESTART_REASON_SHUTDOWN_THERMAL);
-			__raw_writel(0x7766550b, restart_reason);
-
-			if (force_warm_reboot_on_thermal)
-				need_warm_reset = true;
-
+				PON_RESTART_REASON_CROSS_FAIL);
+			__raw_writel(0x7766550c, restart_reason);
+#ifdef CONFIG_SEC_PERIPHERAL_SECURE_CHK
+		} else if (!strcmp(cmd, "peripheral_hw_reset")) {
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_SECURE_CHECK_FAIL);
+			__raw_writel(0x7766550f, restart_reason);
+#endif
 		} else if (!strncmp(cmd, "oem-", 4)) {
 			unsigned long code;
 			int ret;
@@ -615,23 +577,20 @@ static void msm_restart_prepare(const char *cmd)
 			if (!ret)
 				__raw_writel(0x6f656d00 | (code & 0xff),
 					     restart_reason);
+#ifndef CONFIG_SEC_DEBUG
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
+#endif
+#if defined(CONFIG_SEC_ABC)
+		} else if (!strncmp(cmd, "user_dram_test", 14) && sec_abc_get_enabled()) {
+			qpnp_pon_set_restart_reason(PON_RESTART_REASON_USER_DRAM_TEST);
+#endif
 		} else {
-			if (!strcmp(cmd, "reboot-ab-update") &&
-					force_warm_reboot_on_ab_update)
-				need_warm_reset = true;
 			__raw_writel(0x77665501, restart_reason);
 		}
 	}
 
-
-	/* Hard reset the PMIC unless memory contents must be maintained. */
-	if (force_warm_reboot || need_warm_reset)
-		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
-	else
-		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
-
+	sec_debug_update_restart_reason(cmd, in_panic, restart_mode);
 	flush_cache_all();
 
 	/*outer_flush_all is not supported by 64bit kernel*/
@@ -671,9 +630,6 @@ static void do_msm_restart(enum reboot_mode reboot_mode, const char *cmd)
 
 	msm_restart_prepare(cmd);
 
-	if (in_panic && scandump_test)
-		goto enable_sdi_reset;
-
 	/*
 	 * Trigger a watchdog bite here and if this fails,
 	 * device will take the usual restart path.
@@ -682,7 +638,6 @@ static void do_msm_restart(enum reboot_mode reboot_mode, const char *cmd)
 		msm_trigger_wdog_bite();
 
 	scm_disable_sdi();
-enable_sdi_reset:
 	halt_spmi_pmic_arbiter();
 	deassert_ps_hold();
 
@@ -704,41 +659,18 @@ static void do_msm_poweroff(void)
 	pr_err("Powering off has failed\n");
 }
 
-int restart_handler_init(void)
+#ifdef CONFIG_SEC_DEBUG
+static int dload_mode_normal_reboot_handler(struct notifier_block *nb,
+		unsigned long l, void *p)
 {
-	struct device_node *np;
-	struct resource res;
-	u32 rst_info_size = 0;
-
-	np = of_find_compatible_node(NULL, NULL,
-				"msm-imem-rst_info");
-	if (!np) {
-		pr_err("unable to find DT imem rst info node\n");
-		return -ENOENT;
-	} else {
-		reboot_params = of_iomap(np, 0);
-		if (!reboot_params) {
-			pr_err("unable to map imem rst info offset\n");
-			return -ENOMEM;
-		}
-
-		of_address_to_resource(np, 0, &res);
-		rst_info_size = resource_size(&res);
-		if (rst_info_size == 0) {
-			pr_err("%s: Failed to find info_size.\n", __func__);
-			iounmap(reboot_params);
-			return -EINVAL;
-		}
-	}
-
-	rst_msg_size = (size_t) rst_info_size -
-		       offsetof(struct reboot_params, msg);
-	rst_msg_size = min(rst_msg_size, (size_t)MAX_SZ_DIAG_ERR_MSG);
-
-	set_restart_msg("Unknown");
-	pr_debug("%s: default message is set\n", __func__);
+	set_dload_mode(0);
 	return 0;
 }
+
+static struct notifier_block dload_reboot_block = {
+	.notifier_call = dload_mode_normal_reboot_handler
+};
+#endif
 
 static int msm_restart_probe(struct platform_device *pdev)
 {
@@ -747,11 +679,11 @@ static int msm_restart_probe(struct platform_device *pdev)
 	struct device_node *np;
 	int ret = 0;
 
-
-	if (restart_handler_init() < 0)
-		pr_err("restart_handler_init failure\n");
-
 	setup_dload_mode_support();
+
+#ifdef CONFIG_SEC_DEBUG
+	register_reboot_notifier(&dload_reboot_block);
+#endif
 
 	np = of_find_compatible_node(NULL, NULL,
 				"qcom,msm-imem-restart_reason");
@@ -792,12 +724,6 @@ static int msm_restart_probe(struct platform_device *pdev)
 	force_warm_reboot = of_property_read_bool(dev->of_node,
 						"qcom,force-warm-reboot");
 
-	force_warm_reboot_on_thermal = of_property_read_bool(dev->of_node,
-						"qcom,force-warm-reboot-on-thermal-shutdown");
-
-	force_warm_reboot_on_ab_update = of_property_read_bool(dev->of_node,
-						"qcom,force-warm-reboot-on-reboot-ab-update");
-
 	return 0;
 
 err_restart_reason:
@@ -823,11 +749,4 @@ static int __init msm_restart_init(void)
 {
 	return platform_driver_register(&msm_restart_driver);
 }
-#ifdef MODULE
-module_init(msm_restart_init);
-#else
 pure_initcall(msm_restart_init);
-#endif
-
-MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("Msm Poweroff");

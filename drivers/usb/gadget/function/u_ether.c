@@ -45,10 +45,9 @@
 #define UETH__VERSION	"29-May-2008"
 
 /* Experiments show that both Linux and Windows hosts allow up to 16k
- * frame sizes. Set the max MTU size to 15k+52 to prevent allocating 32k
+ * frame sizes. Set the max size to 15k+52 to prevent allocating 32k
  * blocks and still have efficient handling. */
-#define GETHER_MAX_MTU_SIZE 15412
-#define GETHER_MAX_ETH_FRAME_LEN (GETHER_MAX_MTU_SIZE + ETH_HLEN)
+#define GETHER_MAX_ETH_FRAME_LEN 15412
 
 struct eth_dev {
 	/* lock is held while accessing port_usb
@@ -95,7 +94,7 @@ struct eth_dev {
 static inline int qlen(struct usb_gadget *gadget, unsigned qmult)
 {
 	if (gadget_is_dualspeed(gadget) && (gadget->speed == USB_SPEED_HIGH ||
-					    gadget->speed >= USB_SPEED_SUPER))
+					    gadget->speed == USB_SPEED_SUPER))
 		return qmult * DEFAULT_QLEN;
 	else
 		return DEFAULT_QLEN;
@@ -291,12 +290,36 @@ static void rx_complete(struct usb_ep *ep, struct usb_request *req)
 			if (status < 0
 					|| ETH_HLEN > skb2->len
 					|| skb2->len > GETHER_MAX_ETH_FRAME_LEN) {
+#ifdef CONFIG_USB_NCM_SUPPORT_MTU_CHANGE
+				/*
+			 	* Need to revisit net->mtu  does not include header size incase of changed MTU
+			 	*/
+				if (dev->port_usb && !strcmp(dev->port_usb->func.name, "ncm")) {
+					if (status < 0
+						|| ETH_HLEN > skb2->len
+						|| skb2->len > (dev->net->mtu + ETH_HLEN)) {
+						INFO(dev, "usb: %s  drop incase of NCM rx length %d\n",
+							__func__, skb2->len);
+					} else {
+						INFO(dev, "usb: %s  Dont drop incase of NCM rx length %d\n",
+							__func__, skb2->len);
+						goto process_frame;
+					}
+				}
+#endif
 				dev->net->stats.rx_errors++;
 				dev->net->stats.rx_length_errors++;
+#ifndef CONFIG_USB_NCM_SUPPORT_MTU_CHANGE
 				DBG(dev, "rx length %d\n", skb2->len);
+#else
+				INFO(dev, "usb: %s Drop rx length %d\n", __func__, skb2->len);
+#endif
 				dev_kfree_skb_any(skb2);
 				goto next_frame;
 			}
+#ifdef CONFIG_USB_NCM_SUPPORT_MTU_CHANGE
+process_frame:
+#endif
 			skb2->protocol = eth_type_trans(skb2, dev->net);
 			dev->net->stats.rx_packets++;
 			dev->net->stats.rx_bytes += skb2->len;
@@ -590,7 +613,11 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 	retval = usb_ep_queue(in, req, GFP_ATOMIC);
 	switch (retval) {
 	default:
+#ifndef CONFIG_USB_NCM_SUPPORT_MTU_CHANGE
 		DBG(dev, "tx queue err %d\n", retval);
+#else
+		INFO(dev, "usb:%s tx queue err %d\n", __func__, retval);
+#endif
 		break;
 	case 0:
 		netif_trans_update(net);
@@ -792,7 +819,7 @@ struct eth_dev *gether_setup_name(struct usb_gadget *g,
 
 	/* MTU range: 14 - 15412 */
 	net->min_mtu = ETH_HLEN;
-	net->max_mtu = GETHER_MAX_MTU_SIZE;
+	net->max_mtu = GETHER_MAX_ETH_FRAME_LEN;
 
 	dev->gadget = g;
 	SET_NETDEV_DEV(net, &g->dev);
@@ -854,7 +881,7 @@ struct net_device *gether_setup_name_default(const char *netname)
 
 	/* MTU range: 14 - 15412 */
 	net->min_mtu = ETH_HLEN;
-	net->max_mtu = GETHER_MAX_MTU_SIZE;
+	net->max_mtu = GETHER_MAX_ETH_FRAME_LEN;
 
 	return net;
 }
@@ -928,7 +955,7 @@ int gether_get_dev_addr(struct net_device *net, char *dev_addr, int len)
 
 	dev = netdev_priv(net);
 	ret = get_ether_addr_str(dev->dev_mac, dev_addr, len);
-	if (ret + 1 < len) {
+	if (ret + 1 < len && ret > 0) {
 		dev_addr[ret++] = '\n';
 		dev_addr[ret] = '\0';
 	}
@@ -957,7 +984,7 @@ int gether_get_host_addr(struct net_device *net, char *host_addr, int len)
 
 	dev = netdev_priv(net);
 	ret = get_ether_addr_str(dev->host_mac, host_addr, len);
-	if (ret + 1 < len) {
+	if (ret + 1 < len && ret > 0) {
 		host_addr[ret++] = '\n';
 		host_addr[ret] = '\0';
 	}

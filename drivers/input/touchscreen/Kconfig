@@ -11,34 +11,9 @@ menuconfig INPUT_TOUCHSCREEN
 
 if INPUT_TOUCHSCREEN
 
-source "drivers/input/touchscreen/synaptics_dsx_v27/Kconfig"
-
 config TOUCHSCREEN_PROPERTIES
 	def_tristate INPUT
 	depends on INPUT
-
-config TOUCHSCREEN_TBN
-	tristate "Touch Bus Negotiator for Pixel 2020"
-	depends on QCOM_QMI_HELPERS
-	help
-	  Say Y here if you have a Google Pixel 2019 device. This module enables
-	  support for kernel touch drivers to coordinate bus access with remote
-	  processors (e.g. sensor DSP processor), which is required to enable
-	  low power touch gesture detection in processors other than AP.
-
-	  If unsure, say N.
-
-	  To compile this driver as a module, choose M here: the module will be
-	  called touch_bus_negotiator.
-
-config TOUCHSCREEN_OFFLOAD
-	tristate "Touchscreen algorithm offload"
-	help
-	  Say Y here to enable touchscreen algorithm offload. This module allows
-	  the touchscreen driver to feed heatmap data into a char device to be
-	  consumed by a client outside the kernel.
-
-	  If unsure, say N.
 
 config TOUCHSCREEN_88PM860X
 	tristate "Marvell 88PM860x touchscreen"
@@ -120,7 +95,6 @@ config TOUCHSCREEN_AD7879_SPI
 config TOUCHSCREEN_ADC
 	tristate "Generic ADC based resistive touchscreen"
 	depends on IIO
-	select IIO_BUFFER
 	select IIO_BUFFER_CB
 	help
 	  Say Y here if you want to use the generic ADC
@@ -1339,7 +1313,7 @@ config TOUCHSCREEN_ROHM_BU21023
 config TOUCHSCREEN_ST
 	tristate "STMicroelectronics Touchscreen Driver"
 	depends on I2C
-	default y
+	default n
 	help
 	  Say Y here if you have a STMicroelectronics Touchscreen.
 
@@ -1347,19 +1321,8 @@ config TOUCHSCREEN_ST
 	  To compile this driver as a module, choose M here: the
 	  module will be called st.
 
-source "drivers/input/touchscreen/st/Kconfig"
-
-config TOUCHSCREEN_HEATMAP
-	tristate "Heatmap support for touchscreen"
-	select VIDEOBUF2_VMALLOC
-	help
-	  Do not explicitly select this option. The drivers that utilize
-	  this module must select this in their Kconfig.
-
 config TOUCHSCREEN_SYNAPTICS_DSX
 	bool "Synaptics DSX Touchscreen Driver"
-	depends on TOUCHSCREEN_SYNAPTICS_DSX_v27!=y
-	depends on TOUCHSCREEN_SYNAPTICS_DSX_v27!=m
 	depends on I2C
 	default y
 	help
@@ -1370,7 +1333,23 @@ config TOUCHSCREEN_SYNAPTICS_DSX
 	  To compile this driver as a module, choose M here: the
 	  module will be called synaptics_dsx.
 
+config TOUCHSCREEN_DUAL_FOLDABLE
+	tristate "Dual TSP IC for Foldable"
+	depends on I2C
+	help
+	  This enables support for Dual TSP.
+
+source "drivers/input/touchscreen/sec_ts/y79a/Kconfig"
+source "drivers/input/touchscreen/sec_ts/y79a_c/Kconfig"
+source "drivers/input/touchscreen/zinitix/ztw522/Kconfig"
+source "drivers/input/touchscreen/st/Kconfig"
 source "drivers/input/touchscreen/synaptics_dsx/Kconfig"
+source "drivers/input/touchscreen/stm/fts9cu80f_b/Kconfig"
+source "drivers/input/touchscreen/stm/fts1ba90a/Kconfig"
+source "drivers/input/touchscreen/novatek/nt36523/Kconfig"
+source "drivers/input/touchscreen/melfas/mss100/Kconfig"
+source "drivers/input/touchscreen/zinitix/zt7650/Kconfig"
+source "drivers/input/touchscreen/stm/fts5cu56a/Kconfig"
 
 config TOUCHSCREEN_SYNAPTICS_TCM
 	bool "Synaptics TCM Touchscreen Driver"
