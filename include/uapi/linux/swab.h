@@ -3,7 +3,12 @@
 #define _UAPI_LINUX_SWAB_H
 
 #include <linux/types.h>
+<<<<<<< HEAD
 #include <linux/compiler.h>
+=======
+#include <linux/stddef.h>
+#include <asm/bitsperlong.h>
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 #include <asm/swab.h>
 
 /*

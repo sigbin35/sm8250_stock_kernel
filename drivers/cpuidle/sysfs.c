@@ -467,6 +467,10 @@ static int cpuidle_add_state_sysfs(struct cpuidle_device *device)
 		ret = kobject_init_and_add(&kobj->kobj, &ktype_state_cpuidle,
 					   &kdev->kobj, "state%d", i);
 		if (ret) {
+<<<<<<< HEAD
+=======
+			kobject_put(&kobj->kobj);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 			kfree(kobj);
 			goto error_state;
 		}
@@ -598,6 +602,10 @@ static int cpuidle_add_driver_sysfs(struct cpuidle_device *dev)
 	ret = kobject_init_and_add(&kdrv->kobj, &ktype_driver_cpuidle,
 				   &kdev->kobj, "driver");
 	if (ret) {
+<<<<<<< HEAD
+=======
+		kobject_put(&kdrv->kobj);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 		kfree(kdrv);
 		return ret;
 	}
@@ -685,17 +693,21 @@ int cpuidle_add_sysfs(struct cpuidle_device *dev)
 	if (!kdev)
 		return -ENOMEM;
 	kdev->dev = dev;
-	dev->kobj_dev = kdev;
 
 	init_completion(&kdev->kobj_unregister);
 
 	error = kobject_init_and_add(&kdev->kobj, &ktype_cpuidle, &cpu_dev->kobj,
 				   "cpuidle");
 	if (error) {
+<<<<<<< HEAD
+=======
+		kobject_put(&kdev->kobj);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 		kfree(kdev);
 		return error;
 	}
 
+	dev->kobj_dev = kdev;
 	kobject_uevent(&kdev->kobj, KOBJ_ADD);
 
 	return 0;

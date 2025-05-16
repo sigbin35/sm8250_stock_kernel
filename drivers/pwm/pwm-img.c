@@ -329,10 +329,8 @@ err_pm_disable:
 static int img_pwm_remove(struct platform_device *pdev)
 {
 	struct img_pwm_chip *pwm_chip = platform_get_drvdata(pdev);
-	u32 val;
-	unsigned int i;
-	int ret;
 
+<<<<<<< HEAD
 	ret = pm_runtime_get_sync(&pdev->dev);
 	if (ret < 0)
 		return ret;
@@ -344,6 +342,8 @@ static int img_pwm_remove(struct platform_device *pdev)
 	}
 
 	pm_runtime_put(&pdev->dev);
+=======
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	pm_runtime_disable(&pdev->dev);
 	if (!pm_runtime_status_suspended(&pdev->dev))
 		img_pwm_runtime_suspend(&pdev->dev);

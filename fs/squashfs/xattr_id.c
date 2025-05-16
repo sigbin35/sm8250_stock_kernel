@@ -63,8 +63,13 @@ int squashfs_xattr_lookup(struct super_block *sb, unsigned int index,
 /*
  * Read uncompressed xattr id lookup table indexes from disk into memory
  */
+<<<<<<< HEAD
 __le64 *squashfs_read_xattr_id_table(struct super_block *sb, u64 start,
 		u64 *xattr_table_start, int *xattr_ids)
+=======
+__le64 *squashfs_read_xattr_id_table(struct super_block *sb, u64 table_start,
+		u64 *xattr_table_start, unsigned int *xattr_ids)
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 {
 	unsigned int len;
 	struct squashfs_xattr_id_table *id_table;
@@ -91,5 +96,48 @@ __le64 *squashfs_read_xattr_id_table(struct super_block *sb, u64 start,
 
 	TRACE("In read_xattr_index_table, length %d\n", len);
 
+<<<<<<< HEAD
 	return squashfs_read_table(sb, start + sizeof(*id_table), len);
+=======
+	if (len != (end - start))
+		return ERR_PTR(-EINVAL);
+
+	table = squashfs_read_table(sb, start, len);
+	if (IS_ERR(table))
+		return table;
+
+	/* table[0], table[1], ... table[indexes - 1] store the locations
+	 * of the compressed xattr id blocks.  Each entry should be less than
+	 * the next (i.e. table[0] < table[1]), and the difference between them
+	 * should be SQUASHFS_METADATA_SIZE or less.  table[indexes - 1]
+	 * should be less than table_start, and again the difference
+	 * shouls be SQUASHFS_METADATA_SIZE or less.
+	 *
+	 * Finally xattr_table_start should be less than table[0].
+	 */
+	for (n = 0; n < (indexes - 1); n++) {
+		start = le64_to_cpu(table[n]);
+		end = le64_to_cpu(table[n + 1]);
+
+		if (start >= end || (end - start) >
+				(SQUASHFS_METADATA_SIZE + SQUASHFS_BLOCK_OFFSET)) {
+			kfree(table);
+			return ERR_PTR(-EINVAL);
+		}
+	}
+
+	start = le64_to_cpu(table[indexes - 1]);
+	if (start >= table_start || (table_start - start) >
+				(SQUASHFS_METADATA_SIZE + SQUASHFS_BLOCK_OFFSET)) {
+		kfree(table);
+		return ERR_PTR(-EINVAL);
+	}
+
+	if (*xattr_table_start >= le64_to_cpu(table[0])) {
+		kfree(table);
+		return ERR_PTR(-EINVAL);
+	}
+
+	return table;
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 }

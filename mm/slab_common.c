@@ -890,6 +890,35 @@ void kmem_cache_destroy(struct kmem_cache *s)
 	if (s->refcount)
 		goto out_unlock;
 
+<<<<<<< HEAD
+=======
+#ifdef CONFIG_MEMCG_KMEM
+	memcg_set_kmem_cache_dying(s);
+
+	mutex_unlock(&slab_mutex);
+
+	put_online_mems();
+	put_online_cpus();
+
+	flush_memcg_workqueue(s);
+
+	get_online_cpus();
+	get_online_mems();
+
+	mutex_lock(&slab_mutex);
+
+	/*
+	 * Another thread referenced it again
+	 */
+	if (READ_ONCE(s->refcount)) {
+		spin_lock_irq(&memcg_kmem_wq_lock);
+		s->memcg_params.dying = false;
+		spin_unlock_irq(&memcg_kmem_wq_lock);
+		goto out_unlock;
+	}
+#endif
+
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	err = shutdown_memcg_caches(s);
 	if (!err)
 		err = shutdown_cache(s);

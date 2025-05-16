@@ -71,4 +71,8 @@ arm64_get_bp_hardening_vector(enum arm64_bp_harden_el1_vectors slot)
 	return __bp_harden_el1_vectors + SZ_2K * slot;
 }
 
+<<<<<<< HEAD
 #endif /* __ASM_VECTORS_H */
+=======
+#endif /* __ASM_VECTORS_H */
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191

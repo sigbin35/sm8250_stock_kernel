@@ -426,6 +426,7 @@ static int dspi_request_dma(struct fsl_dspi *dspi, phys_addr_t phy_addr)
 		goto err_rx_dma_buf;
 	}
 
+	memset(&cfg, 0, sizeof(cfg));
 	cfg.src_addr = phy_addr + SPI_POPR;
 	cfg.dst_addr = phy_addr + SPI_PUSHR;
 	cfg.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
@@ -1114,11 +1115,23 @@ static int dspi_probe(struct platform_device *pdev)
 	ret = spi_register_master(master);
 	if (ret != 0) {
 		dev_err(&pdev->dev, "Problem registering DSPI master\n");
+<<<<<<< HEAD
 		goto out_clk_put;
+=======
+		goto out_release_dma;
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	}
 
 	return ret;
 
+<<<<<<< HEAD
+=======
+out_release_dma:
+	dspi_release_dma(dspi);
+out_free_irq:
+	if (dspi->irq)
+		free_irq(dspi->irq, dspi);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 out_clk_put:
 	clk_disable_unprepare(dspi->clk);
 out_master_put:

@@ -440,7 +440,12 @@ static inline void *kvm_get_hyp_vector(void)
 	int slot = -1;
 
 	if ((cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR) ||
+<<<<<<< HEAD
 	     cpus_have_const_cap(ARM64_SPECTRE_BHB)) && data->template_start) {
+=======
+	     cpus_have_const_cap(ARM64_SPECTRE_BHB)) &&
+	    data && data->template_start) {
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 		vect = kern_hyp_va(kvm_ksym_ref(__bp_harden_hyp_vecs_start));
 		slot = data->hyp_vectors_slot;
 	}

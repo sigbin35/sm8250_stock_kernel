@@ -8,7 +8,10 @@
 #include <net/af_unix.h>
 #include <net/scm.h>
 #include <linux/init.h>
+<<<<<<< HEAD
 #include <linux/sched/signal.h>
+=======
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 
 #include "scm.h"
 
@@ -58,9 +61,16 @@ void unix_inflight(struct user_struct *user, struct file *fp)
 			BUG_ON(list_empty(&u->link));
 		}
 		u->inflight++;
+<<<<<<< HEAD
 		unix_tot_inflight++;
 	}
 	user->unix_inflight++;
+=======
+		/* Paired with READ_ONCE() in wait_for_unix_gc() */
+		WRITE_ONCE(unix_tot_inflight, unix_tot_inflight + 1);
+	}
+	WRITE_ONCE(user->unix_inflight, user->unix_inflight + 1);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	spin_unlock(&unix_gc_lock);
 }
 
@@ -79,9 +89,16 @@ void unix_notinflight(struct user_struct *user, struct file *fp)
 		u->inflight--;
 		if (!u->inflight)
 			list_del_init(&u->link);
+<<<<<<< HEAD
 		unix_tot_inflight--;
 	}
 	user->unix_inflight--;
+=======
+		/* Paired with READ_ONCE() in wait_for_unix_gc() */
+		WRITE_ONCE(unix_tot_inflight, unix_tot_inflight - 1);
+	}
+	WRITE_ONCE(user->unix_inflight, user->unix_inflight - 1);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	spin_unlock(&unix_gc_lock);
 }
 
@@ -95,7 +112,11 @@ static inline bool too_many_unix_fds(struct task_struct *p)
 {
 	struct user_struct *user = current_user();
 
+<<<<<<< HEAD
 	if (unlikely(user->unix_inflight > task_rlimit(p, RLIMIT_NOFILE)))
+=======
+	if (unlikely(READ_ONCE(user->unix_inflight) > task_rlimit(p, RLIMIT_NOFILE)))
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 		return !capable(CAP_SYS_RESOURCE) && !capable(CAP_SYS_ADMIN);
 	return false;
 }

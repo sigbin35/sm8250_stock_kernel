@@ -249,6 +249,9 @@ config ARCH_HAS_FORTIFY_SOURCE
 config ARCH_HAS_SET_MEMORY
 	bool
 
+config ARCH_HAS_CPU_FINALIZE_INIT
+	bool
+
 # Select if arch init_task must go in the __init_task_data section
 config ARCH_TASK_STRUCT_ON_STACK
        bool
@@ -975,6 +978,7 @@ config HAVE_ARCH_PREL32_RELOCATIONS
 	  architectures, and don't require runtime relocation on relocatable
 	  kernels.
 
+<<<<<<< HEAD
 config PANIC_ON_REFCOUNT_ERROR
 	bool "Kernel panic on refcount error detection"
 	depends on REFCOUNT_FULL
@@ -998,6 +1002,11 @@ config RELR
 	  well as compatible NM and OBJCOPY utilities (llvm-nm and llvm-objcopy
 	  are compatible).
 
+=======
+config ARCH_USE_MEMREMAP_PROT
+	bool
+
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 source "kernel/gcov/Kconfig"
 
 source "scripts/gcc-plugins/Kconfig"

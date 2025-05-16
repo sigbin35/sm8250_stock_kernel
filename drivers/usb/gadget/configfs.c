@@ -177,6 +177,7 @@ struct gadget_config_name {
 	struct list_head list;
 };
 
+<<<<<<< HEAD
 #define MAX_USB_STRING_LEN	126
 #define MAX_USB_STRING_WITH_NULL_LEN	(MAX_USB_STRING_LEN+1)
 #ifdef CONFIG_USB_TYPEC_MANAGER_NOTIFIER
@@ -202,12 +203,16 @@ int dwc3_gadget_get_cmply_link_state_wrapper(void)
 }
 EXPORT_SYMBOL(dwc3_gadget_get_cmply_link_state_wrapper);
 #endif
+=======
+#define USB_MAX_STRING_WITH_NULL_LEN	(USB_MAX_STRING_LEN+1)
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 
 static int usb_string_copy(const char *s, char **s_copy)
 {
 	int ret;
 	char *str;
 	char *copy = *s_copy;
+<<<<<<< HEAD
 	ret = strlen(s);
 	if (ret > MAX_USB_STRING_LEN)
 		return -EOVERFLOW;
@@ -220,6 +225,23 @@ static int usb_string_copy(const char *s, char **s_copy)
 			return -ENOMEM;
 	}
 	strlcpy(str, s, MAX_USB_STRING_WITH_NULL_LEN);
+=======
+
+	ret = strlen(s);
+	if (ret > USB_MAX_STRING_LEN)
+		return -EOVERFLOW;
+	if (ret < 1)
+		return -EINVAL;
+
+	if (copy) {
+		str = copy;
+	} else {
+		str = kmalloc(USB_MAX_STRING_WITH_NULL_LEN, GFP_KERNEL);
+		if (!str)
+			return -ENOMEM;
+	}
+	strcpy(str, s);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	if (str[ret - 1] == '\n')
 		str[ret - 1] = '\0';
 	*s_copy = str;
@@ -1642,6 +1664,8 @@ static void configfs_composite_unbind(struct usb_gadget *gadget)
 	usb_ep_autoconfig_reset(cdev->gadget);
 	spin_lock_irqsave(&gi->spinlock, flags);
 	cdev->gadget = NULL;
+	cdev->deactivations = 0;
+	gadget->deactivated = false;
 	set_gadget_data(gadget, NULL);
 	spin_unlock_irqrestore(&gi->spinlock, flags);
 }

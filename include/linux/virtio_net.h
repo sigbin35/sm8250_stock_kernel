@@ -5,9 +5,27 @@
 #include <linux/if_vlan.h>
 #include <uapi/linux/virtio_net.h>
 
+static inline bool virtio_net_hdr_match_proto(__be16 protocol, __u8 gso_type)
+{
+	switch (gso_type & ~VIRTIO_NET_HDR_GSO_ECN) {
+	case VIRTIO_NET_HDR_GSO_TCPV4:
+		return protocol == cpu_to_be16(ETH_P_IP);
+	case VIRTIO_NET_HDR_GSO_TCPV6:
+		return protocol == cpu_to_be16(ETH_P_IPV6);
+	case VIRTIO_NET_HDR_GSO_UDP:
+		return protocol == cpu_to_be16(ETH_P_IP) ||
+		       protocol == cpu_to_be16(ETH_P_IPV6);
+	default:
+		return false;
+	}
+}
+
 static inline int virtio_net_hdr_set_proto(struct sk_buff *skb,
 					   const struct virtio_net_hdr *hdr)
 {
+	if (skb->protocol)
+		return 0;
+
 	switch (hdr->gso_type & ~VIRTIO_NET_HDR_GSO_ECN) {
 	case VIRTIO_NET_HDR_GSO_TCPV4:
 	case VIRTIO_NET_HDR_GSO_UDP:
@@ -51,19 +69,47 @@ static inline int virtio_net_hdr_to_skb(struct sk_buff *skb,
 			return -EINVAL;
 	}
 
+	skb_reset_mac_header(skb);
+
 	if (hdr->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM) {
-		u16 start = __virtio16_to_cpu(little_endian, hdr->csum_start);
-		u16 off = __virtio16_to_cpu(little_endian, hdr->csum_offset);
+		u32 start = __virtio16_to_cpu(little_endian, hdr->csum_start);
+		u32 off = __virtio16_to_cpu(little_endian, hdr->csum_offset);
+		u32 needed = start + max_t(u32, thlen, off + sizeof(__sum16));
+
+		if (!pskb_may_pull(skb, needed))
+			return -EINVAL;
 
 		if (!skb_partial_csum_set(skb, start, off))
 			return -EINVAL;
+<<<<<<< HEAD
+=======
+
+		p_off = skb_transport_offset(skb) + thlen;
+		if (!pskb_may_pull(skb, p_off))
+			return -EINVAL;
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	} else {
 		/* gso packets without NEEDS_CSUM do not set transport_offset.
 		 * probe and drop if does not match one of the above types.
 		 */
 		if (gso_type && skb->network_header) {
+<<<<<<< HEAD
 			if (!skb->protocol)
 				virtio_net_hdr_set_proto(skb, hdr);
+=======
+			struct flow_keys_basic keys;
+
+			if (!skb->protocol) {
+				__be16 protocol = dev_parse_header_protocol(skb);
+
+				if (!protocol)
+					virtio_net_hdr_set_proto(skb, hdr);
+				else if (!virtio_net_hdr_match_proto(protocol, hdr->gso_type))
+					return -EINVAL;
+				else
+					skb->protocol = protocol;
+			}
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 retry:
 			skb_probe_transport_header(skb, -1);
 			if (!skb_transport_header_was_set(skb)) {
@@ -75,14 +121,46 @@ retry:
 				}
 				return -EINVAL;
 			}
+<<<<<<< HEAD
+=======
+
+			p_off = keys.control.thoff + thlen;
+			if (!pskb_may_pull(skb, p_off) ||
+			    keys.basic.ip_proto != ip_proto)
+				return -EINVAL;
+
+			skb_set_transport_header(skb, keys.control.thoff);
+		} else if (gso_type) {
+			p_off = thlen;
+			if (!pskb_may_pull(skb, p_off))
+				return -EINVAL;
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 		}
 	}
 
 	if (hdr->gso_type != VIRTIO_NET_HDR_GSO_NONE) {
 		u16 gso_size = __virtio16_to_cpu(little_endian, hdr->gso_size);
+<<<<<<< HEAD
 
 		skb_shinfo(skb)->gso_size = gso_size;
 		skb_shinfo(skb)->gso_type = gso_type;
+=======
+		unsigned int nh_off = p_off;
+		struct skb_shared_info *shinfo = skb_shinfo(skb);
+
+		/* UFO may not include transport header in gso_size. */
+		if (gso_type & SKB_GSO_UDP)
+			nh_off -= thlen;
+
+		/* Kernel has a special handling for GSO_BY_FRAGS. */
+		if (gso_size == GSO_BY_FRAGS)
+			return -EINVAL;
+
+		/* Too small packets are not really GSO ones. */
+		if (skb->len - nh_off > gso_size) {
+			shinfo->gso_size = gso_size;
+			shinfo->gso_type = gso_type;
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 
 		/* Header must be checked, and gso_segs computed. */
 		skb_shinfo(skb)->gso_type |= SKB_GSO_DODGY;

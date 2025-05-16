@@ -464,13 +464,13 @@ static int uio_open(struct inode *inode, struct file *filep)
 
 	mutex_lock(&minor_lock);
 	idev = idr_find(&uio_idr, iminor(inode));
-	mutex_unlock(&minor_lock);
 	if (!idev) {
 		ret = -ENODEV;
+		mutex_unlock(&minor_lock);
 		goto out;
 	}
-
 	get_device(&idev->dev);
+	mutex_unlock(&minor_lock);
 
 	if (!try_module_get(idev->owner)) {
 		ret = -ENODEV;
@@ -1019,6 +1019,10 @@ void uio_unregister_device(struct uio_info *info)
 	idev->info = NULL;
 	mutex_unlock(&idev->info_lock);
 
+<<<<<<< HEAD
+=======
+	uio_free_minor(minor);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	device_unregister(&idev->dev);
 
 	return;

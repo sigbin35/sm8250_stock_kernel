@@ -247,6 +247,7 @@ static void bit_cursor(struct vc_data *vc, struct fb_info *info, int mode,
 
 	cursor.set = 0;
 
+<<<<<<< HEAD
 	if (softback_lines) {
 		if (y + softback_lines >= vc->vc_rows) {
 			mode = CM_ERASE;
@@ -255,6 +256,10 @@ static void bit_cursor(struct vc_data *vc, struct fb_info *info, int mode,
 		} else
 			y += softback_lines;
 	}
+=======
+	if (!vc->vc_font.data)
+		return;
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 
  	c = scr_readw((u16 *) vc->vc_pos);
 	attribute = get_attribute(info, c);

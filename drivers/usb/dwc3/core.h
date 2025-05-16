@@ -140,6 +140,7 @@
 #define DWC3_GEVNTCOUNT(n)	(0xc40c + ((n) * 0x10))
 
 #define DWC3_GHWPARAMS8		0xc600
+#define DWC3_GUCTL3		0xc60c
 #define DWC3_GFLADJ		0xc630
 
 /* Device Registers */
@@ -261,9 +262,6 @@
 #define DWC3_GCTL_U2EXIT_LFPS		BIT(2)
 #define DWC3_GCTL_GBLHIBERNATIONEN	BIT(1)
 #define DWC3_GCTL_DSBLCLKGTNG		BIT(0)
-
-/* Global User Control Register */
-#define DWC3_GUCTL_HSTINAUTORETRY	BIT(14)
 
 /* Global User Control 1 Register */
 #define DWC3_GUCTL1_TX_IPGAP_LINECHECK_DIS	BIT(28)
@@ -397,7 +395,11 @@
 #define DWC3_GUCTL2_RST_ACTBITLATER		BIT(14)
 
 /* Global User Control Register 3 */
+<<<<<<< HEAD
 #define DWC3_GUCTL3_USB20_RETRY_DISABLE		BIT(16)
+=======
+#define DWC3_GUCTL3_SPLITDISABLE		BIT(14)
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 
 /* Device Configuration Register */
 #define DWC3_DCFG_DEVADDR(addr)	((addr) << 3)
@@ -1123,6 +1125,7 @@ struct dwc3_scratchpad_array {
  * 	2	- No de-emphasis
  * 	3	- Reserved
  * @dis_metastability_quirk: set to disable metastability quirk.
+<<<<<<< HEAD
  * @err_evt_seen: previous event in queue was erratic error
  * @usb3_u1u2_disable: if true, disable U1U2 low power modes in Superspeed mode
  * @in_lpm: indicates if controller is in low power mode (no clocks)
@@ -1133,6 +1136,9 @@ struct dwc3_scratchpad_array {
  * @irq_dbg_index: index for capturing IRQ stats
  * @wait_linkstate: waitqueue for waiting LINK to move into required state
  * @vbus_draw: current to be drawn from USB
+=======
+ * @dis_split_quirk: set to disable split boundary.
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
  * @imod_interval: set the interrupt moderation interval in 250ns
  *                 increments or 0 to disable.
  * @xhci_imod_value: imod value to use with xhci
@@ -1333,6 +1339,8 @@ struct dwc3 {
 	unsigned int		vbus_draw;
 
 	unsigned		dis_metastability_quirk:1;
+
+	unsigned		dis_split_quirk:1;
 
 	u16			imod_interval;
 	u32			xhci_imod_value;
@@ -1666,7 +1674,6 @@ static inline void dwc3_otg_host_init(struct dwc3 *dwc)
 #if !IS_ENABLED(CONFIG_USB_DWC3_HOST)
 int dwc3_gadget_suspend(struct dwc3 *dwc);
 int dwc3_gadget_resume(struct dwc3 *dwc);
-void dwc3_gadget_process_pending_events(struct dwc3 *dwc);
 #else
 static inline int dwc3_gadget_suspend(struct dwc3 *dwc)
 {
@@ -1678,9 +1685,6 @@ static inline int dwc3_gadget_resume(struct dwc3 *dwc)
 	return 0;
 }
 
-static inline void dwc3_gadget_process_pending_events(struct dwc3 *dwc)
-{
-}
 #endif /* !IS_ENABLED(CONFIG_USB_DWC3_HOST) */
 
 #if IS_ENABLED(CONFIG_USB_DWC3_ULPI)

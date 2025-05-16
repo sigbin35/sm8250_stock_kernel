@@ -676,7 +676,7 @@ static int breakpoint_handler(unsigned long unused, unsigned int esr,
 		perf_bp_event(bp, regs);
 
 		/* Do we need to handle the stepping? */
-		if (is_default_overflow_handler(bp))
+		if (uses_default_overflow_handler(bp))
 			step = 1;
 unlock:
 		rcu_read_unlock();
@@ -752,6 +752,30 @@ static u64 get_distance_from_watchpoint(unsigned long addr, u64 val,
 		return 0;
 }
 
+<<<<<<< HEAD
+=======
+static int watchpoint_report(struct perf_event *wp, unsigned long addr,
+			     struct pt_regs *regs)
+{
+	int step = uses_default_overflow_handler(wp);
+	struct arch_hw_breakpoint *info = counter_arch_bp(wp);
+
+	info->trigger = addr;
+
+	/*
+	 * If we triggered a user watchpoint from a uaccess routine, then
+	 * handle the stepping ourselves since userspace really can't help
+	 * us with this.
+	 */
+	if (!user_mode(regs) && info->ctrl.privilege == AARCH64_BREAKPOINT_EL0)
+		step = 1;
+	else
+		perf_bp_event(wp, regs);
+
+	return step;
+}
+
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 static int watchpoint_handler(unsigned long addr, unsigned int esr,
 			      struct pt_regs *regs)
 {

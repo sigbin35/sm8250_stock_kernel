@@ -1073,7 +1073,7 @@ static int qcom_smd_create_device(struct qcom_smd_channel *channel)
 
 	/* Assign public information to the rpmsg_device */
 	rpdev = &qsdev->rpdev;
-	strncpy(rpdev->id.name, channel->name, RPMSG_NAME_SIZE);
+	strscpy_pad(rpdev->id.name, channel->name, RPMSG_NAME_SIZE);
 	rpdev->src = RPMSG_ADDR_ANY;
 	rpdev->dst = RPMSG_ADDR_ANY;
 
@@ -1304,7 +1304,7 @@ static void qcom_channel_state_worker(struct work_struct *work)
 
 		spin_unlock_irqrestore(&edge->channels_lock, flags);
 
-		strncpy(chinfo.name, channel->name, sizeof(chinfo.name));
+		strscpy_pad(chinfo.name, channel->name, sizeof(chinfo.name));
 		chinfo.src = RPMSG_ADDR_ANY;
 		chinfo.dst = RPMSG_ADDR_ANY;
 		rpmsg_unregister_device(&edge->dev, &chinfo);
@@ -1361,8 +1361,16 @@ static int qcom_smd_parse_edge(struct device *dev,
 		}
 
 		edge->ipc_regmap = syscon_node_to_regmap(syscon_np);
+<<<<<<< HEAD
 		if (IS_ERR(edge->ipc_regmap))
 			return PTR_ERR(edge->ipc_regmap);
+=======
+		of_node_put(syscon_np);
+		if (IS_ERR(edge->ipc_regmap)) {
+			ret = PTR_ERR(edge->ipc_regmap);
+			goto put_node;
+		}
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 
 		key = "qcom,ipc";
 		ret = of_property_read_u32_index(node, key, 1, &edge->ipc_offset);
@@ -1383,9 +1391,14 @@ static int qcom_smd_parse_edge(struct device *dev,
 		edge->name = node->name;
 
 	irq = irq_of_parse_and_map(node, 0);
-	if (irq < 0) {
+	if (!irq) {
 		dev_err(dev, "required smd interrupt missing\n");
+<<<<<<< HEAD
 		return -EINVAL;
+=======
+		ret = -EINVAL;
+		goto put_node;
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	}
 
 	ret = devm_request_irq(dev, irq,

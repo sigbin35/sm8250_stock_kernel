@@ -315,13 +315,9 @@ static void nvme_mpath_set_live(struct nvme_ns *ns)
 	if (!head->disk)
 		return;
 
-	if (!(head->disk->flags & GENHD_FL_UP)) {
-		device_add_disk(&head->subsys->dev, head->disk);
-		if (sysfs_create_group(&disk_to_dev(head->disk)->kobj,
-				&nvme_ns_id_attr_group))
-			dev_warn(&head->subsys->dev,
-				 "failed to create id group.\n");
-	}
+	if (!(head->disk->flags & GENHD_FL_UP))
+		device_add_disk(&head->subsys->dev, head->disk,
+				nvme_ns_id_attr_groups);
 
 	synchronize_srcu(&ns->head->srcu);
 	kblockd_schedule_work(&ns->head->requeue_work);
@@ -404,14 +400,17 @@ static int nvme_update_ana_state(struct nvme_ctrl *ctrl,
 
 	down_write(&ctrl->namespaces_rwsem);
 	list_for_each_entry(ns, &ctrl->namespaces, list) {
-		unsigned nsid = le32_to_cpu(desc->nsids[n]);
-
+		unsigned nsid;
+again:
+		nsid = le32_to_cpu(desc->nsids[n]);
 		if (ns->head->ns_id < nsid)
 			continue;
 		if (ns->head->ns_id == nsid)
 			nvme_update_ns_ana_state(desc, ns);
 		if (++n == nr_nsids)
 			break;
+		if (ns->head->ns_id > nsid)
+			goto again;
 	}
 	up_write(&ctrl->namespaces_rwsem);
 	return 0;
@@ -515,6 +514,17 @@ void nvme_mpath_add_disk(struct nvme_ns *ns, struct nvme_id_ns *id)
 		ns->ana_grpid = le32_to_cpu(id->anagrpid);
 		nvme_parse_ana_log(ns->ctrl, ns, nvme_set_ns_ana_state);
 		mutex_unlock(&ns->ctrl->ana_lock);
+<<<<<<< HEAD
+=======
+		if (desc.state) {
+			/* found the group desc: update */
+			nvme_update_ns_ana_state(&desc, ns);
+		} else {
+			/* group desc not found: trigger a re-read */
+			set_bit(NVME_NS_ANA_PENDING, &ns->flags);
+			queue_work(nvme_wq, &ns->ctrl->ana_work);
+		}
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	} else {
 		mutex_lock(&ns->head->lock);
 		ns->ana_state = NVME_ANA_OPTIMIZED; 
@@ -527,11 +537,8 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 {
 	if (!head->disk)
 		return;
-	if (head->disk->flags & GENHD_FL_UP) {
-		sysfs_remove_group(&disk_to_dev(head->disk)->kobj,
-				   &nvme_ns_id_attr_group);
+	if (head->disk->flags & GENHD_FL_UP)
 		del_gendisk(head->disk);
-	}
 	blk_set_queue_dying(head->disk->queue);
 	/* make sure all pending bios are cleaned up */
 	kblockd_schedule_work(&head->requeue_work);

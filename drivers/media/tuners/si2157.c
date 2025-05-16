@@ -88,8 +88,13 @@ static int si2157_init(struct dvb_frontend *fe)
 
 	dev_dbg(&client->dev, "\n");
 
+<<<<<<< HEAD
 	/* Returned IF frequency is garbage when firmware is not running */
 	memcpy(cmd.args, "\x15\x00\x06\x07", 4);
+=======
+	/* Try to get Xtal trim property, to verify tuner still running */
+	memcpy(cmd.args, "\x15\x00\x02\x04", 4);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	cmd.wlen = 4;
 	cmd.rlen = 4;
 	ret = si2157_cmd_execute(client, &cmd);
