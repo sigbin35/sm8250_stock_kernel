@@ -251,7 +251,7 @@ static void oops_end(unsigned long flags, struct pt_regs *regs,
 		panic("Fatal exception in interrupt");
 	if (panic_on_oops)
 		panic("Fatal exception");
-	do_exit(signr);
+	make_task_dead(signr);
 }
 NOKPROBE_SYMBOL(oops_end);
 
@@ -433,8 +433,16 @@ out:
 		nmi_panic(regs, "Unrecoverable nested System Reset");
 #endif
 	/* Must die if the interrupt is not recoverable */
+<<<<<<< HEAD
 	if (!(regs->msr & MSR_RI))
 		nmi_panic(regs, "Unrecoverable System Reset");
+=======
+	if (!(regs->msr & MSR_RI)) {
+		/* For the reason explained in die_mce, nmi_exit before die */
+		nmi_exit();
+		die("Unrecoverable System Reset", regs, SIGABRT);
+	}
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 
 	if (!nested)
 		nmi_exit();
@@ -1338,10 +1346,12 @@ static int emulate_instruction(struct pt_regs *regs)
 	return -EINVAL;
 }
 
+#ifdef CONFIG_GENERIC_BUG
 int is_valid_bugaddr(unsigned long addr)
 {
 	return is_kernel_addr(addr);
 }
+#endif
 
 #ifdef CONFIG_MATH_EMULATION
 static int emulate_math(struct pt_regs *regs)

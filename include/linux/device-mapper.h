@@ -317,10 +317,22 @@ struct dm_target {
 	bool split_discard_bios:1;
 
 	/*
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	 * Set if inline crypto capabilities from this target's underlying
 	 * device(s) can be exposed via the device-mapper device.
 	 */
 	bool may_passthrough_inline_crypto:1;
+<<<<<<< HEAD
+=======
+	 * Set if we need to limit the number of in-flight bios when swapping.
+	 */
+	bool limit_swap_bios:1;
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 };
 
 /* Each target can link one of these into the table */

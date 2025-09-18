@@ -793,8 +793,7 @@ static struct dst_entry *geneve_get_v6_dst(struct sk_buff *skb,
 		use_cache = false;
 	}
 
-	fl6->flowlabel = ip6_make_flowinfo(RT_TOS(prio),
-					   info->key.label);
+	fl6->flowlabel = ip6_make_flowinfo(prio, info->key.label);
 	dst_cache = (struct dst_cache *)&info->dst_cache;
 	if (use_cache) {
 		dst = dst_cache_get_ip6(dst_cache, &fl6->saddr);
@@ -831,7 +830,16 @@ static int geneve_xmit_skb(struct sk_buff *skb, struct net_device *dev,
 	__be16 df;
 	int err;
 
+<<<<<<< HEAD
 	rt = geneve_get_v4_rt(skb, dev, gs4, &fl4, info);
+=======
+	if (!skb_vlan_inet_prepare(skb))
+		return -EINVAL;
+
+	sport = udp_flow_src_port(geneve->net, skb, 1, USHRT_MAX, true);
+	rt = geneve_get_v4_rt(skb, dev, gs4, &fl4, info,
+			      geneve->info.key.tp_dst, sport);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	if (IS_ERR(rt))
 		return PTR_ERR(rt);
 
@@ -873,7 +881,16 @@ static int geneve6_xmit_skb(struct sk_buff *skb, struct net_device *dev,
 	__be16 sport;
 	int err;
 
+<<<<<<< HEAD
 	dst = geneve_get_v6_dst(skb, dev, gs6, &fl6, info);
+=======
+	if (!skb_vlan_inet_prepare(skb))
+		return -EINVAL;
+
+	sport = udp_flow_src_port(geneve->net, skb, 1, USHRT_MAX, true);
+	dst = geneve_get_v6_dst(skb, dev, gs6, &fl6, info,
+				geneve->info.key.tp_dst, sport);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	if (IS_ERR(dst))
 		return PTR_ERR(dst);
 

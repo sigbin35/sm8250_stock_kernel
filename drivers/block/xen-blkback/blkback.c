@@ -931,6 +931,17 @@ next:
 	if (map_until != num)
 		goto again;
 
+<<<<<<< HEAD
+=======
+out:
+	for (i = last_map; i < num; i++) {
+		/* Don't zap current batch's valid persistent grants. */
+		if(i >= map_until)
+			pages[i]->persistent_gnt = NULL;
+		pages[i]->handle = BLKBACK_INVALID_HANDLE;
+	}
+
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	return ret;
 
 out_of_memory:

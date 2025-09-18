@@ -147,7 +147,26 @@ __le64 *squashfs_read_inode_lookup_table(struct super_block *sb,
 	 * table[0] points to the first inode lookup table metadata block,
 	 * this should be less than lookup_table_start
 	 */
+<<<<<<< HEAD
 	if (!IS_ERR(table) && le64_to_cpu(table[0]) >= lookup_table_start) {
+=======
+	for (n = 0; n < (indexes - 1); n++) {
+		start = le64_to_cpu(table[n]);
+		end = le64_to_cpu(table[n + 1]);
+
+		if (start >= end
+		    || (end - start) >
+		    (SQUASHFS_METADATA_SIZE + SQUASHFS_BLOCK_OFFSET)) {
+			kfree(table);
+			return ERR_PTR(-EINVAL);
+		}
+	}
+
+	start = le64_to_cpu(table[indexes - 1]);
+	if (start >= lookup_table_start ||
+	    (lookup_table_start - start) >
+	    (SQUASHFS_METADATA_SIZE + SQUASHFS_BLOCK_OFFSET)) {
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 		kfree(table);
 		return ERR_PTR(-EINVAL);
 	}

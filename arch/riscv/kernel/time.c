@@ -12,6 +12,11 @@
  *   GNU General Public License for more details.
  */
 
+<<<<<<< HEAD
+=======
+#include <linux/of_clk.h>
+#include <linux/clockchips.h>
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 #include <linux/clocksource.h>
 #include <linux/delay.h>
 #include <asm/sbi.h>
@@ -30,4 +35,6 @@ void __init time_init(void)
 
 	lpj_fine = riscv_timebase / HZ;
 	timer_probe();
+
+	tick_setup_hrtimer_broadcast();
 }

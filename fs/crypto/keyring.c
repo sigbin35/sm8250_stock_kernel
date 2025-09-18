@@ -619,6 +619,19 @@ int fscrypt_ioctl_add_key(struct file *filp, void __user *_uarg)
 		return -EINVAL;
 
 	memset(&secret, 0, sizeof(secret));
+<<<<<<< HEAD
+=======
+
+	if (arg.__flags) {
+		if (arg.__flags & ~__FSCRYPT_ADD_KEY_FLAG_HW_WRAPPED)
+			return -EINVAL;
+		if ((arg.key_spec.type != FSCRYPT_KEY_SPEC_TYPE_IDENTIFIER) &&
+		    (arg.key_spec.type != FSCRYPT_KEY_SPEC_TYPE_DESCRIPTOR))
+			return -EINVAL;
+		secret.is_hw_wrapped = true;
+	}
+
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	if (arg.key_id) {
 		if (arg.raw_size != 0)
 			return -EINVAL;
@@ -641,6 +654,7 @@ int fscrypt_ioctl_add_key(struct file *filp, void __user *_uarg)
 			goto out_wipe_secret;
 	}
 
+<<<<<<< HEAD
 	switch (arg.key_spec.type) {
 	case FSCRYPT_KEY_SPEC_TYPE_DESCRIPTOR:
 		/*
@@ -701,6 +715,8 @@ int fscrypt_ioctl_add_key(struct file *filp, void __user *_uarg)
 		goto out_wipe_secret;
 	}
 
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	err = add_master_key(sb, &secret, &arg.key_spec);
 out_wipe_secret:
 	wipe_master_key_secret(&secret);

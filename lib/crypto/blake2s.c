@@ -15,24 +15,27 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/bug.h>
-#include <asm/unaligned.h>
-
-bool blake2s_selftest(void);
 
 void blake2s_update(struct blake2s_state *state, const u8 *in, size_t inlen)
 {
+<<<<<<< HEAD
 	const size_t fill = BLAKE2S_BLOCK_SIZE - state->buflen;
 
 	if (unlikely(!inlen))
 		return;
 	if (inlen > fill) {
 		memcpy(state->buf + state->buflen, in, fill);
+<<<<<<< HEAD
 		if (IS_ENABLED(CONFIG_CRYPTO_ARCH_HAVE_LIB_BLAKE2S))
 			blake2s_compress_arch(state, state->buf, 1,
 					      BLAKE2S_BLOCK_SIZE);
 		else
 			blake2s_compress_generic(state, state->buf, 1,
 						 BLAKE2S_BLOCK_SIZE);
+=======
+		blake2s_compress_generic(state, state->buf, 1,
+					 BLAKE2S_BLOCK_SIZE);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 		state->buflen = 0;
 		in += fill;
 		inlen -= fill;
@@ -40,36 +43,56 @@ void blake2s_update(struct blake2s_state *state, const u8 *in, size_t inlen)
 	if (inlen > BLAKE2S_BLOCK_SIZE) {
 		const size_t nblocks = DIV_ROUND_UP(inlen, BLAKE2S_BLOCK_SIZE);
 		/* Hash one less (full) block than strictly possible */
+<<<<<<< HEAD
 		if (IS_ENABLED(CONFIG_CRYPTO_ARCH_HAVE_LIB_BLAKE2S))
 			blake2s_compress_arch(state, in, nblocks - 1,
 					      BLAKE2S_BLOCK_SIZE);
 		else
 			blake2s_compress_generic(state, in, nblocks - 1,
 						 BLAKE2S_BLOCK_SIZE);
+=======
+		blake2s_compress_generic(state, in, nblocks - 1,
+					 BLAKE2S_BLOCK_SIZE);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 		in += BLAKE2S_BLOCK_SIZE * (nblocks - 1);
 		inlen -= BLAKE2S_BLOCK_SIZE * (nblocks - 1);
 	}
 	memcpy(state->buf + state->buflen, in, inlen);
 	state->buflen += inlen;
+=======
+	__blake2s_update(state, in, inlen, false);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 }
 EXPORT_SYMBOL(blake2s_update);
 
 void blake2s_final(struct blake2s_state *state, u8 *out)
 {
 	WARN_ON(IS_ENABLED(DEBUG) && !out);
+<<<<<<< HEAD
 	blake2s_set_lastblock(state);
 	memset(state->buf + state->buflen, 0,
 	       BLAKE2S_BLOCK_SIZE - state->buflen); /* Padding */
+<<<<<<< HEAD
 	if (IS_ENABLED(CONFIG_CRYPTO_ARCH_HAVE_LIB_BLAKE2S))
 		blake2s_compress_arch(state, state->buf, 1, state->buflen);
 	else
 		blake2s_compress_generic(state, state->buf, 1, state->buflen);
+=======
+	blake2s_compress_generic(state, state->buf, 1, state->buflen);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	cpu_to_le32_array(state->h, ARRAY_SIZE(state->h));
 	memcpy(out, state->h, state->outlen);
+=======
+	__blake2s_final(state, out, false);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	memzero_explicit(state, sizeof(*state));
 }
 EXPORT_SYMBOL(blake2s_final);
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 void blake2s256_hmac(u8 *out, const u8 *in, const u8 *key, const size_t inlen,
 		     const size_t keylen)
 {
@@ -107,6 +130,11 @@ void blake2s256_hmac(u8 *out, const u8 *in, const u8 *key, const size_t inlen,
 }
 EXPORT_SYMBOL(blake2s256_hmac);
 
+<<<<<<< HEAD
+=======
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 static int __init mod_init(void)
 {
 	if (!IS_ENABLED(CONFIG_CRYPTO_MANAGER_DISABLE_TESTS) &&

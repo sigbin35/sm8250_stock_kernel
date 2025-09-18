@@ -677,6 +677,17 @@ static int tpm_ibmvtpm_probe(struct vio_dev *vio_dev,
 	if (rc)
 		goto init_irq_cleanup;
 
+<<<<<<< HEAD
+=======
+	if (!wait_event_timeout(ibmvtpm->crq_queue.wq,
+				ibmvtpm->rtce_buf != NULL,
+				HZ)) {
+		rc = -ENODEV;
+		dev_err(dev, "CRQ response timed out\n");
+		goto init_irq_cleanup;
+	}
+
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	return tpm_chip_register(chip);
 init_irq_cleanup:
 	do {

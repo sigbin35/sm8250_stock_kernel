@@ -346,6 +346,10 @@ int fscrypt_fname_disk_to_usr(const struct inode *inode,
 	if (fscrypt_has_encryption_key(inode))
 		return fname_decrypt(inode, iname, oname);
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	/*
 	 * Sanity check that struct fscrypt_nokey_name doesn't have padding
 	 * between fields and that its encoded size never exceeds NAME_MAX.
@@ -356,13 +360,8 @@ int fscrypt_fname_disk_to_usr(const struct inode *inode,
 		     offsetof(struct fscrypt_nokey_name, sha256));
 	BUILD_BUG_ON(BASE64_CHARS(FSCRYPT_NOKEY_NAME_MAX) > NAME_MAX);
 
-	if (hash) {
-		nokey_name.dirhash[0] = hash;
-		nokey_name.dirhash[1] = minor_hash;
-	} else {
-		nokey_name.dirhash[0] = 0;
-		nokey_name.dirhash[1] = 0;
-	}
+	nokey_name.dirhash[0] = hash;
+	nokey_name.dirhash[1] = minor_hash;
 	if (iname->len <= sizeof(nokey_name.bytes)) {
 		memcpy(nokey_name.bytes, iname->name, iname->len);
 		size = offsetof(struct fscrypt_nokey_name, bytes[iname->len]);
@@ -377,6 +376,24 @@ int fscrypt_fname_disk_to_usr(const struct inode *inode,
 		size = FSCRYPT_NOKEY_NAME_MAX;
 	}
 	oname->len = base64_encode((const u8 *)&nokey_name, size, oname->name);
+<<<<<<< HEAD
+=======
+	if (iname->len <= FSCRYPT_FNAME_MAX_UNDIGESTED_SIZE) {
+		oname->len = digest_encode(iname->name, iname->len,
+					   oname->name);
+		return 0;
+	}
+	digested_name.hash = hash;
+	digested_name.minor_hash = minor_hash;
+	memcpy(digested_name.digest,
+	       FSCRYPT_FNAME_DIGEST(iname->name, iname->len),
+	       FSCRYPT_FNAME_DIGEST_SIZE);
+	oname->name[0] = '_';
+	oname->len = 1 + digest_encode((const char *)&digested_name,
+				       sizeof(digested_name), oname->name + 1);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	return 0;
 }
 EXPORT_SYMBOL(fscrypt_fname_disk_to_usr);

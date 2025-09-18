@@ -344,7 +344,13 @@ static int rawsock_create(struct net *net, struct socket *sock,
 	if ((sock->type != SOCK_SEQPACKET) && (sock->type != SOCK_RAW))
 		return -ESOCKTNOSUPPORT;
 
+<<<<<<< HEAD
 	if (sock->type == SOCK_RAW)
+=======
+	if (sock->type == SOCK_RAW) {
+		if (!ns_capable(net->user_ns, CAP_NET_RAW))
+			return -EPERM;
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 		sock->ops = &rawsock_raw_ops;
 	else
 		sock->ops = &rawsock_ops;

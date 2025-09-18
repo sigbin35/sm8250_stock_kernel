@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2018-2020, The Linux Foundation. All rights reserved. */
+/* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved. */
 
 #include <linux/debugfs.h>
 #include <linux/delay.h>
@@ -407,7 +407,8 @@ int mhi_pm_m0_transition(struct mhi_controller *mhi_cntrl)
 
 		read_lock_irq(&mhi_chan->lock);
 		/* only ring DB if ring is not empty */
-		if (tre_ring->base && tre_ring->wp  != tre_ring->rp)
+		if (tre_ring->base && tre_ring->wp  != tre_ring->rp &&
+		    mhi_chan->ch_state == MHI_CH_STATE_ENABLED)
 			mhi_ring_chan_db(mhi_cntrl, mhi_chan);
 		read_unlock_irq(&mhi_chan->lock);
 	}
@@ -1078,6 +1079,7 @@ void mhi_control_error(struct mhi_controller *mhi_cntrl)
 				sfr_info->buf_addr);
 	}
 
+<<<<<<< HEAD
 #ifdef CONFIG_SEC_DEBUG_MDM_FILE_INFO
     if (mhi_cntrl->name && 
 		!strncmp("esoc0", mhi_cntrl->name, sizeof("esoc0"))) {
@@ -1091,6 +1093,8 @@ void mhi_control_error(struct mhi_controller *mhi_cntrl)
 	}
 #endif
 
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	/* link is not down if device supports RDDM */
 	transition_state = (mhi_cntrl->rddm_supported) ?
 		MHI_PM_DEVICE_ERR_DETECT : MHI_PM_LD_ERR_FATAL_DETECT;

@@ -764,7 +764,11 @@ void a6xx_preemption_close(struct adreno_device *adreno_dev)
 int a6xx_preemption_init(struct adreno_device *adreno_dev)
 {
 	u32 flags = ADRENO_FEATURE(adreno_dev, ADRENO_APRIV) ?
+<<<<<<< HEAD
 			KGSL_MEMDESC_PRIVILEGED : 0;	
+=======
+			KGSL_MEMDESC_PRIVILEGED : 0;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	struct adreno_preemption *preempt = &adreno_dev->preempt;
 	struct adreno_ringbuffer *rb;

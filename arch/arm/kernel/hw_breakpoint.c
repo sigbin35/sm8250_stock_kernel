@@ -631,7 +631,7 @@ int hw_breakpoint_arch_parse(struct perf_event *bp,
 	hw->address &= ~alignment_mask;
 	hw->ctrl.len <<= offset;
 
-	if (is_default_overflow_handler(bp)) {
+	if (uses_default_overflow_handler(bp)) {
 		/*
 		 * Mismatch breakpoints are required for single-stepping
 		 * breakpoints.
@@ -754,7 +754,24 @@ static void watchpoint_handler(unsigned long addr, unsigned int fsr,
 		 * mismatch breakpoint so we can single-step over the
 		 * watchpoint trigger.
 		 */
+<<<<<<< HEAD
 		if (is_default_overflow_handler(wp))
+=======
+		if (!uses_default_overflow_handler(wp))
+			continue;
+step:
+		enable_single_step(wp, instruction_pointer(regs));
+	}
+
+	if (min_dist > 0 && min_dist != -1) {
+		/* No exact match found. */
+		wp = slots[closest_match];
+		info = counter_arch_bp(wp);
+		info->trigger = addr;
+		pr_debug("watchpoint fired: address = 0x%x\n", info->trigger);
+		perf_bp_event(wp, regs);
+		if (uses_default_overflow_handler(wp))
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 			enable_single_step(wp, instruction_pointer(regs));
 
 unlock:
@@ -830,7 +847,7 @@ static void breakpoint_handler(unsigned long unknown, struct pt_regs *regs)
 			info->trigger = addr;
 			pr_debug("breakpoint fired: address = 0x%x\n", addr);
 			perf_bp_event(bp, regs);
-			if (!bp->overflow_handler)
+			if (uses_default_overflow_handler(bp))
 				enable_single_step(bp, addr);
 			goto unlock;
 		}

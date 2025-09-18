@@ -111,11 +111,11 @@ static void pty_unthrottle(struct tty_struct *tty)
 static int pty_write(struct tty_struct *tty, const unsigned char *buf, int c)
 {
 	struct tty_struct *to = tty->link;
-	unsigned long flags;
 
-	if (tty->stopped)
+	if (tty->stopped || !c)
 		return 0;
 
+<<<<<<< HEAD
 	if (c > 0) {
 		spin_lock_irqsave(&to->port->lock, flags);
 		/* Stuff the data into the input queue of the other end */
@@ -126,6 +126,9 @@ static int pty_write(struct tty_struct *tty, const unsigned char *buf, int c)
 		spin_unlock_irqrestore(&to->port->lock, flags);
 	}
 	return c;
+=======
+	return tty_insert_flip_string_and_push_buffer(to->port, buf, c);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 }
 
 /**

@@ -630,7 +630,11 @@ bool kgsl_mmu_gpuaddr_in_range(struct kgsl_pagetable *pagetable,
 {
 	if (PT_OP_VALID(pagetable, addr_in_range))
 		return pagetable->pt_ops->addr_in_range(pagetable,
+<<<<<<< HEAD
 				gpuaddr, size);
+=======
+			 gpuaddr, size);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	return false;
 }

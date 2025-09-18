@@ -21,11 +21,14 @@
 #include "sdcardfs.h"
 #include "linux/ctype.h"
 
+<<<<<<< HEAD
 #ifdef CONFIG_FSCRYPT_SDP
 extern
 int __fscrypt_sdp_d_delete(const struct dentry *dentry, int dek_is_locked);
 #endif
 
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 /*
  * returns: -ERRNO if error (returned to user)
  *          0: tell VFS to invalidate dentry
@@ -131,6 +134,7 @@ out:
 /* 1 = delete, 0 = cache */
 static int sdcardfs_d_delete(const struct dentry *d)
 {
+<<<<<<< HEAD
 #ifdef CONFIG_FSCRYPT_SDP
 	struct sdcardfs_dentry_info *info = SDCARDFS_D(d);
 	struct path *lower_path = &info->lower_path;
@@ -146,6 +150,8 @@ static int sdcardfs_d_delete(const struct dentry *d)
 			return 1;
 	}
 #endif
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	return SDCARDFS_SB(d->d_sb)->options.nocache ? 1 : 0;
 }
 

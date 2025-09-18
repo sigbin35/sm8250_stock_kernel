@@ -114,7 +114,40 @@ static inline bool fscrypt_dummy_context_enabled(struct inode *inode)
  */
 static inline void fscrypt_handle_d_move(struct dentry *dentry)
 {
+<<<<<<< HEAD
 	dentry->d_flags &= ~DCACHE_ENCRYPTED_NAME;
+=======
+	dentry->d_flags &= ~DCACHE_NOKEY_NAME;
+}
+
+/**
+ * fscrypt_is_nokey_name() - test whether a dentry is a no-key name
+ * @dentry: the dentry to check
+ *
+ * This returns true if the dentry is a no-key dentry.  A no-key dentry is a
+ * dentry that was created in an encrypted directory that hasn't had its
+ * encryption key added yet.  Such dentries may be either positive or negative.
+ *
+ * When a filesystem is asked to create a new filename in an encrypted directory
+ * and the new filename's dentry is a no-key dentry, it must fail the operation
+ * with ENOKEY.  This includes ->create(), ->mkdir(), ->mknod(), ->symlink(),
+ * ->rename(), and ->link().  (However, ->rename() and ->link() are already
+ * handled by fscrypt_prepare_rename() and fscrypt_prepare_link().)
+ *
+ * This is necessary because creating a filename requires the directory's
+ * encryption key, but just checking for the key on the directory inode during
+ * the final filesystem operation doesn't guarantee that the key was available
+ * during the preceding dentry lookup.  And the key must have already been
+ * available during the dentry lookup in order for it to have been checked
+ * whether the filename already exists in the directory and for the new file's
+ * dentry not to be invalidated due to it incorrectly having the no-key flag.
+ *
+ * Return: %true if the dentry is a no-key name
+ */
+static inline bool fscrypt_is_nokey_name(const struct dentry *dentry)
+{
+	return dentry->d_flags & DCACHE_NOKEY_NAME;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 }
 
 /* crypto.c */
@@ -145,8 +178,13 @@ static inline struct page *fscrypt_pagecache_page(struct page *bounce_page)
 	return (struct page *)page_private(bounce_page);
 }
 
+<<<<<<< HEAD
 extern void fscrypt_free_bounce_page(struct page *bounce_page);
 extern int fscrypt_d_revalidate(struct dentry *dentry, unsigned int flags);
+=======
+void fscrypt_free_bounce_page(struct page *bounce_page);
+int fscrypt_d_revalidate(struct dentry *dentry, unsigned int flags);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 /* policy.c */
 extern int fscrypt_ioctl_set_policy(struct file *, const void __user *);
@@ -157,6 +195,7 @@ extern int fscrypt_has_permitted_context(struct inode *, struct inode *);
 extern int fscrypt_inherit_context(struct inode *, struct inode *,
 					void *, bool);
 /* keyring.c */
+<<<<<<< HEAD
 extern void fscrypt_sb_free(struct super_block *sb);
 extern int fscrypt_ioctl_add_key(struct file *filp, void __user *arg);
 extern int fscrypt_ioctl_remove_key(struct file *filp, void __user *arg);
@@ -165,6 +204,15 @@ extern int fscrypt_ioctl_remove_key_all_users(struct file *filp,
 extern int fscrypt_ioctl_get_key_status(struct file *filp, void __user *arg);
 extern int fscrypt_register_key_removal_notifier(struct notifier_block *nb);
 extern int fscrypt_unregister_key_removal_notifier(struct notifier_block *nb);
+=======
+void fscrypt_sb_free(struct super_block *sb);
+int fscrypt_ioctl_add_key(struct file *filp, void __user *arg);
+int fscrypt_ioctl_remove_key(struct file *filp, void __user *arg);
+int fscrypt_ioctl_remove_key_all_users(struct file *filp, void __user *arg);
+int fscrypt_ioctl_get_key_status(struct file *filp, void __user *arg);
+int fscrypt_register_key_removal_notifier(struct notifier_block *nb);
+int fscrypt_unregister_key_removal_notifier(struct notifier_block *nb);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 /* keysetup.c */
 extern int fscrypt_get_encryption_info(struct inode *);
@@ -210,6 +258,7 @@ extern int fscrypt_zeroout_range(const struct inode *, pgoff_t, sector_t,
 				 unsigned int);
 
 /* hooks.c */
+<<<<<<< HEAD
 extern int fscrypt_file_open(struct inode *inode, struct file *filp);
 extern int __fscrypt_prepare_link(struct inode *inode, struct inode *dir,
 				  struct dentry *dentry);
@@ -245,6 +294,27 @@ extern int fscrypt_dd_may_submit_bio(struct bio *bio);
 extern struct inode *fscrypt_bio_get_inode(const struct bio *bio);
 extern bool fscrypt_dd_can_merge_bio(struct bio *bio, struct address_space *mapping);
 #endif
+=======
+int fscrypt_file_open(struct inode *inode, struct file *filp);
+int __fscrypt_prepare_link(struct inode *inode, struct inode *dir,
+			   struct dentry *dentry);
+int __fscrypt_prepare_rename(struct inode *old_dir, struct dentry *old_dentry,
+			     struct inode *new_dir, struct dentry *new_dentry,
+			     unsigned int flags);
+int __fscrypt_prepare_lookup(struct inode *dir, struct dentry *dentry,
+			     struct fscrypt_name *fname);
+int fscrypt_prepare_setflags(struct inode *inode,
+			     unsigned int oldflags, unsigned int flags);
+int __fscrypt_prepare_symlink(struct inode *dir, unsigned int len,
+			      unsigned int max_len,
+			      struct fscrypt_str *disk_link);
+int __fscrypt_encrypt_symlink(struct inode *inode, const char *target,
+			      unsigned int len, struct fscrypt_str *disk_link);
+const char *fscrypt_get_symlink(struct inode *inode, const void *caddr,
+				unsigned int max_size,
+				struct delayed_call *done);
+int fscrypt_symlink_getattr(const struct path *path, struct kstat *stat);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 #else  /* !CONFIG_FS_ENCRYPTION */
 
@@ -564,6 +634,13 @@ static inline const char *fscrypt_get_symlink(struct inode *inode,
 {
 	return ERR_PTR(-EOPNOTSUPP);
 }
+
+static inline int fscrypt_symlink_getattr(const struct path *path,
+					  struct kstat *stat)
+{
+	return -EOPNOTSUPP;
+}
+
 #endif	/* !CONFIG_FS_ENCRYPTION */
 
 /* inline_crypt.c */
@@ -751,9 +828,17 @@ static inline int fscrypt_prepare_rename(struct inode *old_dir,
  * filenames are presented in encrypted form.  Therefore, we'll try to set up
  * the directory's encryption key, but even without it the lookup can continue.
  *
+<<<<<<< HEAD
  * After calling this function, a filesystem should ensure that it's dentry
  * operations contain fscrypt_d_revalidate if DCACHE_ENCRYPTED_NAME was set,
  * so that the dentry can be invalidated if the key is later added.
+=======
+ * This will set DCACHE_NOKEY_NAME on the dentry if the lookup is by no-key
+ * name.  In this case the filesystem must assign the dentry a dentry_operations
+ * which contains fscrypt_d_revalidate (or contains a d_revalidate method that
+ * calls fscrypt_d_revalidate), so that the dentry will be invalidated if the
+ * directory's encryption key is later added.
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
  *
  * Return: 0 on success; -ENOENT if key is unavailable but the filename isn't a
  * correctly formed encoded ciphertext name, so a negative dentry should be

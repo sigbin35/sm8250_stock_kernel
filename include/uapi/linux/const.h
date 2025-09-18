@@ -28,4 +28,16 @@
 #define _BITUL(x)	(_UL(1) << (x))
 #define _BITULL(x)	(_ULL(1) << (x))
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+#define __ALIGN_KERNEL(x, a)		__ALIGN_KERNEL_MASK(x, (__typeof__(x))(a) - 1)
+=======
+#define __ALIGN_KERNEL(x, a)		__ALIGN_KERNEL_MASK(x, (typeof(x))(a) - 1)
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
+#define __ALIGN_KERNEL_MASK(x, mask)	(((x) + (mask)) & ~(mask))
+
+#define __KERNEL_DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
+
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 #endif /* _UAPI_LINUX_CONST_H */

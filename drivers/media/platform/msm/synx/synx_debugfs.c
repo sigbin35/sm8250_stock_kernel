@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+<<<<<<< HEAD
  * Copyright (c) 2019, 2022, The Linux Foundation. All rights reserved.
+=======
+ * Copyright (c) 2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
  */
 
 #include <linux/io.h>
@@ -20,7 +25,11 @@
 struct dentry *my_direc;
 const char delim[] = ",";
 int columns = NAME_COLUMN |
+<<<<<<< HEAD
 	BOUND_COLUMN | STATE_COLUMN | ERROR_CODES;
+=======
+BOUND_COLUMN | ERROR_CODES;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 void populate_bound_rows(
 	struct synx_table_row *row,
@@ -28,14 +37,13 @@ void populate_bound_rows(
 	char *end)
 {
 	int j;
-	int state = SYNX_STATE_INVALID;
+
 
 	for (j = 0; j < row->num_bound_synxs;
 		j++) {
 		cur += scnprintf(cur, end - cur,
-			"\n\tID: %d State: %s",
-			row->bound_synxs[j].external_data->synx_obj,
-			state);
+			"\n\tID: %d ",
+			row->bound_synxs[j].external_data->synx_obj);
 	}
 }
 static ssize_t synx_table_read(struct file *file,
@@ -50,8 +58,8 @@ static ssize_t synx_table_read(struct file *file,
 	char *dbuf, *cur, *end;
 
 	int i = 0;
-	int state = SYNX_STATE_INVALID;
 	ssize_t len = 0;
+	s32 index;
 
 	dbuf = kzalloc(MAX_DBG_BUF_SIZE, GFP_KERNEL);
 	if (!dbuf)
@@ -62,27 +70,29 @@ static ssize_t synx_table_read(struct file *file,
 		cur += scnprintf(cur, end - cur, "|   Name   |");
 	if (columns & BOUND_COLUMN)
 		cur += scnprintf(cur, end - cur, "|   Bound   |");
+<<<<<<< HEAD
 	if (columns & STATE_COLUMN)
 		cur += scnprintf(cur, end - cur, "|  Status  |");
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	cur += scnprintf(cur, end - cur, "\n");
-	for (i = 0; i < SYNX_MAX_OBJS; i++) {
+	for (i = 1; i < SYNX_MAX_OBJS; i++) {
 		row = &dev->synx_table[i];
 
-		if (!row->index)
+		index = row->index;
+		mutex_lock(&dev->row_locks[index]);
+		if (!row->index) {
+			mutex_unlock(&dev->row_locks[index]);
+			pr_debug("synx obj at %d invalid\n", index);
 			continue;
+		}
 
-		mutex_lock(&dev->row_locks[row->index]);
 		if (columns & NAME_COLUMN)
 			cur += scnprintf(cur, end - cur,
 				"|%10s|", row->name);
 		if (columns & BOUND_COLUMN)
 			cur += scnprintf(cur, end - cur,
 				"|%11d|", row->num_bound_synxs);
-		if (columns & STATE_COLUMN) {
-			state = synx_status(row);
-			cur += scnprintf(cur, end - cur,
-				"|%10d|", state);
-		}
 		if ((columns & BOUND_COLUMN) &&
 			(row->num_bound_synxs > 0)) {
 			cur += scnprintf(
@@ -91,7 +101,11 @@ static ssize_t synx_table_read(struct file *file,
 				cur,
 				end);
 		}
+<<<<<<< HEAD
 		mutex_unlock(&dev->row_locks[row->index]);
+=======
+		mutex_unlock(&dev->row_locks[index]);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		cur += scnprintf(cur, end - cur, "\n");
 	}
 	if (columns & ERROR_CODES && !list_empty(

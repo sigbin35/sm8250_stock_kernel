@@ -111,16 +111,48 @@ static f2fs_hash_t __f2fs_dentry_hash(const struct inode *dir,
 	return f2fs_hash;
 }
 
+<<<<<<< HEAD
 f2fs_hash_t f2fs_dentry_hash(const struct inode *dir,
 		const struct qstr *name_info, const struct fscrypt_name *fname)
+=======
+/*
+ * Compute @fname->hash.  For all directories, @fname->disk_name must be set.
+ * For casefolded directories, @fname->usr_fname must be set, and also
+ * @fname->cf_name if the filename is valid Unicode and is not "." or "..".
+ */
+void f2fs_hash_filename(const struct inode *dir, struct f2fs_filename *fname)
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 {
 #ifdef CONFIG_UNICODE
+<<<<<<< HEAD
 	struct f2fs_sb_info *sbi = F2FS_SB(dir->i_sb);
 	const struct unicode_map *um = dir->i_sb->s_encoding;
 	int r, dlen;
 	unsigned char *buff;
 	struct qstr folded;
 	const struct qstr *name = fname ? fname->usr_fname : name_info;
+=======
+	if (IS_CASEFOLDED(dir)) {
+		/*
+		 * If the casefolded name is provided, hash it instead of the
+		 * on-disk name.  If the casefolded name is *not* provided, that
+		 * should only be because the name wasn't valid Unicode or was
+		 * "." or "..", so fall back to treating the name as an opaque
+		 * byte sequence.  Note that to handle encrypted directories,
+		 * the fallback must use usr_fname (plaintext) rather than
+		 * disk_name (ciphertext).
+		 */
+		WARN_ON_ONCE(!fname->usr_fname->name);
+		if (fname->cf_name.name) {
+			name = fname->cf_name.name;
+			len = fname->cf_name.len;
+		} else {
+			name = fname->usr_fname->name;
+			len = fname->usr_fname->len;
+		}
+		if (IS_ENCRYPTED(dir)) {
+			struct qstr tmp = QSTR_INIT(name, len);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	if (!name_info->len || !IS_CASEFOLDED(dir))
 		goto opaque_seq;

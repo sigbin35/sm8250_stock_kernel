@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+<<<<<<< HEAD
  * Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
+=======
+ * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
  */
 
 #define DRIVER_NAME "msm_sharedmem"
@@ -183,9 +187,14 @@ static int msm_sharedmem_probe(struct platform_device *pdev)
 			"qcom,vm-nav-path");
 
 	/* Set up the permissions for the shared ram that was allocated. */
+<<<<<<< HEAD
 	setup_shared_ram_perms(client_id, shared_mem_pyhsical, shared_mem_size,
 				vm_nav_path);
 
+=======
+	setup_shared_ram_perms(client_id, shared_mem_pyhsical,
+					shared_mem_size, vm_nav_path);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	/* Setup device */
 	info->mmap = sharedmem_mmap; /* Custom mmap function. */
 	info->name = clnt_res->name;

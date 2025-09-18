@@ -231,12 +231,21 @@ void __put_cred(struct cred *cred)
 	kdebug("__put_cred(%p{%d,%d})", cred,
 	       atomic_read(&cred->usage),
 	       read_cred_subscribers(cred));
+<<<<<<< HEAD
 #ifdef CONFIG_KDP_CRED
 	if (rkp_ro_page((unsigned long)cred))
 		BUG_ON((rocred_uc_read(cred)) != 0);
 	else
 #endif
 	BUG_ON(atomic_read(&cred->usage) != 0);
+=======
+
+<<<<<<< HEAD
+	BUG_ON(atomic_long_read(&cred->usage) != 0);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	BUG_ON(atomic_read(&cred->usage) != 0);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 #ifdef CONFIG_DEBUG_CREDENTIALS
 	BUG_ON(read_cred_subscribers(cred) != 0);
 	cred->magic = CRED_MAGIC_DEAD;
@@ -314,6 +323,7 @@ const struct cred *get_task_cred(struct task_struct *task)
 	do {
 		cred = __task_cred((task));
 		BUG_ON(!cred);
+<<<<<<< HEAD
 		if (rkp_ro_page((unsigned long)cred)) {
 			inc_test = rocred_uc_inc_not_zero(cred);
 		}
@@ -324,8 +334,16 @@ const struct cred *get_task_cred(struct task_struct *task)
 	do {
 		cred = __task_cred((task));
 		BUG_ON(!cred);
+<<<<<<< HEAD
 	} while (!atomic_inc_not_zero(&((struct cred *)cred)->usage));
 #endif
+=======
+	} while (!atomic_long_inc_not_zero(&((struct cred *)cred)->usage));
+=======
+	} while (!atomic_inc_not_zero(&((struct cred *)cred)->usage));
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
+
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	rcu_read_unlock();
 	return cred;
 }
@@ -698,12 +716,20 @@ int commit_creds(struct cred *new)
 	validate_creds(old);
 	validate_creds(new);
 #endif
+<<<<<<< HEAD
+<<<<<<< HEAD
 #ifdef CONFIG_KDP_CRED
 	if (rkp_ro_page((unsigned long)new))
 		BUG_ON((rocred_uc_read(new)) < 1);
 	else
 #endif
 	BUG_ON(atomic_read(&new->usage) < 1);
+=======
+	BUG_ON(atomic_long_read(&new->usage) < 1);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	BUG_ON(atomic_read(&new->usage) < 1);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	get_cred(new); /* we will require a ref for the subj creds too */
 
@@ -802,12 +828,20 @@ void abort_creds(struct cred *new)
 #ifdef CONFIG_DEBUG_CREDENTIALS
 	BUG_ON(read_cred_subscribers(new) != 0);
 #endif
+<<<<<<< HEAD
+<<<<<<< HEAD
 #ifdef CONFIG_KDP_CRED
 	if (rkp_ro_page((unsigned long)new))
 		BUG_ON((rocred_uc_read(new)) < 1);
 	else
 #endif
 	BUG_ON(atomic_read(&new->usage) < 1);
+=======
+	BUG_ON(atomic_long_read(&new->usage) < 1);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	BUG_ON(atomic_read(&new->usage) < 1);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	put_cred(new);
 }
 EXPORT_SYMBOL(abort_creds);

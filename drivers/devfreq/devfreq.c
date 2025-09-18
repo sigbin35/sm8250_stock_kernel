@@ -582,7 +582,16 @@ static void devfreq_dev_release(struct device *dev)
 		devfreq->profile->exit(devfreq->dev.parent);
 
 	mutex_destroy(&devfreq->lock);
+<<<<<<< HEAD
+<<<<<<< HEAD
 	mutex_destroy(&devfreq->event_lock);
+=======
+	srcu_cleanup_notifier_head(&devfreq->transition_notifier_list);
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+	mutex_destroy(&devfreq->event_lock);
+	srcu_cleanup_notifier_head(&devfreq->transition_notifier_list);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	kfree(devfreq);
 }
 

@@ -494,9 +494,15 @@ int adreno_sysfs_init(struct adreno_device *adreno_dev)
 {
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	int ret;
+<<<<<<< HEAD
  
 	ret = sysfs_create_files(&device->dev->kobj, _attr_list);
 
+=======
+
+	ret = sysfs_create_files(&device->dev->kobj, _attr_list);
+
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	/* Notify userspace */
 	if (!ret)
 		kobject_uevent(&device->dev->kobj, KOBJ_ADD);

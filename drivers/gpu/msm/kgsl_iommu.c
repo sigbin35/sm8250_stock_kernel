@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+<<<<<<< HEAD
  * Copyright (c) 2011-2020, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+=======
+ * Copyright (c) 2011-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
  */
 
 #include <linux/compat.h>
@@ -218,8 +223,9 @@ static void kgsl_iommu_remove_global(struct kgsl_mmu *mmu,
 static void kgsl_iommu_add_global(struct kgsl_mmu *mmu,
 		struct kgsl_memdesc *memdesc, const char *name)
 {
-	u32 bit, start = 0;
+	u32 bit;
 	u64 size = kgsl_memdesc_footprint(memdesc);
+	int start = 0;
 
 	if (memdesc->gpuaddr != 0)
 		return;
@@ -797,7 +803,10 @@ static int kgsl_iommu_fault_handler(struct iommu_domain *domain,
 
 	if (private) {
 		pid = pid_nr(private->pid);
+<<<<<<< HEAD
 		tid = private->tid;
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		comm = private->comm;
 	}
 
@@ -1174,7 +1183,7 @@ void _enable_gpuhtw_llc(struct kgsl_mmu *mmu, struct kgsl_iommu_pt *iommu_pt)
 	int ret;
 
 	/* GPU pagetable walk LLC slice not enabled */
-	if (IS_ERR(adreno_dev->gpuhtw_llc_slice))
+	if (IS_ERR_OR_NULL(adreno_dev->gpuhtw_llc_slice))
 		return;
 
 	/* Domain attribute to enable system cache for GPU pagetable walks */
@@ -2620,10 +2629,13 @@ static bool kgsl_iommu_addr_in_range(struct kgsl_pagetable *pagetable,
 		uint64_t gpuaddr, uint64_t size)
 {
 	struct kgsl_iommu_pt *pt = pagetable->priv;
+	u64 end = gpuaddr + size;
 
-	if (gpuaddr == 0)
+	/* Make sure we don't wrap around */
+	if (gpuaddr == 0 || end < gpuaddr)
 		return false;
 
+<<<<<<< HEAD
 	if (gpuaddr >= pt->va_start && (gpuaddr + size) < pt->va_end)
 		return true;
 
@@ -2632,6 +2644,15 @@ static bool kgsl_iommu_addr_in_range(struct kgsl_pagetable *pagetable,
 		return true;
 
 	if (gpuaddr >= pt->svm_start && (gpuaddr + size) < pt->svm_end)
+=======
+	if (gpuaddr >= pt->va_start && end <= pt->va_end)
+		return true;
+
+	if (gpuaddr >= pt->compat_va_start && end <= pt->compat_va_end)
+		return true;
+
+	if (gpuaddr >= pt->svm_start && end <= pt->svm_end)
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		return true;
 
 	return false;

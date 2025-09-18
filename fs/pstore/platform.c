@@ -250,6 +250,12 @@ static int pstore_compress(const void *in, void *out,
 {
 	int ret;
 
+<<<<<<< HEAD
+=======
+	if (!IS_ENABLED(CONFIG_PSTORE_COMPRESS))
+		return -EINVAL;
+
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 	ret = crypto_comp_compress(tfm, in, inlen, out, &outlen);
 	if (ret) {
 		pr_err("crypto_comp_compress failed, ret = %d!\n", ret);
@@ -647,7 +653,11 @@ static void decompress_record(struct pstore_record *record)
 	int unzipped_len;
 	char *decompressed;
 
+<<<<<<< HEAD
 	if (!record->compressed)
+=======
+	if (!IS_ENABLED(CONFIG_PSTORE_COMPRESS) || !record->compressed)
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 		return;
 
 	/* Only PSTORE_TYPE_DMESG support compression. */

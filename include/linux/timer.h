@@ -178,6 +178,8 @@ extern void add_timer(struct timer_list *timer);
 
 extern int try_to_del_timer_sync(struct timer_list *timer);
 
+<<<<<<< HEAD
+<<<<<<< HEAD
 extern struct timer_base timer_base_deferrable;
 
 #ifdef CONFIG_SMP
@@ -185,6 +187,25 @@ extern struct timer_base timer_base_deferrable;
 #else
 # define del_timer_sync(t)		del_timer(t)
 #endif
+=======
+/**
+ * del_timer_sync - Delete a pending timer and wait for a running callback
+ * @timer:	The timer to be deleted
+ *
+ * See timer_delete_sync() for detailed explanation.
+ *
+ * Do not use in new code. Use timer_delete_sync() instead.
+ */
+static inline int del_timer_sync(struct timer_list *timer)
+{
+	return timer_delete_sync(timer);
+}
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+extern struct timer_base timer_base_deferrable;
+
+extern int del_timer_sync(struct timer_list *timer);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 #define del_singleshot_timer_sync(t) del_timer_sync(t)
 

@@ -136,10 +136,14 @@ endmenu
 endif # BLOCK
 
 if BLOCK
-menu "DOS/FAT/NT Filesystems"
+menu "DOS/FAT/EXFAT/NT Filesystems"
 
 source "fs/fat/Kconfig"
+<<<<<<< HEAD
 source "fs/sdfat/Kconfig"
+=======
+source "fs/exfat/Kconfig"
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 source "fs/ntfs/Kconfig"
 
 endmenu
@@ -263,6 +267,7 @@ source "fs/pstore/Kconfig"
 source "fs/sysv/Kconfig"
 source "fs/ufs/Kconfig"
 source "fs/exofs/Kconfig"
+source "fs/erofs/Kconfig"
 
 endif # MISC_FILESYSTEMS
 

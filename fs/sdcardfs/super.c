@@ -78,11 +78,14 @@ static int sdcardfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	err = vfs_statfs(&lower_path, buf);
 	sdcardfs_put_lower_path(dentry, &lower_path);
 
+<<<<<<< HEAD
 	if (uid_eq(GLOBAL_ROOT_UID, current_fsuid()) ||
 			capable(CAP_SYS_RESOURCE) ||
 			in_group_p(AID_USE_ROOT_RESERVED))
 		goto out;
 
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	if (sbi->options.reserved_mb) {
 		/* Invalid statfs informations. */
 		if (buf->f_bsize == 0) {
@@ -101,7 +104,11 @@ static int sdcardfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 		/* Make reserved blocks invisiable to media storage */
 		buf->f_bfree = buf->f_bavail;
 	}
+<<<<<<< HEAD
 out:
+=======
+
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	/* set return buf to our f/s to avoid confusing user-level utils */
 	buf->f_type = SDCARDFS_SUPER_MAGIC;
 
@@ -149,7 +156,11 @@ static int sdcardfs_remount_fs2(struct vfsmount *mnt, struct super_block *sb,
 		pr_err("sdcardfs: remount flags 0x%x unsupported\n", *flags);
 		err = -EINVAL;
 	}
+<<<<<<< HEAD
 	pr_info("Remount options were %s\n", options);
+=======
+	pr_info("Remount options were %s for vfsmnt %p.\n", options, mnt);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	err = parse_options_remount(sb, options, *flags & ~MS_SILENT, mnt->data);
 
 

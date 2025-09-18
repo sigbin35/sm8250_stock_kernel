@@ -469,7 +469,11 @@ int inode_permission2(struct vfsmount *mnt, struct inode *inode, int mask)
 	retval = security_inode_permission(inode, mask);
 	return retval;
 }
+<<<<<<< HEAD
 EXPORT_SYMBOL(inode_permission2);
+=======
+EXPORT_SYMBOL_GPL(inode_permission2);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 int inode_permission(struct inode *inode, int mask)
 {
@@ -2667,7 +2671,11 @@ struct dentry *lookup_one_len2(const char *name, struct vfsmount *mnt, struct de
 	dentry = lookup_dcache(&this, base, 0);
 	return dentry ? dentry : __lookup_slow(&this, base, 0);
 }
+<<<<<<< HEAD
 EXPORT_SYMBOL(lookup_one_len2);
+=======
+EXPORT_SYMBOL_GPL(lookup_one_len2);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 struct dentry *lookup_one_len(const char *name, struct dentry *base, int len)
 {
@@ -2705,6 +2713,26 @@ struct dentry *lookup_one_len_unlocked(const char *name,
 }
 EXPORT_SYMBOL(lookup_one_len_unlocked);
 
+/*
+ * Like lookup_one_len_unlocked(), except that it yields ERR_PTR(-ENOENT)
+ * on negatives.  Returns known positive or ERR_PTR(); that's what
+ * most of the users want.  Note that pinned negative with unlocked parent
+ * _can_ become positive at any time, so callers of lookup_one_len_unlocked()
+ * need to be very careful; pinned positives have ->d_inode stable, so
+ * this one avoids such problems.
+ */
+struct dentry *lookup_positive_unlocked(const char *name,
+				       struct dentry *base, int len)
+{
+	struct dentry *ret = lookup_one_len_unlocked(name, base, len);
+	if (!IS_ERR(ret) && d_is_negative(ret)) {
+		dput(ret);
+		ret = ERR_PTR(-ENOENT);
+	}
+	return ret;
+}
+EXPORT_SYMBOL(lookup_positive_unlocked);
+
 #ifdef CONFIG_UNIX98_PTYS
 int path_pts(struct path *path)
 {
@@ -2723,7 +2751,7 @@ int path_pts(struct path *path)
 	this.name = "pts";
 	this.len = 3;
 	child = d_hash_and_lookup(parent, &this);
-	if (!child)
+	if (IS_ERR_OR_NULL(child))
 		return -ENOENT;
 
 	path->dentry = child;
@@ -3045,7 +3073,11 @@ int vfs_create2(struct vfsmount *mnt, struct inode *dir, struct dentry *dentry,
 		fsnotify_create(dir, dentry);
 	return error;
 }
+<<<<<<< HEAD
 EXPORT_SYMBOL(vfs_create2);
+=======
+EXPORT_SYMBOL_GPL(vfs_create2);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 int vfs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 		bool want_excl)
@@ -3073,7 +3105,11 @@ int vfs_mkobj2(struct vfsmount *mnt, struct dentry *dentry, umode_t mode,
 		fsnotify_create(dir, dentry);
 	return error;
 }
+<<<<<<< HEAD
 EXPORT_SYMBOL(vfs_mkobj2);
+=======
+EXPORT_SYMBOL_GPL(vfs_mkobj2);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 
 int vfs_mkobj(struct dentry *dentry, umode_t mode,
@@ -3601,6 +3637,8 @@ struct dentry *vfs_tmpfile(struct dentry *dentry, umode_t mode, int open_flag)
 	child = d_alloc(dentry, &slash_name);
 	if (unlikely(!child))
 		goto out_err;
+	if (!IS_POSIXACL(dir))
+		mode &= ~current_umask();
 	error = dir->i_op->tmpfile(dir, child, mode);
 	if (error)
 		goto out_err;
@@ -3871,7 +3909,11 @@ int vfs_mknod2(struct vfsmount *mnt, struct inode *dir, struct dentry *dentry, u
 		fsnotify_create(dir, dentry);
 	return error;
 }
+<<<<<<< HEAD
 EXPORT_SYMBOL(vfs_mknod2);
+=======
+EXPORT_SYMBOL_GPL(vfs_mknod2);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 int vfs_mknod(struct inode *dir, struct dentry *dentry, umode_t mode, dev_t dev)
 {
@@ -3975,7 +4017,11 @@ int vfs_mkdir2(struct vfsmount *mnt, struct inode *dir, struct dentry *dentry, u
 		fsnotify_mkdir(dir, dentry);
 	return error;
 }
+<<<<<<< HEAD
 EXPORT_SYMBOL(vfs_mkdir2);
+=======
+EXPORT_SYMBOL_GPL(vfs_mkdir2);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 int vfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
@@ -4061,7 +4107,11 @@ out:
 		d_delete(dentry);
 	return error;
 }
+<<<<<<< HEAD
 EXPORT_SYMBOL(vfs_rmdir2);
+=======
+EXPORT_SYMBOL_GPL(vfs_rmdir2);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 int vfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
@@ -4113,10 +4163,13 @@ retry:
 	if (error)
 		goto exit3;
 	error = vfs_rmdir2(path.mnt, path.dentry->d_inode, dentry);
+<<<<<<< HEAD
 #ifdef CONFIG_PROC_DLOG
 	if (!error)
 		dlog_hook_rmdir(dentry, &path);
 #endif
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 exit3:
 	dput(dentry);
 exit2:
@@ -4193,7 +4246,11 @@ out:
 
 	return error;
 }
+<<<<<<< HEAD
 EXPORT_SYMBOL(vfs_unlink2);
+=======
+EXPORT_SYMBOL_GPL(vfs_unlink2);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 int vfs_unlink(struct inode *dir, struct dentry *dentry, struct inode **delegated_inode)
 {
@@ -4245,10 +4302,13 @@ retry_deleg:
 		if (error)
 			goto exit2;
 		error = vfs_unlink2(path.mnt, path.dentry->d_inode, dentry, &delegated_inode);
+<<<<<<< HEAD
 #ifdef CONFIG_PROC_DLOG
 		if (!error)
 			dlog_hook(dentry, inode, &path);
 #endif
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 exit2:
 		dput(dentry);
 	}
@@ -4317,7 +4377,11 @@ int vfs_symlink2(struct vfsmount *mnt, struct inode *dir, struct dentry *dentry,
 		fsnotify_create(dir, dentry);
 	return error;
 }
+<<<<<<< HEAD
 EXPORT_SYMBOL(vfs_symlink2);
+=======
+EXPORT_SYMBOL_GPL(vfs_symlink2);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 int vfs_symlink(struct inode *dir, struct dentry *dentry, const char *oldname)
 {
@@ -4445,7 +4509,11 @@ int vfs_link2(struct vfsmount *mnt, struct dentry *old_dentry, struct inode *dir
 		fsnotify_link(dir, inode, new_dentry);
 	return error;
 }
+<<<<<<< HEAD
 EXPORT_SYMBOL(vfs_link2);
+=======
+EXPORT_SYMBOL_GPL(vfs_link2);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 int vfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_dentry, struct inode **delegated_inode)
 {
@@ -4721,7 +4789,11 @@ out:
 
 	return error;
 }
+<<<<<<< HEAD
 EXPORT_SYMBOL(vfs_rename2);
+=======
+EXPORT_SYMBOL_GPL(vfs_rename2);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 int vfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	       struct inode *new_dir, struct dentry *new_dentry,
@@ -5040,7 +5112,7 @@ int __page_symlink(struct inode *inode, const char *symname, int len, int nofs)
 {
 	struct address_space *mapping = inode->i_mapping;
 	struct page *page;
-	void *fsdata;
+	void *fsdata = NULL;
 	int err;
 	unsigned int flags = 0;
 	if (nofs)

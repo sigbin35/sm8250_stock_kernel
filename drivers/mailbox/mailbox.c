@@ -85,6 +85,10 @@ static int __msg_submit(struct mbox_chan *chan)
 exit:
 	spin_unlock_irqrestore(&chan->lock, flags);
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	return err;
 }
 
@@ -103,9 +107,20 @@ static void msg_submit(struct mbox_chan *chan)
 		err = __msg_submit(chan);
 	} while (err == -EAGAIN);
 
+<<<<<<< HEAD
 	if (!err && (chan->txdone_method & TXDONE_BY_POLL))
 		/* kick start the timer immediately to avoid delays */
 		hrtimer_start(&chan->mbox->poll_hrt, 0, HRTIMER_MODE_REL);
+=======
+=======
+	/* kick start the timer immediately to avoid delays */
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
+	if (!err && (chan->txdone_method & TXDONE_BY_POLL)) {
+		/* but only if not already active */
+		if (!hrtimer_active(&chan->mbox->poll_hrt))
+			hrtimer_start(&chan->mbox->poll_hrt, 0, HRTIMER_MODE_REL);
+	}
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
 }
 
 static void tx_tick(struct mbox_chan *chan, int r)
@@ -143,11 +158,10 @@ static enum hrtimer_restart txdone_hrtimer(struct hrtimer *hrtimer)
 		struct mbox_chan *chan = &mbox->chans[i];
 
 		if (chan->active_req && chan->cl) {
+			resched = true;
 			txdone = chan->mbox->ops->last_tx_done(chan);
 			if (txdone)
 				tx_tick(chan, 0);
-			else
-				resched = true;
 		}
 	}
 

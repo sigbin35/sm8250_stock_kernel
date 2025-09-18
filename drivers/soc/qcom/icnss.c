@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
 #define pr_fmt(fmt) "icnss: " fmt
@@ -649,6 +649,15 @@ bool icnss_is_fw_ready(void)
 }
 EXPORT_SYMBOL(icnss_is_fw_ready);
 
+unsigned long icnss_get_device_config(void)
+{
+	if (!penv)
+		return 0;
+
+	return penv->device_config;
+}
+EXPORT_SYMBOL(icnss_get_device_config);
+
 void icnss_block_shutdown(bool status)
 {
 	if (!penv)
@@ -1080,26 +1089,42 @@ static int icnss_driver_event_server_arrive(void *data)
 			goto qmi_registered;
 		}
 		ignore_assert = true;
+<<<<<<< HEAD
 		goto err_power_on;
+=======
+		goto fail;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	}
 
 	if (!penv->msa_va) {
 		icnss_pr_err("Invalid MSA address\n");
 		ret = -EINVAL;
+<<<<<<< HEAD
 		goto err_power_on;
+=======
+		goto fail;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	}
 
 	ret = wlfw_msa_mem_info_send_sync_msg(penv);
 	if (ret < 0) {
 		ignore_assert = true;
+<<<<<<< HEAD
 		goto err_power_on;
+=======
+		goto fail;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	}
 
 	if (!test_bit(ICNSS_MSA0_ASSIGNED, &penv->state)) {
 		ret = icnss_assign_msa_perm_all(penv,
 						ICNSS_MSA_PERM_WLAN_HW_RW);
 		if (ret < 0)
+<<<<<<< HEAD
 			goto err_power_on;
+=======
+			goto fail;
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		set_bit(ICNSS_MSA0_ASSIGNED, &penv->state);
 	}
 
@@ -1135,10 +1160,13 @@ static int icnss_driver_event_server_arrive(void *data)
 err_setup_msa:
 	icnss_assign_msa_perm_all(penv, ICNSS_MSA_PERM_HLOS_ALL);
 	clear_bit(ICNSS_MSA0_ASSIGNED, &penv->state);
+<<<<<<< HEAD
 err_power_on:
 	icnss_hw_power_off(penv);
 clear_server:
 	icnss_clear_server(penv);
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 fail:
 	ICNSS_ASSERT(ignore_assert);
 qmi_registered:
@@ -2261,6 +2289,9 @@ int icnss_set_fw_log_mode(struct device *dev, uint8_t fw_log_mode)
 	if (!dev)
 		return -ENODEV;
 
+	if (test_bit(SKIP_QMI, &quirks))
+		return 0;
+
 	if (test_bit(ICNSS_FW_DOWN, &penv->state) ||
 	    !test_bit(ICNSS_FW_READY, &penv->state)) {
 		icnss_pr_err("FW down, ignoring fw_log_mode state: 0x%lx\n",
@@ -2354,6 +2385,9 @@ int icnss_wlan_enable(struct device *dev, struct icnss_wlan_enable_cfg *config,
 		      enum icnss_driver_mode mode,
 		      const char *host_version)
 {
+	if (test_bit(SKIP_QMI, &quirks))
+		return 0;
+
 	if (test_bit(ICNSS_FW_DOWN, &penv->state) ||
 	    !test_bit(ICNSS_FW_READY, &penv->state)) {
 		icnss_pr_err("FW down, ignoring wlan_enable state: 0x%lx\n",
@@ -2373,6 +2407,9 @@ EXPORT_SYMBOL(icnss_wlan_enable);
 
 int icnss_wlan_disable(struct device *dev, enum icnss_driver_mode mode)
 {
+	if (test_bit(SKIP_QMI, &quirks))
+		return 0;
+
 	if (test_bit(ICNSS_FW_DOWN, &penv->state)) {
 		icnss_pr_dbg("FW down, ignoring wlan_disable state: 0x%lx\n",
 			     penv->state);
@@ -3783,6 +3820,7 @@ static int icnss_smmu_dt_parse(struct icnss_priv *priv)
 	return 0;
 }
 
+<<<<<<< HEAD
 /**
  * enum driver_status: Driver Modules status
  * @DRIVER_MODULES_UNINITIALIZED: Driver CDS modules uninitialized
@@ -4005,6 +4043,13 @@ static void sec_remove_wifi_sysfs(struct icnss_priv *priv)
 				  &sec_sysfs_attr_group);
 		kobject_put(priv->wifi_kobj);
 		priv->wifi_kobj = NULL;
+=======
+static void icnss_read_device_configs(struct icnss_priv *priv)
+{
+	if (of_property_read_bool(priv->pdev->dev.of_node,
+				  "wlan-ipa-disabled")) {
+		set_bit(ICNSS_IPA_DISABLED, &priv->device_config);
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	}
 }
 
@@ -4033,6 +4078,8 @@ static int icnss_probe(struct platform_device *pdev)
 	priv->vreg_info = icnss_vreg_info;
 
 	icnss_allow_recursive_recovery(dev);
+
+	icnss_read_device_configs(priv);
 
 	ret = icnss_resource_parse(priv);
 	if (ret)

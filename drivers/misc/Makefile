@@ -77,5 +77,10 @@ obj-$(CONFIG_QTI_XR_SMRTVWR_MISC) += qxr-stdalonevwr.o
 obj-$(CONFIG_QTI_MAXIM_FAN_CONTROLLER) += max31760.o
 obj-$(CONFIG_QTI_XR_SMRTVWR_MISC) += qxr-stdalonevwr.o
 obj-$(CONFIG_FPR_FPC)		+= fpr_FingerprintCard/
+<<<<<<< HEAD
 
 obj-$(CONFIG_DEV_RIL_BRIDGE) += dev_ril_bridge.o
+=======
+obj-y                           += qrc/
+obj-$(CONFIG_KINECTICS_XR_NORDIC) += kxrctrl/
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843

@@ -38,6 +38,7 @@ struct poly1305_desc_ctx {
 	bool sset;
 };
 
+<<<<<<< HEAD
 /*
  * Poly1305 core functions.  These implement the ε-almost-∆-universal hash
  * function underlying the Poly1305 MAC, i.e. they don't add an encrypted nonce
@@ -45,6 +46,14 @@ struct poly1305_desc_ctx {
  */
 void poly1305_core_setkey(struct poly1305_key *key, const u8 *raw_key);
 static inline void poly1305_core_init(struct poly1305_state *state)
+=======
+void poly1305_init_arch(struct poly1305_desc_ctx *desc,
+			const u8 key[POLY1305_KEY_SIZE]);
+void poly1305_init_generic(struct poly1305_desc_ctx *desc,
+			   const u8 key[POLY1305_KEY_SIZE]);
+
+static inline void poly1305_init(struct poly1305_desc_ctx *desc, const u8 *key)
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 {
 	memset(state->h, 0, sizeof(state->h));
 }

@@ -280,7 +280,10 @@ static void __cqhci_enable(struct cqhci_host *cq_host)
 		cqcfg |= CQHCI_TASK_DESC_SZ;
 
 	if (cqhci_host_is_crypto_supported(cq_host)) {
+<<<<<<< HEAD
 //		cqhci_crypto_enable(cq_host);
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 		cqcfg |= CQHCI_ICE_ENABLE;
 		/* For SDHC v5.0 onwards, ICE 3.0 specific registers are added
 		 * in CQ register space, due to which few CQ registers are
@@ -294,6 +297,9 @@ static void __cqhci_enable(struct cqhci_host *cq_host)
 	cqcfg |= CQHCI_ENABLE;
 	cqhci_writel(cq_host, cqcfg, CQHCI_CFG);
 
+	if (cqhci_readl(cq_host, CQHCI_CTL) & CQHCI_HALT)
+		cqhci_writel(cq_host, 0, CQHCI_CTL);
+
 	cqhci_writel(cq_host, lower_32_bits(cq_host->desc_dma_base),
 		     CQHCI_TDLBA);
 	cqhci_writel(cq_host, upper_32_bits(cq_host->desc_dma_base),
@@ -306,6 +312,19 @@ static void __cqhci_enable(struct cqhci_host *cq_host)
 
 	cqhci_set_irqs(cq_host, 0);
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+	cqcfg |= CQHCI_ENABLE;
+
+	cqhci_writel(cq_host, cqcfg, CQHCI_CFG);
+
+	if (cqhci_readl(cq_host, CQHCI_CTL) & CQHCI_HALT)
+		cqhci_writel(cq_host, 0, CQHCI_CTL);
+
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	mmc->cqe_on = true;
 
 	if (cq_host->ops->enable)
@@ -324,9 +343,12 @@ static void __cqhci_disable(struct cqhci_host *cq_host)
 {
 	u32 cqcfg;
 
+<<<<<<< HEAD
 //	if (cqhci_host_is_crypto_supported(cq_host))
 //		cqhci_crypto_disable(cq_host);
 
+=======
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	cqcfg = cqhci_readl(cq_host, CQHCI_CFG);
 	cqcfg &= ~CQHCI_ENABLE;
 	cqhci_writel(cq_host, cqcfg, CQHCI_CFG);
@@ -374,7 +396,13 @@ static int cqhci_enable(struct mmc_host *mmc, struct mmc_card *card)
     if (cqhci_host_is_crypto_supported(cq_host))
         cqhci_crypto_enable(cq_host);
 
+	if (cqhci_host_is_crypto_supported(cq_host))
+		cqhci_crypto_enable(cq_host);
+
 	__cqhci_enable(cq_host);
+
+	if (cq_host->ops->enhanced_strobe_mask)
+		cq_host->ops->enhanced_strobe_mask(mmc, true);
 
 	cq_host->enabled = true;
 
@@ -433,7 +461,13 @@ static void cqhci_disable(struct mmc_host *mmc)
     if (cqhci_host_is_crypto_supported(cq_host))
         cqhci_crypto_disable(cq_host);
 
+	if (cqhci_host_is_crypto_supported(cq_host))
+		cqhci_crypto_disable(cq_host);
+
 	__cqhci_disable(cq_host);
+
+	if (cq_host->ops->enhanced_strobe_mask)
+		cq_host->ops->enhanced_strobe_mask(mmc, false);
 
 	dmam_free_coherent(mmc_dev(mmc), cq_host->data_size,
 			   cq_host->trans_desc_base,
@@ -1053,8 +1087,8 @@ static bool cqhci_clear_all_tasks(struct mmc_host *mmc, unsigned int timeout)
 	ret = cqhci_tasks_cleared(cq_host);
 
 	if (!ret)
-		pr_debug("%s: cqhci: Failed to clear tasks\n",
-			 mmc_hostname(mmc));
+		pr_warn("%s: cqhci: Failed to clear tasks\n",
+			mmc_hostname(mmc));
 
 	return ret;
 }
@@ -1089,7 +1123,15 @@ static bool cqhci_halt(struct mmc_host *mmc, unsigned int timeout)
 	ret = cqhci_halted(cq_host);
 
 	if (!ret)
+<<<<<<< HEAD
+<<<<<<< HEAD
 		pr_err("%s: cqhci: Failed to halt\n", mmc_hostname(mmc));
+=======
+		pr_warn("%s: cqhci: Failed to halt\n", mmc_hostname(mmc));
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+		pr_warn("%s: cqhci: Failed to halt\n", mmc_hostname(mmc));
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 	mmc_log_string(mmc, "halt done with ret %d\n", ret);
 	return ret;
@@ -1098,10 +1140,18 @@ static bool cqhci_halt(struct mmc_host *mmc, unsigned int timeout)
 /*
  * After halting we expect to be able to use the command line. We interpret the
  * failure to halt to mean the data lines might still be in use (and the upper
- * layers will need to send a STOP command), so we set the timeout based on a
- * generous command timeout.
+ * layers will need to send a STOP command), however failing to halt complicates
+ * the recovery, so set a timeout that would reasonably allow I/O to complete.
  */
+<<<<<<< HEAD
+<<<<<<< HEAD
 #define CQHCI_START_HALT_TIMEOUT	5000
+=======
+#define CQHCI_START_HALT_TIMEOUT	500
+>>>>>>> 4032897d243ab4fbe7b5eca36a3ecb496c752191
+=======
+#define CQHCI_START_HALT_TIMEOUT	5000
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 
 static void cqhci_recovery_start(struct mmc_host *mmc)
 {
@@ -1191,28 +1241,28 @@ static void cqhci_recovery_finish(struct mmc_host *mmc)
 
 	ok = cqhci_halt(mmc, CQHCI_FINISH_HALT_TIMEOUT);
 
-	if (!cqhci_clear_all_tasks(mmc, CQHCI_CLEAR_TIMEOUT))
-		ok = false;
-
 	/*
 	 * The specification contradicts itself, by saying that tasks cannot be
 	 * cleared if CQHCI does not halt, but if CQHCI does not halt, it should
 	 * be disabled/re-enabled, but not to disable before clearing tasks.
 	 * Have a go anyway.
 	 */
-	if (!ok) {
-		pr_debug("%s: cqhci: disable / re-enable\n", mmc_hostname(mmc));
-		cqcfg = cqhci_readl(cq_host, CQHCI_CFG);
-		cqcfg &= ~CQHCI_ENABLE;
-		cqhci_writel(cq_host, cqcfg, CQHCI_CFG);
-		cqcfg |= CQHCI_ENABLE;
-		cqhci_writel(cq_host, cqcfg, CQHCI_CFG);
-		/* Be sure that there are no tasks */
-		ok = cqhci_halt(mmc, CQHCI_FINISH_HALT_TIMEOUT);
-		if (!cqhci_clear_all_tasks(mmc, CQHCI_CLEAR_TIMEOUT))
-			ok = false;
-		WARN_ON(!ok);
-	}
+	if (!cqhci_clear_all_tasks(mmc, CQHCI_CLEAR_TIMEOUT))
+		ok = false;
+
+	/* Disable to make sure tasks really are cleared */
+	cqcfg = cqhci_readl(cq_host, CQHCI_CFG);
+	cqcfg &= ~CQHCI_ENABLE;
+	cqhci_writel(cq_host, cqcfg, CQHCI_CFG);
+
+	cqcfg = cqhci_readl(cq_host, CQHCI_CFG);
+	cqcfg |= CQHCI_ENABLE;
+	cqhci_writel(cq_host, cqcfg, CQHCI_CFG);
+
+	cqhci_halt(mmc, CQHCI_FINISH_HALT_TIMEOUT);
+
+	if (!ok)
+		cqhci_clear_all_tasks(mmc, CQHCI_CLEAR_TIMEOUT);
 
 	cqhci_recover_mrqs(cq_host);
 

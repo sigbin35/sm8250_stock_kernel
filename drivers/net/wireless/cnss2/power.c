@@ -4,6 +4,7 @@
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/of.h>
+#include <linux/of_gpio.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/regulator/consumer.h>
 #include <soc/qcom/cmd-db.h>
@@ -42,7 +43,12 @@ static struct cnss_clk_cfg cnss_clk_list[] = {
 #define BOOTSTRAP_GPIO			"qcom,enable-bootstrap-gpio"
 #define BOOTSTRAP_ACTIVE		"bootstrap_active"
 #define WLAN_EN_GPIO			"wlan-en-gpio"
+<<<<<<< HEAD
 #define BT_EN_GPIO				"qcom,bt-en-gpio"
+=======
+#define SW_CTRL_GPIO			"qcom,sw-ctrl-gpio"
+#define BT_EN_GPIO			"qcom,bt-en-gpio"
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 #define WLAN_EN_ACTIVE			"wlan_en_active"
 #define WLAN_EN_SLEEP			"wlan_en_sleep"
 
@@ -712,6 +718,19 @@ int cnss_get_pinctrl(struct cnss_plat_data *plat_priv)
 		pinctrl_info->bt_en_gpio = -EINVAL;
 	}
 
+<<<<<<< HEAD
+=======
+	if (of_find_property(dev->of_node, SW_CTRL_GPIO, NULL)) {
+		pinctrl_info->sw_ctrl_gpio = of_get_named_gpio(dev->of_node,
+							       SW_CTRL_GPIO,
+							       0);
+		cnss_pr_dbg("Switch control GPIO: %d\n",
+			    pinctrl_info->sw_ctrl_gpio);
+	} else {
+		pinctrl_info->sw_ctrl_gpio = -EINVAL;
+	}
+
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 	return 0;
 out:
 	return ret;
@@ -823,6 +842,26 @@ set_wlan_en:
 	return ret;
 }
 
+<<<<<<< HEAD
+=======
+int cnss_get_gpio_value(struct cnss_plat_data *plat_priv, int gpio_num)
+{
+	int ret = 0;
+
+	if (gpio_num < 0)
+		return -EINVAL;
+
+	ret = gpio_direction_input(gpio_num);
+	if (ret) {
+		cnss_pr_err("Failed to set direction of the GPIO(%d), err %d",
+			    gpio_num, ret);
+		return -EINVAL;
+	}
+
+	return  gpio_get_value(gpio_num);
+}
+
+>>>>>>> 11825792784e0c76e01b855279993839c6ac8843
 int cnss_power_on_device(struct cnss_plat_data *plat_priv)
 {
 	int ret = 0;
